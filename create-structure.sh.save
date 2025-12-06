@@ -1,0 +1,167 @@
+#!/bin/bash
+
+echo "🔍 Checking & creating missing folders/files..."
+
+# Function to create folders
+make_dir() {
+  if [ ! -d "$1" ]; then
+    mkdir -p "$1"
+    echo "📁 Created folder: $1"
+  fi
+}
+
+# Function to create files without overwriting
+make_file() {
+  if [ ! -f "$1" ]; then
+    touch "$1"
+    echo "📄 Created file: $1"
+  fi
+}
+
+# ------------------------------
+# FOLDER LIST
+# ------------------------------
+
+DIRS=(
+  "prisma/migrations"
+  "src/app/(auth)/login"
+  "src/app/(auth)/forgot-password"
+  "src/app/(student)/dashboard"
+  "src/app/(student)/profile/edit"
+  "src/app/(student)/profile/view"
+  "src/app/(student)/documents/upload"
+  "src/app/(student)/projects/create"
+  "src/app/(student)/projects/[id]/edit"
+  "src/app/(student)/projects/[id]/delete"
+  "src/app/(student)/groups"
+  "src/app/(student)/announcements"
+  "src/app/(class-rep)/dashboard"
+  "src/app/(class-rep)/students/[id]"
+  "src/app/(class-rep)/notifications"
+  "src/app/(super-admin)/dashboard"
+  "src/app/(super-admin)/students/bulk-upload"
+  "src/app/(super-admin)/students/[id]/edit"
+  "src.app/(super-admin)/students/export"
+  "src/app/(super-admin)/admins/create"
+  "src/app/(super-admin)/admins/[id]/edit"
+  "src/app/(super-admin)/class-reps/manage"
+  "src/app/(super-admin)/groups/[groupId]"
+  "src/app/(super-admin)/announcements/create"
+  "src/app/(super-admin)/leetcode/sync"
+  "src/app/(super-admin)/custom-fields/manage"
+  "src/app/(super-admin)/batch-management/graduate"
+  "src/app/(super-admin)/batch-management/handover"
+  "src/app/api"
+  "src/components/ui"
+  "src/components/auth"
+  "src/components/student"
+  "src/components/admin"
+  "src/components/class-rep"
+  "src/components/groups"
+  "src/components/leetcode"
+  "src/components/announcements"
+  "src/components/layout"
+  "src/components/shared"
+  "src/lib/auth"
+  "src/lib/db/queries"
+  "src/lib/db/seeds"
+  "src/lib/cloudinary"
+  "src/lib/openrouter"
+  "src/lib/leetcode"
+  "src/lib/socket/handlers"
+  "src/lib/redis"
+  "src/lib/validation/schemas"
+  "src/lib/middleware"
+  "src/lib/utils"
+  "src/lib/hooks"
+  "src/types"
+  "src/server/cron"
+  "public/icons"
+  "public/images"
+  "public/templates"
+  "capacitor/android/app"
+  "capacitor/ios/App"
+  "capacitor/resources"
+  "scripts"
+)
+
+# ------------------------------
+# FILE LIST
+# ------------------------------
+
+FILES=(
+  "prisma/schema.prisma"
+  "prisma/seed.ts"
+  "src/app/(auth)/login/page.tsx"
+  "src/app/(auth)/forgot-password/page.tsx"
+  "src/app/(auth)/layout.tsx"
+  "src/app/(student)/dashboard/page.tsx"
+  "src/app/(student)/profile/page.tsx"
+  "src/app/(student)/profile/edit/page.tsx"
+  "src/app/(student)/profile/view/page.tsx"
+  "src/app/(student)/documents/page.tsx"
+  "src/app/(student)/documents/upload/page.tsx"
+  "src/app/(student)/projects/page.tsx"
+  "src/app/(student)/projects/create/page.tsx"
+  "src/app/(student)/projects/[id]/edit/page.tsx"
+  "src/app/(student)/projects/[id]/delete/page.tsx"
+  "src/app/(student)/groups/page.tsx"
+  "src/app/(student)/announcements/page.tsx"
+  "src/app/(student)/layout.tsx"
+  "src/app/(class-rep)/dashboard/page.tsx"
+  "src/app/(class-rep)/students/page.tsx"
+  "src/app/(class-rep)/students/[id]/page.tsx"
+  "src/app/(class-rep)/notifications/page.tsx"
+  "src/app/(class-rep)/layout.tsx"
+  "src/app/(super-admin)/dashboard/page.tsx"
+  "src/app/(super-admin)/students/page.tsx"
+  "src/app/(super-admin)/students/bulk-upload/page.tsx"
+  "src/app/(super-admin)/students/[id]/page.tsx"
+  "src/app/(super-admin)/students/[id]/edit/page.tsx"
+  "src/app/(super-admin)/students/export/page.tsx"
+  "src/app/(super-admin)/admins/page.tsx"
+  "src/app/(super-admin)/admins/create/page.tsx"
+  "src/app/(super-admin)/admins/[id]/edit/page.tsx"
+  "src/app/(super-admin)/class-reps/page.tsx"
+  "src/app/(super-admin)/class-reps/manage/page.tsx"
+  "src/app/(super-admin)/groups/page.tsx"
+  "src/app/(super-admin)/groups/[groupId]/page.tsx"
+  "src/app/(super-admin)/announcements/page.tsx"
+  "src/app/(super-admin)/announcements/create/page.tsx"
+  "src/app/(super-admin)/leetcode/page.tsx"
+  "src/app/(super-admin)/leetcode/sync/page.tsx"
+  "src/app/(super-admin)/custom-fields/page.tsx"
+  "src/app/(super-admin)/custom-fields/manage/page.tsx"
+  "src/app/(super-admin)/batch-management/page.tsx"
+  "src/app/(super-admin)/batch-management/graduate/page.tsx"
+  "src/app/(super-admin)/batch-management/handover/page.tsx"
+  "src/app/(super-admin)/layout.tsx"
+  "public/templates/bulk-upload-template.xlsx"
+  ".env.local"
+  ".env.example"
+  ".gitignore"
+  "next.config.js"
+  "tailwind.config.ts"
+  "tsconfig.json"
+  "package.json"
+  "components.json"
+  "README.md"
+)
+
+# ------------------------------
+# Create directories
+# ------------------------------
+
+for dir in "${DIRS[@]}"; do
+  make_dir "$dir"
+done
+
+# ------------------------------
+# Create files
+# ------------------------------
+
+for file in "${FILES[@]}"; do
+  make_file "$file"
+done
+
+echo "✅ Done! All missing files and folders created."

@@ -1,0 +1,390 @@
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["fullTextSearch", "fullTextIndex"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL")
+}
+
+enum UserRole {
+  STUDENT
+  CLASS_REP
+  SUPER_ADMIN
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+model User {
+  id              String    @id @default(cuid())
+  registerNumber  String    @unique
+  email           String    @unique
+  password        String
+  role            UserRole  @default(STUDENT)
+  
+  // Batch info for temporal access control
+  batchStartYear  Int       // e.g., 2025
+  batchEndYear    Int       // e.g., 2027
+  classSection    String    // G1 or G2
+  academicYear    Int       // 1 or 2
+  
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  lastLoginAt     DateTime?
+  
+  // Relations
+  studentProfile  StudentProfile?
+  projects        Project[]
+  groupMembers    GroupMember[]
+  messages        Message[]
+  notifications   Notification[]
+  leetcodeProfile LeetCodeProfile?
+  documents       Document[]
+  
+  @@index([registerNumber])
+  @@index([email])
+  @@index([batchStartYear, batchEndYear])
+  @@map("users")
+}
+
+model StudentProfile {
+  id                      String    @id @default(cuid())
+  userId                  String    @unique
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Personal Info
+  fullName                String
+  dateOfBirth             DateTime
+  gender                  Gender
+  contactNumber           String
+  whatsappNumber          String?
+  personalEmail           String
+  
+  // Academic Info
+  ugDegree                String
+  ugCollege               String
+  ugPercentage            Float
+  schoolName              String
+  tenthPercentage         Float
+  twelfthPercentage       Float?
+  diplomaPercentage       Float?
+  
+  // Professional Info
+  technicalSkills         String[]  // Array of skills
+  certifications          String[]  // Array of certification names
+  areasOfInterest         String[]
+  
+  // Links
+  githubUrl               String?
+  leetcodeUrl             String?
+  linkedinUrl             String?
+  portfolioUrl            String?
+  otherCodingProfiles     Json?     // Flexible JSON for multiple platforms
+  
+  // Resume
+  resumeUrl               String?
+  resumePublicId          String?
+  
+  // Metadata
+  isProfileComplete       Boolean   @default(false)
+  profileCompletionScore  Int       @default(0)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  
+  @@index([userId])
+  @@map("student_profiles")
+}
+
+model Project {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  title           String
+  description     String    @db.Text
+  technologiesUsed String[]
+  projectUrl      String?
+  githubUrl       String?
+  thumbnailUrl    String?
+  thumbnailPublicId String?
+  startDate       DateTime?
+  endDate         DateTime?
+  isOngoing       Boolean   @default(false)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([userId])
+  @@map("projects")
+}
+
+model Document {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  fileName        String
+  fileUrl         String
+  filePublicId    String
+  fileType        String
+  fileSize        Int
+  documentType    String    // resume, certificate, etc.
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([userId])
+  @@map("documents")
+}
+
+model Group {
+  id              String        @id @default(cuid())
+  name            String
+  groupNumber     Int           @unique // 1-20
+  batchStartYear  Int
+  batchEndYear    Int
+  classSection    String        // G1 or G2
+  academicYear    Int
+  
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  members         GroupMember[]
+  messages        Message[]
+  
+  @@index([batchStartYear, batchEndYear])
+  @@map("groups")
+}
+
+model GroupMember {
+  id        String    @id @default(cuid())
+  groupId   String
+  group     Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  joinedAt  DateTime  @default(now())
+  
+  @@unique([groupId, userId])
+  @@index([groupId])
+  @@index([userId])
+  @@map("group_members")
+}
+
+model Message {
+  id              String    @id @default(cuid())
+  groupId         String
+  group           Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  content         String    @db.Text
+  isModerated     Boolean   @default(false)
+  moderationFlags Json?     // Store moderation results
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([groupId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("messages")
+}
+
+model Announcement {
+  id          String    @id @default(cuid())
+  title       String
+  content     String    @db.Text
+  authorId    String
+  
+  // Target audience
+  batchStartYear Int?
+  batchEndYear   Int?
+  classSection   String? // null means all sections
+  academicYear   Int?    // null means all years
+  
+  isPinned    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@index([batchStartYear, batchEndYear])
+  @@index([createdAt])
+  @@map("announcements")
+}
+
+model Notification {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  title       String
+  message     String    @db.Text
+  type        String    // info, warning, action_required
+  actionUrl   String?
+  
+  isRead      Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model LeetCodeProfile {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  leetcodeUsername String
+  totalSolved     Int       @default(0)
+  easySolved      Int       @default(0)
+  mediumSolved    Int       @default(0)
+  hardSolved      Int       @default(0)
+  ranking         Int?
+  reputation      Int       @default(0)
+  
+  profileData     Json?     // Store full LeetCode profile
+  lastSyncedAt    DateTime?
+  syncError       String?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([userId])
+  @@index([lastSyncedAt])
+  @@map("leetcode_profiles")
+}
+
+model CustomField {
+  id          String    @id @default(cuid())
+  fieldName   String    @unique
+  fieldType   String    // text, number, date, select, multiselect
+  fieldLabel  String
+  isRequired  Boolean   @default(false)
+  options     Json?     // For select/multiselect types
+  
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@map("custom_fields")
+}
+
+model CustomFieldValue {
+  id          String    @id @default(cuid())
+  userId      String
+  fieldId     String
+  value       String    @db.Text
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@unique([userId, fieldId])
+  @@index([userId])
+  @@index([fieldId])
+  @@map("custom_field_values")
+}
+
+model MotivationQuote {
+  id          String    @id @default(cuid())
+  quote       String    @db.Text
+  author      String?
+  date        DateTime  @unique @default(now())
+  
+  createdAt   DateTime  @default(now())
+  
+  @@index([date])
+  @@map("motivation_quotes")
+}
+
+// Rate Limiting & Security
+model RateLimit {
+  id          String    @id @default(cuid())
+  identifier  String    // IP or user ID
+  route       String
+  requests    Int       @default(1)
+  windowStart DateTime  @default(now())
+  
+  @@unique([identifier, route])
+  @@index([identifier])
+  @@index([windowStart])
+  @@map("rate_limits")
+}
+
+model AuditLog {
+  id          String    @id @default(cuid())
+  userId      String?
+  action      String    // CREATE, UPDATE, DELETE, LOGIN, etc.
+  entityType  String    // User, Student, Group, etc.
+  entityId    String?
+  ipAddress   String?
+  userAgent   String?
+  details     Json?
+  
+  createdAt   DateTime  @default(now())
+  
+  @@index([userId])
+  @@index([createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
+
+model Session {
+  id          String    @id @default(cuid())
+  userId      String
+  sessionToken String   @unique
+  deviceInfo  String?
+  ipAddress   String?
+  expiresAt   DateTime
+  
+  createdAt   DateTime  @default(now())
+  
+  @@index([userId])
+  @@index([sessionToken])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+// Batch Management
+model Batch {
+  id          String    @id @default(cuid())
+  startYear   Int
+  endYear     Int
+  isActive    Boolean   @default(true)
+  isArchived  Boolean   @default(false)
+  
+  // Handover tracking
+  handoverDate DateTime?
+  handoverBy   String?
+  handoverTo   String?
+  handoverNotes String?  @db.Text
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@unique([startYear, endYear])
+  @@index([isActive])
+  @@map("batches")
+}
+
+// System Configuration
+model SystemConfig {
+  id          String    @id @default(cuid())
+  key         String    @unique
+  value       String    @db.Text
+  description String?
+  
+  updatedAt   DateTime  @updatedAt
+  updatedBy   String?
+  
+  @@map("system_config")
+}
