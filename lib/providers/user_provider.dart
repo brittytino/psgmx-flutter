@@ -25,21 +25,43 @@ class UserProvider with ChangeNotifier {
   bool get isPlacementRep => _currentUser?.isPlacementRep ?? false;
 
   void _init() {
-    _authService.authStateChanges.listen((User? firebaseUser) async {
-      if (firebaseUser != null) {
-        try {
-          _currentUser = await _userRepo.ensureUserDocument(firebaseUser.uid, firebaseUser.email!);
-        } catch (e) {
-          print("Error fetching user: $e");
-          await _authService.signOut();
+    debugPrint('[UserProvider] Initializing...');
+    
+    // Set a timeout to ensure loading state clears
+    Future.delayed(const Duration(seconds: 3), () {
+      if (_isLoading) {
+        debugPrint('[UserProvider] Timeout fired - clearing loading state');
+        _isLoading = false;
+        notifyListeners();
+      }
+    });
+
+    // Listen to auth state changes
+    _authService.authStateChanges.listen(
+      (User? firebaseUser) async {
+        debugPrint('[UserProvider] Auth state changed: ${firebaseUser?.email}');
+        if (firebaseUser != null) {
+          try {
+            _currentUser = await _userRepo.ensureUserDocument(firebaseUser.uid, firebaseUser.email!);
+            debugPrint('[UserProvider] User loaded: ${_currentUser?.email}');
+          } catch (e) {
+            debugPrint('[UserProvider] Error fetching user: $e');
+            await _authService.signOut();
+            _currentUser = null;
+          }
+        } else {
+          debugPrint('[UserProvider] User signed out');
           _currentUser = null;
         }
-      } else {
-        _currentUser = null;
-      }
-      _isLoading = false;
-      notifyListeners();
-    });
+        _isLoading = false;
+        notifyListeners();
+      },
+      onError: (e) {
+        debugPrint('[UserProvider] Auth stream error: $e');
+        _isLoading = false;
+        notifyListeners();
+      },
+    );
   }
 
   Future<void> sendLoginLink(String email) async {

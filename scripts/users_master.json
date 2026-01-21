@@ -2,37 +2,1574 @@
   {
     "email": "25mx354@psgtech.ac.in",
     "regNo": "25MX354",
-    "name": "Release Engineer (You)",
-    "teamId": "TEAM_01",
+    "name": "Tino Britty J",
+    "teamId": "TEAM_10",
+    "batch": "G2",
     "roles": {
-      "isStudent": true,
-      "isTeamLeader": true,
-      "isCoordinator": true,
-      "isPlacementRep": true
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": true
+    }
+  },
+  {
+    "email": "25mx301@psgtech.ac.in",
+    "regNo": "25MX301",
+    "name": "Abishek S",
+    "teamId": "TEAM_01",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": true,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx308@psgtech.ac.in",
+    "regNo": "25MX308",
+    "name": "Dayananda J",
+    "teamId": "TEAM_02",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": true,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx314@psgtech.ac.in",
+    "regNo": "25MX314",
+    "name": "Hari Balaji",
+    "teamId": "TEAM_03",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": true,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx318@psgtech.ac.in",
+    "regNo": "25MX318",
+    "name": "Jeeva silviya J",
+    "teamId": "TEAM_04",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": true,
+      "coordinator": true,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx216@psgtech.ac.in",
+    "regNo": "25MX216",
+    "name": "Priyadharshini S",
+    "teamId": "TEAM_05",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": true,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx327@psgtech.ac.in",
+    "regNo": "25MX327",
+    "name": "Mithra N",
+    "teamId": "TEAM_06",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": true,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx336@psgtech.ac.in",
+    "regNo": "25MX336",
+    "name": "Nitheesh Muthu Krishnan C",
+    "teamId": "TEAM_07",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": true,
+      "coordinator": true,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx349@psgtech.ac.in",
+    "regNo": "25MX349",
+    "name": "Sowmiya",
+    "teamId": "TEAM_08",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": true,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx352@psgtech.ac.in",
+    "regNo": "25MX352",
+    "name": "Tamilini S",
+    "teamId": "TEAM_09",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": true,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx358@psgtech.ac.in",
+    "regNo": "25MX358",
+    "name": "Vikram Sethupathy S",
+    "teamId": "TEAM_10",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": true,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx360@psgtech.ac.in",
+    "regNo": "25MX360",
+    "name": "Yaswanth R T",
+    "teamId": "TEAM_11",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": true,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx125@psgtech.ac.in",
+    "regNo": "25MX125",
+    "name": "Stephina Smily C",
+    "teamId": "TEAM_12",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": true,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx104@psgtech.ac.in",
+    "regNo": "25MX104",
+    "name": "Deepikaa B S",
+    "teamId": "TEAM_13",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": true,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx114@psgtech.ac.in",
+    "regNo": "25MX114",
+    "name": "Kavin M",
+    "teamId": "TEAM_14",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": true,
+      "coordinator": true,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx204@psgtech.ac.in",
+    "regNo": "25MX204",
+    "name": "Chinnaya K",
+    "teamId": "TEAM_15",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": true,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx124@psgtech.ac.in",
+    "regNo": "25MX124",
+    "name": "Srinithi J",
+    "teamId": "TEAM_16",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": true,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx212@psgtech.ac.in",
+    "regNo": "25MX212",
+    "name": "Kartheesvaran S",
+    "teamId": "TEAM_17",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": true,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx127@psgtech.ac.in",
+    "regNo": "25MX127",
+    "name": "Swarna Rathna A",
+    "teamId": "TEAM_18",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": true,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx326@psgtech.ac.in",
+    "regNo": "25MX326",
+    "name": "Meyappan R",
+    "teamId": "TEAM_19",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": true,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx325@psgtech.ac.in",
+    "regNo": "25MX325",
+    "name": "Kirsaan F",
+    "teamId": "TEAM_20",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": true,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx105@psgtech.ac.in",
+    "regNo": "25MX105",
+    "name": "Divya R",
+    "teamId": "TEAM_21",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": true,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx201@psgtech.ac.in",
+    "regNo": "25MX201",
+    "name": "ANUVARSHINI",
+    "teamId": "TEAM_17",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": true,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx302@psgtech.ac.in",
+    "regNo": "25MX302",
+    "name": "G.DEEPIKA RAJA LAKSHAYA",
+    "teamId": "TEAM_01",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx303@psgtech.ac.in",
+    "regNo": "25MX303",
+    "name": "Sathish M",
+    "teamId": "TEAM_01",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx304@psgtech.ac.in",
+    "regNo": "25MX304",
+    "name": "Dinakaran T",
+    "teamId": "TEAM_02",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx305@psgtech.ac.in",
+    "regNo": "25MX305",
+    "name": "Surya L",
+    "teamId": "TEAM_02",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx306@psgtech.ac.in",
+    "regNo": "25MX306",
+    "name": "Lalil Chandran",
+    "teamId": "TEAM_03",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx307@psgtech.ac.in",
+    "regNo": "25MX307",
+    "name": "R.Sibitheran",
+    "teamId": "TEAM_03",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx309@psgtech.ac.in",
+    "regNo": "25MX309",
+    "name": "Harikapavan",
+    "teamId": "TEAM_04",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx310@psgtech.ac.in",
+    "regNo": "25MX310",
+    "name": "OWIYA S",
+    "teamId": "TEAM_04",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx311@psgtech.ac.in",
+    "regNo": "25MX311",
+    "name": "Balasubramaniam S",
+    "teamId": "TEAM_04",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx312@psgtech.ac.in",
+    "regNo": "25MX312",
+    "name": "Gopikaa J M",
+    "teamId": "TEAM_05",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx313@psgtech.ac.in",
+    "regNo": "25MX313",
+    "name": "Vishal Karthikeyan. P",
+    "teamId": "TEAM_05",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx315@psgtech.ac.in",
+    "regNo": "25MX315",
+    "name": "keerthanaa",
+    "teamId": "TEAM_05",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx316@psgtech.ac.in",
+    "regNo": "25MX316",
+    "name": "Miruna M V",
+    "teamId": "TEAM_06",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx317@psgtech.ac.in",
+    "regNo": "25MX317",
+    "name": "SUPREETH K R",
+    "teamId": "TEAM_06",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx319@psgtech.ac.in",
+    "regNo": "25MX319",
+    "name": "Jarpila Denst J",
+    "teamId": "TEAM_07",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx320@psgtech.ac.in",
+    "regNo": "25MX320",
+    "name": "Sweatha A M",
+    "teamId": "TEAM_07",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx321@psgtech.ac.in",
+    "regNo": "25MX321",
+    "name": "Aravindh Kannan M S",
+    "teamId": "TEAM_07",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx322@psgtech.ac.in",
+    "regNo": "25MX322",
+    "name": "ROHITHMAHESWARAN K",
+    "teamId": "TEAM_07",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx323@psgtech.ac.in",
+    "regNo": "25MX323",
+    "name": "GOPINATH R G",
+    "teamId": "TEAM_08",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx324@psgtech.ac.in",
+    "regNo": "25MX324",
+    "name": "Sri Vimika J",
+    "teamId": "TEAM_08",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx328@psgtech.ac.in",
+    "regNo": "25MX328",
+    "name": "Bhuvisha Sri Priya P",
+    "teamId": "TEAM_08",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx329@psgtech.ac.in",
+    "regNo": "25MX329",
+    "name": "Vignesh",
+    "teamId": "TEAM_08",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx330@psgtech.ac.in",
+    "regNo": "25MX330",
+    "name": "Divya Dharshini K",
+    "teamId": "TEAM_09",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx331@psgtech.ac.in",
+    "regNo": "25MX331",
+    "name": "Surya Krishna S",
+    "teamId": "TEAM_09",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx332@psgtech.ac.in",
+    "regNo": "25MX332",
+    "name": "Dinesh",
+    "teamId": "TEAM_09",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx333@psgtech.ac.in",
+    "regNo": "25MX333",
+    "name": "SRIVIKASHNI S",
+    "teamId": "TEAM_09",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx334@psgtech.ac.in",
+    "regNo": "25MX334",
+    "name": "MOHANKUMAR P",
+    "teamId": "TEAM_10",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx335@psgtech.ac.in",
+    "regNo": "25MX335",
+    "name": "Thirupathi B",
+    "teamId": "TEAM_10",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx337@psgtech.ac.in",
+    "regNo": "25MX337",
+    "name": "Jeshnie T",
+    "teamId": "TEAM_10",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx338@psgtech.ac.in",
+    "regNo": "25MX338",
+    "name": "Thirisha R",
+    "teamId": "TEAM_10",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx339@psgtech.ac.in",
+    "regNo": "25MX339",
+    "name": "Shree Nivedha",
+    "teamId": "TEAM_11",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx340@psgtech.ac.in",
+    "regNo": "25MX340",
+    "name": "RGA SAKTHIVEL MALLAIAH",
+    "teamId": "TEAM_11",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx341@psgtech.ac.in",
+    "regNo": "25MX341",
+    "name": "Puratchiyar R",
+    "teamId": "TEAM_11",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx342@psgtech.ac.in",
+    "regNo": "25MX342",
+    "name": "Sivapradeep M",
+    "teamId": "TEAM_11",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx343@psgtech.ac.in",
+    "regNo": "25MX343",
+    "name": "Mugundhan KP",
+    "teamId": "TEAM_12",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx344@psgtech.ac.in",
+    "regNo": "25MX344",
+    "name": "Deepa M",
+    "teamId": "TEAM_12",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx345@psgtech.ac.in",
+    "regNo": "25MX345",
+    "name": "Prabhakar O S",
+    "teamId": "TEAM_12",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx346@psgtech.ac.in",
+    "regNo": "25MX346",
+    "name": "Sanjana M",
+    "teamId": "TEAM_12",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx347@psgtech.ac.in",
+    "regNo": "25MX347",
+    "name": "Pon Akilesh",
+    "teamId": "TEAM_13",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx348@psgtech.ac.in",
+    "regNo": "25MX348",
+    "name": "Dhakshanamoorthy S",
+    "teamId": "TEAM_13",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx350@psgtech.ac.in",
+    "regNo": "25MX350",
+    "name": "Mohana Priya. M",
+    "teamId": "TEAM_13",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx351@psgtech.ac.in",
+    "regNo": "25MX351",
+    "name": "Narayanasamy",
+    "teamId": "TEAM_13",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx353@psgtech.ac.in",
+    "regNo": "25MX353",
+    "name": "Nagakeerthanaa N",
+    "teamId": "TEAM_14",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx355@psgtech.ac.in",
+    "regNo": "25MX355",
+    "name": "Jessica A",
+    "teamId": "TEAM_14",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx356@psgtech.ac.in",
+    "regNo": "25MX356",
+    "name": "Monish P",
+    "teamId": "TEAM_14",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx357@psgtech.ac.in",
+    "regNo": "25MX357",
+    "name": "Tharun S",
+    "teamId": "TEAM_14",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx359@psgtech.ac.in",
+    "regNo": "25MX359",
+    "name": "Vijaya Sree K",
+    "teamId": "TEAM_15",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx361@psgtech.ac.in",
+    "regNo": "25MX361",
+    "name": "Karthick K",
+    "teamId": "TEAM_15",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx362@psgtech.ac.in",
+    "regNo": "25MX362",
+    "name": "Dinesh",
+    "teamId": "TEAM_15",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx363@psgtech.ac.in",
+    "regNo": "25MX363",
+    "name": "Krishna Priya m s",
+    "teamId": "TEAM_15",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx364@psgtech.ac.in",
+    "regNo": "25MX364",
+    "name": "Jackson Solomon Raj M",
+    "teamId": "TEAM_16",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx365@psgtech.ac.in",
+    "regNo": "25MX365",
+    "name": "Janani T G",
+    "teamId": "TEAM_16",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx366@psgtech.ac.in",
+    "regNo": "25MX366",
+    "name": "Poorani R",
+    "teamId": "TEAM_16",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx367@psgtech.ac.in",
+    "regNo": "25MX367",
+    "name": "Sriram",
+    "teamId": "TEAM_16",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx368@psgtech.ac.in",
+    "regNo": "25MX368",
+    "name": "Preethi S",
+    "teamId": "TEAM_17",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx369@psgtech.ac.in",
+    "regNo": "25MX369",
+    "name": "Satya Pramodh R",
+    "teamId": "TEAM_17",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx370@psgtech.ac.in",
+    "regNo": "25MX370",
+    "name": "BarathiVikraman SK",
+    "teamId": "TEAM_17",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx371@psgtech.ac.in",
+    "regNo": "25MX371",
+    "name": "Siddarth M R",
+    "teamId": "TEAM_17",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx372@psgtech.ac.in",
+    "regNo": "25MX372",
+    "name": "S D S Thamizhthilaga",
+    "teamId": "TEAM_18",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx373@psgtech.ac.in",
+    "regNo": "25MX373",
+    "name": "Kasibya M",
+    "teamId": "TEAM_18",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx374@psgtech.ac.in",
+    "regNo": "25MX374",
+    "name": "Tino Britty J",
+    "teamId": "TEAM_18",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx375@psgtech.ac.in",
+    "regNo": "25MX375",
+    "name": "Joshna k",
+    "teamId": "TEAM_18",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx376@psgtech.ac.in",
+    "regNo": "25MX376",
+    "name": "H Kansal ur rahman",
+    "teamId": "TEAM_19",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx377@psgtech.ac.in",
+    "regNo": "25MX377",
+    "name": "Darunya Sri",
+    "teamId": "TEAM_19",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx378@psgtech.ac.in",
+    "regNo": "25MX378",
+    "name": "Nithyashree C",
+    "teamId": "TEAM_19",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx379@psgtech.ac.in",
+    "regNo": "25MX379",
+    "name": "Arjun Vishwas B",
+    "teamId": "TEAM_19",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx380@psgtech.ac.in",
+    "regNo": "25MX380",
+    "name": "Balaji K",
+    "teamId": "TEAM_20",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx381@psgtech.ac.in",
+    "regNo": "25MX381",
+    "name": "HARIKESAN D J",
+    "teamId": "TEAM_20",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx382@psgtech.ac.in",
+    "regNo": "25MX382",
+    "name": "Vishnavri S",
+    "teamId": "TEAM_20",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx383@psgtech.ac.in",
+    "regNo": "25MX383",
+    "name": "Sabarish P",
+    "teamId": "TEAM_20",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx384@psgtech.ac.in",
+    "regNo": "25MX384",
+    "name": "Shaarakesh K.R",
+    "teamId": "TEAM_21",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx385@psgtech.ac.in",
+    "regNo": "25MX385",
+    "name": "Nauveet pranav T",
+    "teamId": "TEAM_21",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx386@psgtech.ac.in",
+    "regNo": "25MX386",
+    "name": "Kevin Johnson A A",
+    "teamId": "TEAM_21",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx387@psgtech.ac.in",
+    "regNo": "25MX387",
+    "name": "Kaavya R",
+    "teamId": "TEAM_21",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx100@psgtech.ac.in",
+    "regNo": "25MX100",
+    "name": "S.S SOBAN",
+    "teamId": "TEAM_01",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
     }
   },
   {
     "email": "25mx101@psgtech.ac.in",
     "regNo": "25MX101",
-    "name": "Member One",
-    "teamId": "TEAM_01",
+    "name": "Vishnuvardani K S",
+    "teamId": "TEAM_02",
+    "batch": "G2",
     "roles": {
-      "isStudent": true,
-      "isTeamLeader": false,
-      "isCoordinator": false,
-      "isPlacementRep": false
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
     }
   },
   {
     "email": "25mx102@psgtech.ac.in",
     "regNo": "25MX102",
-    "name": "Leader Team 2",
+    "name": "Indhu Balaji",
     "teamId": "TEAM_02",
+    "batch": "G2",
     "roles": {
-      "isStudent": true,
-      "isTeamLeader": true,
-      "isCoordinator": false,
-      "isPlacementRep": false
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx103@psgtech.ac.in",
+    "regNo": "25MX103",
+    "name": "Sudherson V",
+    "teamId": "TEAM_03",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx106@psgtech.ac.in",
+    "regNo": "25MX106",
+    "name": "Nandhilhasan",
+    "teamId": "TEAM_03",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx107@psgtech.ac.in",
+    "regNo": "25MX107",
+    "name": "Sadhu Dharsan K M",
+    "teamId": "TEAM_04",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx108@psgtech.ac.in",
+    "regNo": "25MX108",
+    "name": "Vishaly S",
+    "teamId": "TEAM_04",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx109@psgtech.ac.in",
+    "regNo": "25MX109",
+    "name": "SHANMUGA PRIYA S",
+    "teamId": "TEAM_05",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx110@psgtech.ac.in",
+    "regNo": "25MX110",
+    "name": "Shri sanjay M",
+    "teamId": "TEAM_05",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx111@psgtech.ac.in",
+    "regNo": "25MX111",
+    "name": "Chillesh",
+    "teamId": "TEAM_06",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx112@psgtech.ac.in",
+    "regNo": "25MX112",
+    "name": "Suriya C S",
+    "teamId": "TEAM_06",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx115@psgtech.ac.in",
+    "regNo": "25MX115",
+    "name": "Devibala N",
+    "teamId": "TEAM_07",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx116@psgtech.ac.in",
+    "regNo": "25MX116",
+    "name": "Naga Sruthi M",
+    "teamId": "TEAM_08",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx117@psgtech.ac.in",
+    "regNo": "25MX117",
+    "name": "Reena Carolin S",
+    "teamId": "TEAM_09",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx118@psgtech.ac.in",
+    "regNo": "25MX118",
+    "name": "Dheephin R R",
+    "teamId": "TEAM_10",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx119@psgtech.ac.in",
+    "regNo": "25MX119",
+    "name": "Divyalaar",
+    "teamId": "TEAM_11",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx120@psgtech.ac.in",
+    "regNo": "25MX120",
+    "name": "SARAVANAVEL P",
+    "teamId": "TEAM_14",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx121@psgtech.ac.in",
+    "regNo": "25MX121",
+    "name": "Shairajya V S",
+    "teamId": "TEAM_15",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx122@psgtech.ac.in",
+    "regNo": "25MX122",
+    "name": "Saran k",
+    "teamId": "TEAM_16",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx123@psgtech.ac.in",
+    "regNo": "25MX123",
+    "name": "Badhmarayanan S K",
+    "teamId": "TEAM_06",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx126@psgtech.ac.in",
+    "regNo": "25MX126",
+    "name": "Gayathri",
+    "teamId": "TEAM_03",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx128@psgtech.ac.in",
+    "regNo": "25MX128",
+    "name": "Muthu Sailappan",
+    "teamId": "TEAM_01",
+    "batch": "G2",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx129@psgtech.ac.in",
+    "regNo": "25MX129",
+    "name": "Vaishnavi",
+    "teamId": "TEAM_01",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
+    }
+  },
+  {
+    "email": "25mx130@psgtech.ac.in",
+    "regNo": "25MX130",
+    "name": "MOWLIDHARAN",
+    "teamId": "TEAM_02",
+    "batch": "G1",
+    "roles": {
+      "student": true,
+      "team_leader": false,
+      "coordinator": false,
+      "placement_rep": false
     }
   }
 ]

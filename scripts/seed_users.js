@@ -38,7 +38,7 @@ async function seed() {
   const users = JSON.parse(fs.readFileSync(DATA_FILE_PATH, 'utf8'));
   console.log(`Found ${users.length} users to seed.`);
 
-  // 4. Write to Whitelist
+  // 4. Write to Users Collection (not whitelist, since we have no auth triggers)
   const batch = db.batch();
   let count = 0;
 
@@ -48,15 +48,25 @@ async function seed() {
       continue;
     }
 
-    const ref = db.collection('whitelist').doc(user.email);
-    batch.set(ref, user);
+    // Write to 'users' collection with email as document ID
+    // Since we can't use Firebase Auth triggers on free tier
+    const ref = db.collection('users').doc(user.email.replace('@psgtech.ac.in', ''));
+    batch.set(ref, {
+      email: user.email,
+      name: user.name,
+      regNo: user.regNo,
+      teamId: user.teamId,
+      batch: user.batch,
+      roles: user.roles,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
     count++;
   }
 
   try {
     await batch.commit();
-    console.log(`${GREEN}SUCCESS: Seeded ${count} users into 'whitelist' collection.${RESET}`);
-    console.log("Next Step: When these users sign in, Cloud Functions will create their profiles.");
+    console.log(`${GREEN}SUCCESS: Seeded ${count} users into 'users' collection.${RESET}`);
+    console.log("Users can now login using Email Link authentication.");
   } catch (e) {
     console.error(`${RED}FAILED to commit batch:${RESET}`, e);
   }

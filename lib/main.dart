@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
-// import 'firebase_options.dart'; // User needs to generate this
+import 'firebase_options.dart';
 import 'core/app_router.dart';
 import 'providers/user_provider.dart';
 import 'services/auth_service.dart';
@@ -12,14 +12,9 @@ import 'core/theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  // Using a try-catch for demo purposes so it doesn't crash without config
-  try {
-     await Firebase.initializeApp(); 
-  } catch (e) {
-    print("Firebase not initialized (expected if no config): $e");
-  }
-
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const PsgMxApp());
 }
 

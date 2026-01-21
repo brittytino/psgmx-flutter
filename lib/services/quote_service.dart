@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -36,7 +37,7 @@ class QuoteService {
         return {'text': content, 'author': author};
       }
     } catch (e) {
-      print('Quote fetch error: $e');
+      debugPrint('Quote fetch error: $e');
     }
 
     return {'text': 'Consistency is key.', 'author': 'Unknown'};

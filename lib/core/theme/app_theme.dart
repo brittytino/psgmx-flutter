@@ -34,10 +34,10 @@ class AppTheme {
       textTheme: AppTypography.getTextTheme(colorScheme.brightness == Brightness.dark),
       
       // Component Themes
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
-        color: colorScheme.surfaceContainerHighest.withOpacity(0.3), // M3 Surface
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3), // M3 Surface
         margin: EdgeInsets.zero,
       ),
       
@@ -51,7 +51,7 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadius.sm)),
         filled: true,
-        fillColor: colorScheme.surfaceContainerHighest.withOpacity(0.5),
+        fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         contentPadding: const EdgeInsets.all(AppSpacing.md),
         isDense: true,
       ),
@@ -65,7 +65,7 @@ class AppTheme {
       dividerTheme: DividerThemeData(
         space: AppSpacing.lg,
         thickness: 1,
-        color: colorScheme.outlineVariant.withOpacity(0.5),
+        color: colorScheme.outlineVariant.withValues(alpha: 0.5),
       ),
     );
   }

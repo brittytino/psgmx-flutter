@@ -76,20 +76,6 @@ class FirestoreService {
         // Or we just write data provided.
       });
     });
-
-    // Batch write specifically for records (since transaction limit is 500 operations, fine for 10-15 students)
-    final batch = _db.batch();
-    for (var entry in studentStatus.entries) {
-      final uid = entry.key;
-      final isPresent = entry.value;
-      // We need regNo. Let's assume the UI provides it or we fetch it? 
-      // For clean architecture, passed data should be sufficient.
-      // Let's rely on stored user profile data in the UI context to pass it, or just store by UID and join later.
-      // Schema says "attendance_records" has regNo.
-      
-      // Let's assume we do another lookup or the map includes regNo.
-      // Changing signature to List<AttendanceRecord> would be cleaner.
-    }
   }
   
   // Revised Submit Method
