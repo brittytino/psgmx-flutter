@@ -1,0 +1,69 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.svn/
+
+# IntelliJ
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# Visual Studio Code
+.vscode/
+
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+
+# Android
+.gradle/
+android/.gradle/
+android/app/build/
+android/app/.cxx/
+android/app/release/
+android/local.properties
+android/key.properties
+android/*.jks
+android/*.keystore
+
+
+# iOS
+ios/Runner/GoogleService-Info.plist
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+ios/Flutter/Generated.xcconfig
+ios/Flutter/app.flx
+ios/Flutter/app.zip
+ios/Flutter/flutter_assets/
+ios/ServiceDefinitions.json
+ios/Runner/GeneratedPluginRegistrant.*
+
+# Firebase
+firebase-debug.log
+firestore-debug.log
+functions/node_modules/
+functions/.firebase/
+functions/firebase-debug.log
+functions/firebase-debug.log.*
+lib/firebase_options.dart
+
+# Scripts & Secrets
+scripts/node_modules/
+scripts/service-account.json
+# Block all instances of these across the repo
+**/google-services.json
+**/GoogleService-Info.plist
+**/service-account.json
+
