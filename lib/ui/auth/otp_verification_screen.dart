@@ -1,23 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-/// DEPRECATED: EmailSentScreen
+/// DEPRECATED: OtpVerificationScreen
 /// 
 /// This screen is deprecated - replaced by password-based auth flow
-/// Old magic link flow is no longer used
-class EmailSentScreen extends StatefulWidget {
+/// Old OTP magic link verification is no longer used
+class OtpVerificationScreen extends StatefulWidget {
   final String email;
-  const EmailSentScreen({super.key, required this.email});
+  const OtpVerificationScreen({super.key, required this.email});
 
   @override
-  State<EmailSentScreen> createState() => _EmailSentScreenState();
+  State<OtpVerificationScreen> createState() => _OtpVerificationScreenState();
 }
 
-class _EmailSentScreenState extends State<EmailSentScreen> {
+class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Email Sent')),
+      appBar: AppBar(title: const Text('Verify OTP')),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

@@ -1,17 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../providers/user_provider.dart';
-import '../services/auth_service.dart';
 import '../ui/auth/login_screen.dart';
-import '../ui/auth/email_sent_screen.dart';
+import '../ui/auth/set_password_screen.dart';
+import '../ui/auth/verify_otp_screen.dart';
+import '../ui/auth/forgot_password_screen.dart';
 import '../ui/student/dashboard_screen.dart';
 import '../ui/splash_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
-bool _emailLinkProcessed = false;
 
+/// App Router: Navigation configuration with authentication guards
+///
+/// SECURE AUTH FLOW:
+/// 1. User starts at /set_password (email verification)
+/// 2. Requests OTP → OTP sent to email
+/// 3. Redirects to /verify_otp (with email as extra parameter)
+/// 4. User enters OTP and creates password
+/// 5. Account created and auto-logged in
+/// 6. Redirects to /dashboard
+///
+/// Routes:
+/// - / (root): Dashboard (authenticated only)
+/// - /login: Sign in screen (existing users)
+/// - /set_password: Email verification & OTP request (new users)
+/// - /verify_otp: OTP entry & password creation (new users after OTP sent)
+/// - /forgot_password: Password reset request
+/// - /splash: Loading screen during auth check
+///
+/// Redirect Logic:
+/// - If not authenticated → /login
+/// - If authenticated → /
+/// - If initializing → /splash
 final GoRouter appRouter = GoRouter(
   navigatorKey: _rootNavigatorKey,
   initialLocation: '/',
@@ -24,12 +45,23 @@ final GoRouter appRouter = GoRouter(
       path: '/login',
       builder: (context, state) => const LoginScreen(),
     ),
-     GoRoute(
-      path: '/email_sent',
+    GoRoute(
+      path: '/set_password',
+      builder: (context, state) => const SetPasswordScreen(),
+    ),
+    GoRoute(
+      path: '/verify_otp',
       builder: (context, state) {
-        final email = state.extra as String? ?? '';
-        return EmailSentScreen(email: email);
+        final email = state.extra as String?;
+        if (email == null) {
+          return const SetPasswordScreen(); // Fallback if no email
+        }
+        return VerifyOtpScreen(email: email);
       },
+    ),
+    GoRoute(
+      path: '/forgot_password',
+      builder: (context, state) => const ForgotPasswordScreen(),
     ),
     GoRoute(
       path: '/',
@@ -38,92 +70,61 @@ final GoRouter appRouter = GoRouter(
   ],
   redirect: (context, state) async {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
-    final authService = Provider.of<AuthService>(context, listen: false);
-    
-    final fullUrl = state.uri.toString();
-    debugPrint('[Router] Redirect check - URI: $fullUrl');
-    debugPrint('[Router] Query params: ${state.uri.queryParameters}');
-    
+    final currentPath = state.uri.toString();
+
+    debugPrint(
+        '[Router] Redirect check - Current path: $currentPath, InitComplete: ${userProvider.initComplete}, HasUser: ${userProvider.currentUser != null}');
+
     // 1. Still initializing - show splash screen
     if (!userProvider.initComplete) {
-      debugPrint('[Router] Not initialized yet, showing splash');
-      if (state.uri.toString() != '/splash') {
+      debugPrint('[Router] Still initializing, showing splash');
+      // Only redirect to splash if not already there
+      if (currentPath != '/splash') {
         return '/splash';
       }
       return null;
     }
 
-    // 2. Check if this is a deep link with email sign-in (oobCode present)
-    // AND hasn't been processed yet (prevent multiple attempts)
-    if (state.uri.queryParameters.containsKey('oobCode') && !_emailLinkProcessed) {
-      _emailLinkProcessed = true;
-      debugPrint('[Router] ============================================');
-      debugPrint('[Router] DEEP LINK WITH EMAIL SIGN-IN DETECTED');
-      debugPrint('[Router] ============================================');
-      
-      final email = state.uri.queryParameters['email'];
-      final oobCode = state.uri.queryParameters['oobCode'];
-      
-      debugPrint('[Router] Email: $email');
-      debugPrint('[Router] oobCode: $oobCode');
-      debugPrint('[Router] Full URL: $fullUrl');
-      
-      if (email != null && oobCode != null) {
-        try {
-          debugPrint('[Router] Verifying email link validity...');
-          
-          if (FirebaseAuth.instance.isSignInWithEmailLink(fullUrl)) {
-            debugPrint('[Router] ✓ Valid email link verified by Firebase');
-            debugPrint('[Router] Attempting to sign in...');
-            
-            try {
-              final credential = await authService.signInWithEmailLink(email, fullUrl);
-              debugPrint('[Router] ✓✓✓ SIGN IN SUCCESS! User: ${credential.user?.email}');
-              
-              // Reset the flag to allow processing again next time
-              _emailLinkProcessed = false;
-              
-              // Let normal auth state changes take over
-              return null;
-            } catch (signInError) {
-              debugPrint('[Router] ✗ Sign-in failed: $signInError');
-              _emailLinkProcessed = false;
-              return '/login';
-            }
-          } else {
-            debugPrint('[Router] ✗ Invalid email link - Firebase verification failed');
-            debugPrint('[Router] This might mean:');
-            debugPrint('[Router]   - URL format is incorrect');
-            debugPrint('[Router]   - oobCode has expired');
-            debugPrint('[Router]   - URL is not from Firebase Auth');
-            _emailLinkProcessed = false;
-          }
-        } catch (e) {
-          debugPrint('[Router] ✗ Exception processing email link: $e');
-          _emailLinkProcessed = false;
-        }
-      } else {
-        debugPrint('[Router] ✗ Missing email or oobCode');
-        debugPrint('[Router] Email: $email, oobCode: $oobCode');
-        _emailLinkProcessed = false;
+    // 2. After initialization is complete, route based on auth state
+    final isAuthenticated = userProvider.currentUser != null;
+
+    // Define auth screens (unauthenticated-only routes)
+    final authPaths = {
+      '/login',
+      '/set_password',
+      '/verify_otp',
+      '/forgot_password'
+    };
+
+    debugPrint(
+        '[Router] Initialized. Authenticated: $isAuthenticated, Current path: $currentPath');
+
+    // If user is authenticated
+    if (isAuthenticated) {
+      // On splash or auth screen while authenticated - redirect to dashboard
+      if (currentPath == '/splash' || authPaths.contains(currentPath)) {
+        debugPrint(
+            '[Router] User authenticated but on splash/auth screen, redirecting to /');
+        return '/';
       }
-    }
 
-    // 3. Auth State (normal flow)
-    final loggedIn = userProvider.currentUser != null;
-    final loggingIn = state.uri.toString() == '/login';
-    final emailSent = state.uri.toString() == '/email_sent';
+      // On dashboard or protected route - allow it
+      debugPrint('[Router] User authenticated, on correct path: $currentPath');
+      return null;
+    } else {
+      // User is not authenticated
+      // On splash, dashboard or other protected route - redirect to login
+      if (currentPath == '/splash' ||
+          (currentPath == '/' ||
+              (currentPath != '/' && !authPaths.contains(currentPath)))) {
+        debugPrint('[Router] User not authenticated, redirecting to /login');
+        return '/login';
+      }
 
-    if (!loggedIn && !loggingIn && !emailSent) {
-      debugPrint('[Router] Redirecting to login - user not authenticated');
-      return '/login';
+      // On auth screen - allow it
+      debugPrint(
+          '[Router] User not authenticated, on auth screen $currentPath, allowing');
+      return null;
     }
-    
-    if (loggedIn && (loggingIn || emailSent)) {
-      debugPrint('[Router] Redirecting to dashboard - user authenticated');
-      return '/';
-    }
-
-    return null;
   },
 );

@@ -26,7 +26,7 @@ class _TeamAttendanceTabState extends State<TeamAttendanceTab> {
 
   Future<void> _loadData() async {
     final user = Provider.of<UserProvider>(context, listen: false).currentUser;
-    final firestore = Provider.of<FirestoreService>(context, listen: false);
+    final firestore = Provider.of<SupabaseDbService>(context, listen: false);
     
     if (user?.teamId == null) {
       if (mounted) setState(() => _isLoading = false);
@@ -66,7 +66,7 @@ class _TeamAttendanceTabState extends State<TeamAttendanceTab> {
 
   Future<void> _submit() async {
     final user = Provider.of<UserProvider>(context, listen: false).currentUser;
-    final firestore = Provider.of<FirestoreService>(context, listen: false);
+    final firestore = Provider.of<SupabaseDbService>(context, listen: false);
     final today = DateTime.now().toIso8601String().split('T')[0];
 
     try {

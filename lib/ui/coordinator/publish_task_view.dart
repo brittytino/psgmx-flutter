@@ -34,7 +34,7 @@ class _PublishTaskViewState extends State<PublishTaskView> {
     );
 
     try {
-      await Provider.of<FirestoreService>(context, listen: false).publishDailyTask(task);
+      await Provider.of<SupabaseDbService>(context, listen: false).publishDailyTask(task);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Task Published!')));
         // Clear form

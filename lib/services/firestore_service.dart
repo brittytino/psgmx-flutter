@@ -1,161 +1,152 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/app_user.dart';
 import '../models/task_attendance.dart';
+import 'supabase_service.dart';
 
-class FirestoreService {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
+class SupabaseDbService {
+  final SupabaseService _supabaseService;
+
+  SupabaseDbService(this._supabaseService);
 
   // --- Task Methods ---
   Stream<DailyTask?> getDailyTask(String date) {
-    return _db.collection('daily_tasks').doc(date).snapshots().map((doc) {
-      if (!doc.exists) return null;
-      return DailyTask.fromMap(doc.data()!, doc.id);
-    });
+    return _supabaseService
+        .from('daily_tasks')
+        .stream(primaryKey: ['id'])
+        .eq('date', date)
+        .map((data) {
+          if (data.isEmpty) return null;
+          return DailyTask.fromMap(data.first, data.first['date']);
+        });
   }
 
   Future<void> publishDailyTask(DailyTask task) async {
-    await _db.collection('daily_tasks').doc(task.date).set({
-      'leetcodeUrl': task.leetcodeUrl,
-      'csTopic': task.csTopic,
-      'csTopicDescription': task.csTopicDescription,
-      'motivationQuote': task.motivationQuote,
+    final currentUser = _supabaseService.currentUser;
+    if (currentUser == null) {
+      throw Exception('User not authenticated');
+    }
+
+    await _supabaseService.from('daily_tasks').upsert({
+      'date': task.date,
+      'leetcode_url': task.leetcodeUrl,
+      'cs_topic': task.csTopic,
+      'cs_topic_description': task.csTopicDescription,
+      'motivation_quote': task.motivationQuote,
+      'created_by': currentUser.id,
     });
   }
 
   // --- Student Methods ---
   Future<List<AppUser>> getTeamMembers(String teamId) async {
-    final snapshot = await _db.collection('users')
-        .where('teamId', isEqualTo: teamId)
-        .where('roles.isStudent', isEqualTo: true)
-        .get();
-    
-    return snapshot.docs.map((d) => AppUser.fromMap(d.id, d.data())).toList();
+    final response = await _supabaseService
+        .from('users')
+        .select()
+        .eq('team_id', teamId)
+        .eq('roles->>isStudent', true);
+
+    return response
+        .map<AppUser>((data) => AppUser.fromMap(data['id'], data))
+        .toList();
   }
 
   // --- Attendance Methods ---
   Future<bool> isAttendanceSubmitted(String teamId, String date) async {
-    final doc = await _db.collection('attendance_submissions').doc('${date}_$teamId').get();
-    return doc.exists;
+    final response = await _supabaseService
+        .from('attendance_submissions')
+        .select('id')
+        .eq('date', date)
+        .eq('team_id', teamId)
+        .maybeSingle();
+
+    return response != null;
   }
 
-  Future<void> submitAttendance({
-    required String teamId,
-    required String date,
-    required String leaderUid,
-    required Map<String, bool> studentStatus, // uid -> isPresent
-  }) async {
-    // 1. Transaction to Ensure Atomic Submission and Non-Duplication
-    await _db.runTransaction((transaction) async {
-      final submissionRef = _db.collection('attendance_submissions').doc('${date}_$teamId');
-      final submissionDoc = await transaction.get(submissionRef);
-
-      if (submissionDoc.exists) {
-        throw Exception("Attendance already submitted for today.");
-      }
-
-      // 2. Create Submission Record
-      transaction.set(submissionRef, {
+  Future<void> submitTeamAttendance(
+    String teamId,
+    String date,
+    String leaderUid,
+    List<AttendanceRecord> records,
+  ) async {
+    try {
+      // 1. Insert submission record
+      await _supabaseService.from('attendance_submissions').insert({
         'date': date,
-        'teamId': teamId,
-        'submittedBy': leaderUid,
-        'submittedAt': FieldValue.serverTimestamp(),
-        'isLocked': false, // Will be locked by Cloud Function at 8 PM
+        'team_id': teamId,
+        'submitted_by': leaderUid,
       });
 
-      // 3. Create Individual Records
-      studentStatus.forEach((uid, isPresent) {
-        // Need regNo to be stored, but we only have map of UID -> Bool here.
-        // Ideally we pass full user objects or fetch them.
-        // Optimisation: We assume the UI passed valid UIDs.
-        // We need the key to be unique daily per student.
-        // But to save writes, maybe we only write PRESENT? 
-        // No, writing both is safer for explicit history.
-        
-        // Wait, for this demo, let's just write to attendance_records.
-        // We'll need another read in cloud function if we want to fill usage details.
-        // Or we just write data provided.
-      });
-    });
-  }
-  
-  // Revised Submit Method
-  Future<void> submitTeamAttendance(String teamId, String date, String leaderUid, List<AttendanceRecord> records) async {
-     return _db.runTransaction((transaction) async {
-      final submissionRef = _db.collection('attendance_submissions').doc('${date}_$teamId');
-      final submissionDoc = await transaction.get(submissionRef);
-
-      if (submissionDoc.exists) {
-        throw Exception("Attendance already submitted for today.");
-      }
-
-      transaction.set(submissionRef, {
+      // 2. Insert individual attendance records
+      final attendanceData = records.map((record) => {
         'date': date,
-        'teamId': teamId,
-        'submittedBy': leaderUid,
-        'submittedAt': FieldValue.serverTimestamp(),
-        'isLocked': false,
-      });
+        'student_uid': record.studentUid,
+        'reg_no': record.regNo,
+        'team_id': teamId,
+        'status': record.isPresent ? 'PRESENT' : 'ABSENT',
+        'marked_by': leaderUid,
+      }).toList();
 
-      for (var record in records) {
-        final ref = _db.collection('attendance_records').doc('${date}_${record.regNo}');
-        transaction.set(ref, {
-          'date': date,
-          'studentUid': record.studentUid,
-          'regNo': record.regNo,
-          'teamId': teamId,
-          'status': record.isPresent ? 'PRESENT' : 'ABSENT',
-          'markedBy': leaderUid,
-          'timestamp': FieldValue.serverTimestamp(),
-        });
-      }
-    });
+      await _supabaseService.from('attendance_records').insert(attendanceData);
+    } catch (e) {
+      throw Exception('Failed to submit attendance: $e');
+    }
   }
 
   // --- Student View ---
   Stream<List<AttendanceRecord>> getStudentAttendance(String uid) {
-    return _db.collection('attendance_records')
-        .where('studentUid', isEqualTo: uid)
-        .orderBy('date', descending: true)
-        .snapshots()
-        .map((qs) => qs.docs.map((d) => AttendanceRecord.fromMap(d.data(), d.id)).toList());
+    return _supabaseService
+        .from('attendance_records')
+        .stream(primaryKey: ['id'])
+        .eq('student_uid', uid)
+        .order('date', ascending: false)
+        .map((data) => data
+            .map<AttendanceRecord>((item) => AttendanceRecord.fromMap(item, item['id']))
+            .toList());
   }
-  
+
   // --- Rep Override ---
-  Future<void> overrideAttendance(String regNo, String date, bool newStatus, String repUid, String reason) async {
-    final recordId = '${date}_$regNo';
-    final ref = _db.collection('attendance_records').doc(recordId);
-    
-    // We also need to log this
-    final logRef = _db.collection('audit_logs').doc();
-    
-    await _db.runTransaction((t) async {
-       final doc = await t.get(ref);
-       String prevStatus = "UNKNOWN";
-       if (doc.exists) {
-         prevStatus = doc.data()?['status'] ?? "UNKNOWN";
-       }
-       
-       t.set(ref, {
-         'status': newStatus ? 'PRESENT' : 'ABSENT',
-         'overriddenBy': repUid,
-         // Maintain other fields if it exists, theoretically merge: true but transaction set needs all data if strictly enforcing schema
-         // For simplicity: upsert
-         'date': date,
-         'regNo': regNo,
-         // 'studentUid': ... we might miss this if creating new record from scratch...
-         // Assumption: Rep edits existing record usually. If creating new, Rep needs to know UID.
-       }, SetOptions(merge: true));
-       
-       t.set(logRef, {
-         'action': 'OVERRIDE_ATTENDANCE',
-         'targetDate': date,
-         'targetRegNo': regNo,
-         'previousStatus': prevStatus,
-         'newStatus': newStatus ? 'PRESENT' : 'ABSENT',
-         'reason': reason,
-         'performedBy': repUid,
-         'timestamp': FieldValue.serverTimestamp(),
-       });
-    });
+  Future<void> overrideAttendance(
+    String regNo,
+    String date,
+    bool newStatus,
+    String repUid,
+    String reason,
+  ) async {
+    try {
+      // Get existing record
+      final existing = await _supabaseService
+          .from('attendance_records')
+          .select()
+          .eq('date', date)
+          .eq('reg_no', regNo)
+          .maybeSingle();
+
+      String prevStatus = existing?['status'] ?? 'UNKNOWN';
+
+      // Upsert attendance record
+      await _supabaseService.from('attendance_records').upsert({
+        'date': date,
+        'reg_no': regNo,
+        'status': newStatus ? 'PRESENT' : 'ABSENT',
+        'overridden_by': repUid,
+        if (existing != null) ...{
+          'id': existing['id'],
+          'student_uid': existing['student_uid'],
+          'team_id': existing['team_id'],
+          'marked_by': existing['marked_by'],
+        },
+      });
+
+      // Create audit log
+      await _supabaseService.from('audit_logs').insert({
+        'actor_id': repUid,
+        'action': 'OVERRIDE_ATTENDANCE',
+        'target_reg_no': regNo,
+        'target_date': date,
+        'prev_value': prevStatus,
+        'new_value': newStatus ? 'PRESENT' : 'ABSENT',
+        'reason': reason,
+      });
+    } catch (e) {
+      throw Exception('Failed to override attendance: $e');
+    }
   }
 }

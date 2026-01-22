@@ -26,7 +26,7 @@ class _RepOverrideViewState extends State<RepOverrideView> {
 
     setState(() => _isLoading = true);
     final user = Provider.of<UserProvider>(context, listen: false).currentUser;
-    final firestore = Provider.of<FirestoreService>(context, listen: false);
+    final firestore = Provider.of<SupabaseDbService>(context, listen: false);
     final dateStr = _selectedDate.toIso8601String().split('T')[0];
 
     try {

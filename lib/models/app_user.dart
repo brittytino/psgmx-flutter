@@ -31,9 +31,9 @@ class AppUser {
     return AppUser(
       uid: uid,
       email: data['email'] ?? '',
-      regNo: data['regNo'] ?? '',
+      regNo: data['reg_no'] ?? data['regNo'] ?? '',
       name: data['name'] ?? '',
-      teamId: data['teamId'],
+      teamId: data['team_id'] ?? data['teamId'],
       isTeamLeader: roles['isTeamLeader'] ?? false,
       isCoordinator: roles['isCoordinator'] ?? false,
       isPlacementRep: roles['isPlacementRep'] ?? false,
@@ -42,11 +42,11 @@ class AppUser {
 
   Map<String, dynamic> toMap() {
     return {
-      'uid': uid,
+      'id': uid,
       'email': email,
-      'regNo': regNo,
+      'reg_no': regNo,
       'name': name,
-      'teamId': teamId,
+      'team_id': teamId,
       'roles': {
         'isTeamLeader': isTeamLeader,
         'isCoordinator': isCoordinator,

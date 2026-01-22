@@ -14,7 +14,7 @@ class HomeTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final firestore = Provider.of<FirestoreService>(context);
+    final firestore = Provider.of<SupabaseDbService>(context);
     final quoteService = Provider.of<QuoteService>(context);
     final today = DateTime.now().toIso8601String().split('T')[0];
 

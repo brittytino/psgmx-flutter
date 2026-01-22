@@ -3,37 +3,31 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/user_provider.dart';
 
-/// LoginScreen: Sign in with email and password
+/// ForgotPasswordScreen: Request password reset email
 /// 
 /// User flow:
 /// 1. Enters college email
-/// 2. Enters password
-/// 3. System authenticates via Supabase Auth
-/// 4. On success:
-///    - User profile is loaded
-///    - Roles are fetched from database
-///    - Navigate to Dashboard
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+/// 2. System sends password reset email
+/// 3. User clicks link in email
+/// 4. Can reset password via Supabase
+class ForgotPasswordScreen extends StatefulWidget {
+  const ForgotPasswordScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
 
   bool _isLoading = false;
-  bool _showPassword = false;
+  bool _emailSent = false;
   String? _emailError;
-  String? _passwordError;
   String? _generalError;
 
   @override
   void dispose() {
     _emailController.dispose();
-    _passwordController.dispose();
     super.dispose();
   }
 
@@ -60,29 +54,13 @@ class _LoginScreenState extends State<LoginScreen> {
     return true;
   }
 
-  /// Validate password field
-  bool _validatePassword() {
-    final password = _passwordController.text;
-
-    if (password.isEmpty) {
-      setState(() => _passwordError = 'Password is required');
-      return false;
-    }
-
-    setState(() => _passwordError = null);
-    return true;
-  }
-
-  /// Handle sign in
-  Future<void> _handleSignIn() async {
+  /// Handle password reset request
+  Future<void> _handleResetPassword() async {
     // Clear previous errors
     setState(() => _generalError = null);
 
-    // Validate fields
-    final emailValid = _validateEmail();
-    final passwordValid = _validatePassword();
-
-    if (!emailValid || !passwordValid) {
+    // Validate email
+    if (!_validateEmail()) {
       return;
     }
 
@@ -90,22 +68,20 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final email = _emailController.text.trim().toLowerCase();
-      final password = _passwordController.text;
 
-      debugPrint('[LoginScreen] Signing in user: $email');
+      debugPrint('[ForgotPasswordScreen] Requesting password reset for: $email');
 
-      // Sign in via UserProvider
-      await Provider.of<UserProvider>(context, listen: false).signIn(
-        email: email,
-        password: password,
-      );
+      // Call UserProvider to reset password
+      await Provider.of<UserProvider>(context, listen: false)
+          .resetPassword(email);
 
-      debugPrint('[LoginScreen] Sign in successful');
+      debugPrint('[ForgotPasswordScreen] Password reset email sent');
 
-      // Navigation is handled by auth state change listener in router
-      // User will be redirected to dashboard automatically
+      if (mounted) {
+        setState(() => _emailSent = true);
+      }
     } catch (e) {
-      debugPrint('[LoginScreen] Sign in error: $e');
+      debugPrint('[ForgotPasswordScreen] Error: $e');
       if (mounted) {
         setState(() {
           _generalError = e.toString();
@@ -124,9 +100,86 @@ class _LoginScreenState extends State<LoginScreen> {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
+    // Success screen after email is sent
+    if (_emailSent) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Check Your Email'),
+          centerTitle: true,
+        ),
+        body: SafeArea(
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: isMobile ? 24 : 40,
+              vertical: isMobile ? 32 : 40,
+            ),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    /// Success Icon
+                    Center(
+                      child: Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: colorScheme.tertiaryContainer,
+                        ),
+                        child: Icon(
+                          Icons.check_circle_outline_rounded,
+                          size: 40,
+                          color: colorScheme.tertiary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Email Sent',
+                      textAlign: TextAlign.center,
+                      style: textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'We have sent a password reset link to your email.',
+                      textAlign: TextAlign.center,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.outline,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Check your inbox and follow the link to reset your password.',
+                      textAlign: TextAlign.center,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.outline,
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+
+                    /// Back to Sign In Button
+                    FilledButton(
+                      onPressed: () => context.go('/login'),
+                      child: const Text('Back to Sign In'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Password reset request screen
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sign In'),
+        title: const Text('Forgot Password'),
         centerTitle: true,
       ),
       body: SafeArea(
@@ -143,7 +196,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    /// Header Section
+                    /// Icon
                     Center(
                       child: Container(
                         width: 80,
@@ -153,7 +206,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           color: colorScheme.primaryContainer,
                         ),
                         child: Icon(
-                          Icons.lock_outline_rounded,
+                          Icons.lock_reset_rounded,
                           size: 40,
                           color: colorScheme.primary,
                         ),
@@ -161,7 +214,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 24),
                     Text(
-                      'Welcome Back',
+                      'Reset Your Password',
                       textAlign: TextAlign.center,
                       style: textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.bold,
@@ -169,7 +222,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Sign in to your PSG MCA Prep account',
+                      'Enter your college email to receive a password reset link.',
                       textAlign: TextAlign.center,
                       style: textTheme.bodyMedium?.copyWith(
                         color: colorScheme.outline,
@@ -209,61 +262,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    /// Password Field
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Password',
-                              style: textTheme.bodySmall?.copyWith(
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: _isLoading
-                                  ? null
-                                  : () => context.go('/forgot_password'),
-                              child: const Text('Forgot?'),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        TextField(
-                          controller: _passwordController,
-                          enabled: !_isLoading,
-                          obscureText: !_showPassword,
-                          decoration: InputDecoration(
-                            hintText: 'Enter your password',
-                            prefixIcon: Icon(Icons.lock_outline_rounded,
-                                color: colorScheme.outline),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _showPassword
-                                    ? Icons.visibility_rounded
-                                    : Icons.visibility_off_rounded,
-                                color: colorScheme.outline,
-                              ),
-                              onPressed: () {
-                                setState(
-                                    () => _showPassword = !_showPassword);
-                              },
-                            ),
-                            errorText: _passwordError,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          onChanged: (_) {
-                            if (_passwordError != null) _validatePassword();
-                          },
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-
                     /// General Error Message
                     if (_generalError != null)
                       Padding(
@@ -286,9 +284,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
 
-                    /// Sign In Button
+                    /// Submit Button
                     FilledButton(
-                      onPressed: _isLoading ? null : _handleSignIn,
+                      onPressed:
+                          _isLoading ? null : _handleResetPassword,
                       child: _isLoading
                           ? SizedBox(
                               height: 20,
@@ -300,23 +299,23 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               ),
                             )
-                          : const Text('Sign In'),
+                          : const Text('Send Reset Link'),
                     ),
                     const SizedBox(height: 16),
 
-                    /// Sign Up Link
+                    /// Back to Sign In Link
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          'New user? ',
+                          'Remember your password? ',
                           style: textTheme.bodySmall,
                         ),
                         TextButton(
                           onPressed: _isLoading
                               ? null
-                              : () => context.go('/set_password'),
-                          child: const Text('Create Account'),
+                              : () => context.go('/login'),
+                          child: const Text('Sign In'),
                         ),
                       ],
                     ),

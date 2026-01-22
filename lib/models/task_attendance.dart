@@ -15,11 +15,11 @@ class DailyTask {
 
   factory DailyTask.fromMap(Map<String, dynamic> map, String id) {
     return DailyTask(
-      date: id,
-      leetcodeUrl: map['leetcodeUrl'] ?? '',
-      csTopic: map['csTopic'] ?? '',
-      csTopicDescription: map['csTopicDescription'] ?? '',
-      motivationQuote: map['motivationQuote'] ?? '',
+      date: map['date'] ?? id,
+      leetcodeUrl: map['leetcode_url'] ?? map['leetcodeUrl'] ?? '',
+      csTopic: map['cs_topic'] ?? map['csTopic'] ?? '',
+      csTopicDescription: map['cs_topic_description'] ?? map['csTopicDescription'] ?? '',
+      motivationQuote: map['motivation_quote'] ?? map['motivationQuote'] ?? '',
     );
   }
 }
@@ -49,12 +49,14 @@ class AttendanceRecord {
     return AttendanceRecord(
       id: id,
       date: map['date'] ?? '',
-      studentUid: map['studentUid'] ?? '',
-      regNo: map['regNo'] ?? '',
-      teamId: map['teamId'] ?? '',
+      studentUid: map['student_uid'] ?? map['studentUid'] ?? '',
+      regNo: map['reg_no'] ?? map['regNo'] ?? '',
+      teamId: map['team_id'] ?? map['teamId'] ?? '',
       isPresent: map['status'] == 'PRESENT',
-      timestamp: (map['timestamp'] as dynamic).toDate(),
-      markedBy: map['markedBy'] ?? '',
+      timestamp: map['timestamp'] != null 
+          ? DateTime.parse(map['timestamp'].toString())
+          : DateTime.now(),
+      markedBy: map['marked_by'] ?? map['markedBy'] ?? '',
     );
   }
 }

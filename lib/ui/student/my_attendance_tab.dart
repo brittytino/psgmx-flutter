@@ -11,7 +11,7 @@ class MyAttendanceTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = Provider.of<UserProvider>(context).currentUser;
-    final firestore = Provider.of<FirestoreService>(context);
+    final firestore = Provider.of<SupabaseDbService>(context);
 
     if (user == null) return const SizedBox.shrink();
 
