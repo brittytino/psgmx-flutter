@@ -3,7 +3,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/app_router.dart';
 import '../models/app_user.dart';
 import '../services/auth_service.dart';
-import '../services/user_repository.dart';
 
 /// UserProvider: Central state management for authenticated user
 ///
@@ -14,16 +13,13 @@ import '../services/user_repository.dart';
 /// - Persist session across app restarts
 class UserProvider with ChangeNotifier {
   final AuthService _authService;
-  final UserRepository _userRepo;
 
   AppUser? _currentUser;
   bool _isLoading = true;
   bool _initComplete = false;
 
-  UserProvider(
-      {required AuthService authService, required UserRepository userRepo})
-      : _authService = authService,
-        _userRepo = userRepo {
+  UserProvider({required AuthService authService})
+      : _authService = authService {
     _init();
   }
 
@@ -56,7 +52,7 @@ class UserProvider with ChangeNotifier {
         try {
           debugPrint(
               '[UserProvider] Fetching user document for: ${supabaseUser.email}');
-          _currentUser = await _userRepo.ensureUserDocument(
+          _currentUser = await _authService.ensureUserDocument(
             supabaseUser.id,
             supabaseUser.email!,
           );
@@ -111,7 +107,7 @@ class UserProvider with ChangeNotifier {
 
         if (supabaseUser != null) {
           try {
-            _currentUser = await _userRepo.ensureUserDocument(
+            _currentUser = await _authService.ensureUserDocument(
               supabaseUser.id,
               supabaseUser.email!,
             );

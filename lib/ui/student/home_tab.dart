@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../services/firestore_service.dart';
 import '../../services/quote_service.dart';
 import '../../models/task_attendance.dart';
 import '../../core/theme/layout_tokens.dart';

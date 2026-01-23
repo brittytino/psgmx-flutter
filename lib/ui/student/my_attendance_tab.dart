@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../providers/user_provider.dart';
-import '../../services/firestore_service.dart';
 import '../../models/task_attendance.dart';
 
 class MyAttendanceTab extends StatelessWidget {

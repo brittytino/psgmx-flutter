@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_service.dart';
+import '../models/app_user.dart';
 
 /// AuthService: Secure OTP-based authentication using Supabase Auth
 /// 
@@ -426,5 +427,72 @@ class AuthService {
       return 'Password must be at least 8 characters';
     }
     return 'Password is strong';
+  }
+
+  /// Fetch user profile from database
+  /// 
+  /// Returns: AppUser if found, null otherwise
+  Future<AppUser?> getUserProfile(String userId) async {
+    try {
+      debugPrint('[AuthService] Fetching user profile for: $userId');
+      final response = await _supabaseService.client
+          .from('users')
+          .select()
+          .eq('id', userId)
+          .maybeSingle();
+
+      if (response == null) {
+        debugPrint('[AuthService] No user profile found');
+        return null;
+      }
+
+      return AppUser.fromJson(response);
+    } catch (e) {
+      debugPrint('[AuthService] Error fetching user profile: $e');
+      return null;
+    }
+  }
+
+  /// Ensure user document exists (create if not exists)
+  /// 
+  /// Used after successful sign-up/OTP verification
+  Future<AppUser> ensureUserDocument(String userId, String email) async {
+    try {
+      // Try to fetch existing user
+      final existingUser = await getUserProfile(userId);
+      if (existingUser != null) {
+        return existingUser;
+      }
+
+      // Create new user profile with minimal info
+      debugPrint('[AuthService] Creating new user profile for: $email');
+      final newUserData = {
+        'id': userId,
+        'email': email,
+        'name': email.split('@')[0], // Temporary name
+        'reg_no': email.split('@')[0].toUpperCase(),
+        'batch': 'G1', // Default batch
+        'roles': {
+          'isStudent': true,
+          'isTeamLeader': false,
+          'isCoordinator': false,
+          'isPlacementRep': false,
+        },
+      };
+
+      await _supabaseService.client
+          .from('users')
+          .insert(newUserData);
+
+      final createdUser = await getUserProfile(userId);
+      if (createdUser == null) {
+        throw Exception('Failed to create user profile');
+      }
+
+      return createdUser;
+    } catch (e) {
+      debugPrint('[AuthService] Error ensuring user document: $e');
+      rethrow;
+    }
   }
 }

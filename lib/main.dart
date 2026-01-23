@@ -5,9 +5,7 @@ import 'core/supabase_config.dart';
 import 'core/app_router.dart';
 import 'providers/user_provider.dart';
 import 'services/auth_service.dart';
-import 'services/user_repository.dart';
 import 'services/supabase_service.dart';
-import 'services/firestore_service.dart';
 import 'services/quote_service.dart';
 import 'core/theme/app_theme.dart';
 
@@ -30,19 +28,15 @@ class PsgMxApp extends StatelessWidget {
     // Services
     final supabaseService = SupabaseService();
     final authService = AuthService(supabaseService);
-    final userRepo = UserRepository(supabaseService);
-    final dbService = SupabaseDbService(supabaseService);
     final quoteService = QuoteService();
 
     return MultiProvider(
       providers: [
         Provider<SupabaseService>.value(value: supabaseService),
         Provider<AuthService>.value(value: authService),
-        Provider<UserRepository>.value(value: userRepo),
-        Provider<SupabaseDbService>.value(value: dbService),
         Provider<QuoteService>.value(value: quoteService),
         ChangeNotifierProvider(
-          create: (_) => UserProvider(authService: authService, userRepo: userRepo),
+          create: (_) => UserProvider(authService: authService),
         ),
       ],
       child: MaterialApp.router(

@@ -6,7 +6,7 @@ import '../ui/auth/login_screen.dart';
 import '../ui/auth/set_password_screen.dart';
 import '../ui/auth/verify_otp_screen.dart';
 import '../ui/auth/forgot_password_screen.dart';
-import '../ui/student/dashboard_screen.dart';
+import '../ui/screens/home_screen.dart';
 import '../ui/splash_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -65,7 +65,7 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: '/',
-      builder: (context, state) => const DashboardScreen(),
+      builder: (context, state) => const HomeScreen(),
     ),
   ],
   redirect: (context, state) async {

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../services/firestore_service.dart';
 import '../../providers/user_provider.dart';
 
 class RepOverrideView extends StatefulWidget {
