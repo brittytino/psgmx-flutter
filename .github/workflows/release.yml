@@ -1,17 +1,64 @@
 name: Build and Release
 
 on:
+  workflow_dispatch:
   push:
+    branches:
+      - main  # Run on every push to main to check for new versions
     tags:
-      - "v*" # Push events to matching v*, i.e. v1.0, v20.15.10
-      - "atest" # Test tag
+      - "v*"
 
 permissions:
   contents: write
 
 jobs:
+  check_version:
+    name: Check Version & Tag
+    runs-on: ubuntu-latest
+    outputs:
+      new_tag: ${{ steps.tag_version.outputs.new_tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch all history for tags
+
+      - name: Get Version from Pubspec
+        id: get_version
+        run: |
+          VERSION=$(grep 'version:' pubspec.yaml | sed 's/version: //')
+          echo "Detected version: $VERSION"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Check if Tag Exists
+        id: check_tag
+        run: |
+          TAG="v${{ env.VERSION }}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists."
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "Tag $TAG does not exist. Creating..."
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "new_tag=$TAG" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Tag
+        if: steps.check_tag.outputs.exists == 'false'
+        id: tag_version
+        run: |
+          TAG="v${{ env.VERSION }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+          echo "new_tag=$TAG" >> $GITHUB_OUTPUT
+
   build_android:
     name: Build Android APK
+    needs: check_version
+    # Run if we just created a new tag OR if manually triggered OR if pushed tag directly
+    if: needs.check_version.outputs.new_tag != '' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -33,7 +80,6 @@ jobs:
         run: flutter pub get
 
       - name: Build APK
-        # Falls back to debug signing if no release key provided via env, which matches "no secrets" request
         run: flutter build apk --release
 
       - name: Upload APK Artifact
@@ -44,6 +90,8 @@ jobs:
 
   build_ios:
     name: Build iOS App
+    needs: check_version
+    if: needs.check_version.outputs.new_tag != '' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
     runs-on: macos-latest
     steps:
       - name: Checkout code
@@ -74,9 +122,9 @@ jobs:
 
   release:
     name: Create Release
-    needs: [build_android, build_ios]
+    needs: [check_version, build_android, build_ios]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    if: needs.check_version.outputs.new_tag != '' || startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Download Android Artifact
         uses: actions/download-artifact@v4
@@ -88,17 +136,25 @@ jobs:
         with:
           name: psgmx_ios_unsigned
 
+      - name: Determine Tag
+        id: get_tag
+        run: |
+          if [ -n "${{ needs.check_version.outputs.new_tag }}" ]; then
+            echo "tag_name=${{ needs.check_version.outputs.new_tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag_name=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             app-release.apk
             psgmx_ios_unsigned.ipa
-          name: Release ${{ github.ref_name }}
-          tag_name: ${{ github.ref_name }}
+          name: Release ${{ steps.get_tag.outputs.tag_name }}
+          tag_name: ${{ steps.get_tag.outputs.tag_name }}
           draft: false
           prerelease: false
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
