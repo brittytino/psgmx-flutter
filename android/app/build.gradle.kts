@@ -29,6 +29,8 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        
+        multiDexEnabled = true
     }
 
     buildTypes {
@@ -45,5 +47,6 @@ flutter {
 }
 
 dependencies {
+    implementation("androidx.multidex:multidex:2.0.1")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

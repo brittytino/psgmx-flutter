@@ -13,10 +13,15 @@ import 'services/supabase_service.dart';
 import 'services/supabase_db_service.dart';
 import 'services/quote_service.dart';
 import 'services/notification_service.dart';
+import 'services/connectivity_service.dart';
+import 'core/error_boundary.dart';
 import 'core/theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Global Error Handling
+  setupGlobalErrorHandling();
   
   await NotificationService().init();
   
@@ -25,7 +30,7 @@ void main() async {
     anonKey: SupabaseConfig.supabaseAnonKey,
   );
   
-  runApp(const PsgMxApp());
+  runApp(const ErrorBoundary(child: PsgMxApp()));
 }
 
 class PsgMxApp extends StatelessWidget {
@@ -90,6 +95,9 @@ class _PsgMxAppInnerState extends State<PsgMxAppInner> {
       darkTheme: AppTheme.dark(),
       themeMode: ThemeMode.system,
       routerConfig: _router,
+      builder: (context, child) {
+        return OfflineBanner(child: child ?? const SizedBox());
+      },
     );
   }
 }

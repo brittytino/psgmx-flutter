@@ -70,6 +70,7 @@ class AppUser {
   final String? leetcodeUsername;
   final DateTime? dob;
   final bool birthdayNotificationsEnabled;
+  final bool leetcodeNotificationsEnabled;
 
   AppUser({
     required this.uid,
@@ -84,6 +85,7 @@ class AppUser {
     this.leetcodeUsername,
     this.dob,
     this.birthdayNotificationsEnabled = true,
+    this.leetcodeNotificationsEnabled = true,
   })  : createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now();
 
@@ -115,6 +117,7 @@ class AppUser {
       leetcodeUsername: data['leetcode_username'],
       dob: data['dob'] != null ? DateTime.tryParse(data['dob'].toString()) : null,
       birthdayNotificationsEnabled: data['birthday_notifications_enabled'] ?? true,
+      leetcodeNotificationsEnabled: data['leetcode_notifications_enabled'] ?? true,
     );
   }
   
@@ -135,6 +138,7 @@ class AppUser {
       'leetcode_username': leetcodeUsername,
       'dob': dob?.toIso8601String().split('T')[0],
       'birthday_notifications_enabled': birthdayNotificationsEnabled,
+      'leetcode_notifications_enabled': leetcodeNotificationsEnabled,
     };
   }
 
@@ -144,6 +148,7 @@ class AppUser {
     String? leetcodeUsername,
     DateTime? dob,
     bool? birthdayNotificationsEnabled,
+    bool? leetcodeNotificationsEnabled,
     String? teamId,
   }) {
     return AppUser(
@@ -159,6 +164,7 @@ class AppUser {
       leetcodeUsername: leetcodeUsername ?? this.leetcodeUsername,
       dob: dob ?? this.dob,
       birthdayNotificationsEnabled: birthdayNotificationsEnabled ?? this.birthdayNotificationsEnabled,
+      leetcodeNotificationsEnabled: leetcodeNotificationsEnabled ?? this.leetcodeNotificationsEnabled,
     );
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/app_user.dart';
 import '../services/auth_service.dart';
+import '../services/notification_service.dart'; // Import this
 
 /// UserProvider: Central state management for authenticated user
 ///
@@ -326,6 +327,78 @@ class UserProvider with ChangeNotifier {
       debugPrint('[UserProvider] Sign out successful');
     } catch (e) {
       debugPrint('[UserProvider] Sign out error: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateDob(DateTime newDob) async {
+    if (_currentUser == null) return;
+    try {
+      final dobStr = newDob.toIso8601String().split('T')[0];
+      await Supabase.instance.client
+          .from('users')
+          .update({'dob': dobStr})
+          .eq('id', _currentUser!.uid);
+          
+      _currentUser = _currentUser!.copyWith(dob: newDob);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error updating DOB: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateBirthdayNotification(bool enabled) async {
+    if (_currentUser == null) return;
+    try {
+      await Supabase.instance.client
+          .from('users')
+          .update({'birthday_notifications_enabled': enabled})
+          .eq('id', _currentUser!.uid);
+          
+      _currentUser = _currentUser!.copyWith(birthdayNotificationsEnabled: enabled);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error updating notif setting: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateLeetCodeUsername(String username) async {
+    if (_currentUser == null) return;
+    try {
+      await Supabase.instance.client
+          .from('users')
+          .update({'leetcode_username': username})
+          .eq('id', _currentUser!.uid);
+          
+      _currentUser = _currentUser!.copyWith(leetcodeUsername: username);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error updating leetcode username: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateLeetCodeNotification(bool enabled) async {
+    if (_currentUser == null) return;
+    try {
+      await Supabase.instance.client
+          .from('users')
+          .update({'leetcode_notifications_enabled': enabled})
+          .eq('id', _currentUser!.uid);
+          
+      _currentUser = _currentUser!.copyWith(leetcodeNotificationsEnabled: enabled);
+      notifyListeners();
+      
+      // Update local schedule
+      if (enabled) {
+         await NotificationService().scheduleLeetCodeReminders();
+      } else {
+         await NotificationService().cancelLeetCodeReminders();
+      }
+    } catch (e) {
+      debugPrint('Error updating leetcode notif setting: $e');
       rethrow;
     }
   }

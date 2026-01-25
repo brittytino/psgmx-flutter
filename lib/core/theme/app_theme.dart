@@ -29,7 +29,7 @@ class AppTheme {
     final colorScheme = ColorScheme.fromSeed(
       seedColor: psgPrimary,
       brightness: Brightness.dark,
-      surface: const Color(0xFF121212), // Dark grey elevation
+      surface: const Color(0xFF0A0A0A), // Dark Black
       onSurface: textLight,
       outline: const Color(0xFF333333),
     );
@@ -46,7 +46,7 @@ class AppTheme {
       scaffoldBackgroundColor: isDark ? const Color(0xFF000000) : Colors.white,
       
       // Typography
-      textTheme: GoogleFonts.interTextTheme(
+      textTheme: GoogleFonts.outfitTextTheme(
         isDark ? ThemeData.dark().textTheme : ThemeData.light().textTheme,
       ).apply(
         bodyColor: colorScheme.onSurface,
@@ -60,7 +60,7 @@ class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 2,
         centerTitle: false,
-        titleTextStyle: GoogleFonts.inter(
+        titleTextStyle: GoogleFonts.outfit(
           fontSize: 18,
           fontWeight: FontWeight.w600,
           color: colorScheme.onSurface,
@@ -72,7 +72,7 @@ class AppTheme {
         style: FilledButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
-          textStyle: GoogleFonts.inter(fontWeight: FontWeight.w600),
+          textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w600),
           elevation: 0,
         ),
       ),

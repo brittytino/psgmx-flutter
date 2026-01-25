@@ -154,6 +154,49 @@ class ProfileScreen extends StatelessWidget {
                    const SizedBox(height: AppSpacing.xl),
                 ],
 
+
+                // Personal Details
+                const _SectionLabel(label: "PERSONAL DETAILS"),
+                PremiumCard(
+                  padding: EdgeInsets.zero,
+                  child: Column(
+                    children: [
+                       ListTile(
+                        leading: const Icon(Icons.code),
+                        title: const Text("LeetCode Username"),
+                        subtitle: Text(user.leetcodeUsername ?? "Not set"),
+                        trailing: const Icon(Icons.edit, size: 18),
+                        onTap: () => _editLeetCode(context, provider, user.leetcodeUsername),
+                      ),
+                      Divider(height: 1, indent: 56, color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
+                      ListTile(
+                        leading: const Icon(Icons.cake_outlined),
+                        title: const Text("Date of Birth"),
+                        subtitle: Text(user.dob != null ? user.dob!.toString().split(' ')[0] : "Not set"),
+                        trailing: const Icon(Icons.edit_calendar, size: 18),
+                        onTap: () => _editDob(context, provider, user.dob),
+                      ),
+                       Divider(height: 1, indent: 56, color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
+                      SwitchListTile(
+                        secondary: const Icon(Icons.celebration_outlined),
+                        title: const Text("Birthday Notifications"),
+                        subtitle: const Text("Show celebration on home screen"),
+                        value: user.birthdayNotificationsEnabled,
+                        onChanged: (v) => provider.updateBirthdayNotification(v),
+                      ),
+                      Divider(height: 1, indent: 56, color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
+                      SwitchListTile(
+                        secondary: const Icon(Icons.notifications_active_outlined),
+                        title: const Text("LeetCode Reminders"),
+                        subtitle: const Text("Daily challenge & Weekly leaderboard"),
+                        value: user.leetcodeNotificationsEnabled,
+                        onChanged: (v) => provider.updateLeetCodeNotification(v),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xl),
+
                 // Account
                 const _SectionLabel(label: "ACCOUNT PREFERENCES"),
                 PremiumCard(
@@ -242,6 +285,43 @@ class ProfileScreen extends StatelessWidget {
         style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.0),
       ),
     );
+  }
+
+  Future<void> _editLeetCode(BuildContext context, UserProvider provider, String? current) async {
+    final ctrl = TextEditingController(text: current);
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("LeetCode Username"),
+        content: TextField(
+          controller: ctrl,
+          decoration: const InputDecoration(labelText: "Username", hintText: "e.g. user123"),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel")),
+          FilledButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await provider.updateLeetCodeUsername(ctrl.text.trim());
+            }, 
+            child: const Text("Save")
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _editDob(BuildContext context, UserProvider provider, DateTime? current) async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: current ?? DateTime(2003, 1, 1),
+      firstDate: DateTime(1990),
+      lastDate: DateTime.now(),
+    );
+    
+    if (date != null) {
+      await provider.updateDob(date);
+    }
   }
 
   void _confirmSignOut(BuildContext context, UserProvider provider) {

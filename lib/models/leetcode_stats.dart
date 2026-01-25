@@ -5,6 +5,7 @@ class LeetCodeStats {
   final int mediumSolved;
   final int hardSolved;
   final int ranking;
+  final int weeklyScore;
   final DateTime lastUpdated;
 
   LeetCodeStats({
@@ -14,6 +15,7 @@ class LeetCodeStats {
     required this.mediumSolved,
     required this.hardSolved,
     required this.ranking,
+    this.weeklyScore = 0,
     required this.lastUpdated,
   });
 
@@ -25,6 +27,7 @@ class LeetCodeStats {
       mediumSolved: map['medium_solved'] ?? 0,
       hardSolved: map['hard_solved'] ?? 0,
       ranking: map['ranking'] ?? 0,
+      weeklyScore: map['weekly_score'] ?? 0,
       lastUpdated: map['last_updated'] != null ? DateTime.parse(map['last_updated']) : DateTime.now(),
     );
   }
@@ -37,6 +40,7 @@ class LeetCodeStats {
       'medium_solved': mediumSolved,
       'hard_solved': hardSolved,
       'ranking': ranking,
+      'weekly_score': weeklyScore,
       'last_updated': lastUpdated.toIso8601String(),
     };
   }

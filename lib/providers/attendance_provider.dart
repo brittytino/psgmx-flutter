@@ -16,7 +16,37 @@ class AttendanceProvider extends ChangeNotifier {
 
   AttendanceProvider(this._supabaseService);
 
+  String? _cachedTeamId;
+
   Future<void> loadTeamMembers(String teamId) async {
+    _isLoading = true;
+    notifyListeners();
+    
+    try {
+      // Cache: Only fetch members if team changed or list empty
+      if (_cachedTeamId != teamId || _teamMembers.isEmpty) {
+        final response = await _supabaseService.client
+            .from('users')
+            .select()
+            .eq('team_id', teamId)
+            .order('reg_no');
+            
+        _teamMembers = (response as List).map((e) => AppUser.fromMap(e)).toList();
+        _cachedTeamId = teamId;
+      }
+      
+      // Check if already submitted today
+      await _checkSubmissionStatus(teamId);
+      
+    } catch (e) {
+      debugPrint('Error loading team: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadAllUsers() async {
     _isLoading = true;
     notifyListeners();
     
@@ -24,16 +54,13 @@ class AttendanceProvider extends ChangeNotifier {
       final response = await _supabaseService.client
           .from('users')
           .select()
-          .eq('team_id', teamId)
           .order('reg_no');
           
       _teamMembers = (response as List).map((e) => AppUser.fromMap(e)).toList();
-      
-      // Check if already submitted today
-      await _checkSubmissionStatus(teamId);
+      _hasSubmittedToday = false; // Reps can always edit/submit in this mode
       
     } catch (e) {
-      debugPrint('Error loading team: $e');
+      debugPrint('Error loading all users: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -51,8 +78,8 @@ class AttendanceProvider extends ChangeNotifier {
     _hasSubmittedToday = count > 0;
   }
 
-  Future<void> submitAttendance(String teamId, Map<String, String> statusMap) async {
-    if (_hasSubmittedToday) throw Exception("Already submitted for today");
+  Future<void> submitAttendance(String? teamId, Map<String, String> statusMap, {bool isRep = false}) async {
+    if (!isRep && _hasSubmittedToday) throw Exception("Already submitted for today");
     
     final today = DateTime.now().toIso8601String().split('T')[0];
     final user = _supabaseService.client.auth.currentUser;
@@ -62,15 +89,23 @@ class AttendanceProvider extends ChangeNotifier {
       rows.add({
         'date': today,
         'student_id': studentId,
-        'team_id': teamId,
+        'team_id': teamId, // Can be null if marking for all
         'status': status,
         'marked_by': user!.id,
       });
     });
 
     if (rows.isNotEmpty) {
-      await _supabaseService.client.from('attendance').insert(rows);
-      _hasSubmittedToday = true;
+      if (isRep) {
+        // Upsert for Reps
+        await _supabaseService.client.from('attendance').upsert(rows);
+      } else {
+        await _supabaseService.client.from('attendance').insert(rows);
+      }
+      
+      if (!isRep && teamId != null) {
+        _hasSubmittedToday = true; 
+      }
       notifyListeners();
     }
   }

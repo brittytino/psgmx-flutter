@@ -1,14 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../models/leetcode_stats.dart';
 import '../../providers/user_provider.dart';
+import '../../providers/leetcode_provider.dart';
 import '../../providers/announcement_provider.dart';
 import '../../services/supabase_db_service.dart';
 import '../../services/quote_service.dart';
+import '../../services/notification_service.dart';
 import '../../core/theme/app_dimens.dart';
 import '../widgets/premium_card.dart';
 import 'widgets/leetcode_card.dart';
+import 'widgets/leaderboard_card.dart';
 import 'widgets/attendance_action_card.dart';
+import '../../core/ui/skeletons.dart';
 import 'widgets/announcements_list.dart';
+import 'widgets/create_announcement_dialog.dart';
+import '../attendance/daily_attendance_sheet.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -18,26 +25,64 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  Future<List<LeetCodeStats>>? _leaderboardFuture;
+
   @override
   void initState() {
     super.initState();
-    // Fetch announcements on load
+    _leaderboardFuture = context.read<LeetCodeProvider>().fetchTopSolvers();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // 1. Fetch Announcements
       context.read<AnnouncementProvider>().fetchAnnouncements();
-      _checkAttendancePopup();
+      
+      // 2. Refresh My LeetCode Stats
+      final user = context.read<UserProvider>().currentUser;
+      if (user?.leetcodeUsername != null) {
+        context.read<LeetCodeProvider>().fetchStats(user!.leetcodeUsername!);
+      }
     });
+
+    NotificationService().init(); // Ensure notification init
+    NotificationService().requestPermissions();
+    _checkAttendancePopup();
   }
 
-  void _checkAttendancePopup() {
-    // Logic to auto-show attendance sheet if TL and > 5PM
-    // For manual trigger, we rely on the card logic in build.
+  void _checkAttendancePopup() async {
+    final userProvider = context.read<UserProvider>();
+    if (!userProvider.isTeamLeader) return;
+
+    final now = DateTime.now();
+    // After 5 PM
+    if (now.hour >= 17) {
+       // Ideally check if already submitted today
+       if (!mounted) return;
+       await Future.delayed(const Duration(seconds: 1)); // Small delay for enter animation
+       if (!mounted) return;
+       
+       showModalBottomSheet(
+        context: context, 
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) => const DailyAttendanceSheet(),
+       );
+    }
   }
 
   void _showAttendanceSheet(BuildContext context) {
-    // Navigate to dedicated attendance marking screen or show modal
-    // For now we assume a route exists or just print
-    // context.push('/attendance/mark'); 
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Opening Attendance Sheet...')));
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true, 
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => const DailyAttendanceSheet(),
+    );
+  }
+
+  void _showCreateAnnouncement(BuildContext context) {
+    showDialog(
+      context: context, 
+      builder: (ctx) => const CreateAnnouncementDialog()
+    );
   }
 
   @override
@@ -57,8 +102,14 @@ class _HomeScreenState extends State<HomeScreen> {
     final isStudentView = !userProvider.isCoordinator && !userProvider.isPlacementRep;
     // Show TL Actions if Lead AND (Time > 10AM for demo, > 17PM for prod)
     final showTLActions = userProvider.isTeamLeader; 
+    final canPost = userProvider.isCoordinator || userProvider.isPlacementRep;
 
     return Scaffold(
+      floatingActionButton: canPost ? FloatingActionButton.extended(
+        onPressed: () => _showCreateAnnouncement(context),
+        icon: const Icon(Icons.campaign),
+        label: const Text("Announce"),
+      ) : null,
       body: CustomScrollView(
         slivers: [
           _buildSliverAppBar(context, userProvider),
@@ -77,6 +128,26 @@ class _HomeScreenState extends State<HomeScreen> {
                 // 3. Announcements (Global)
                 const AnnouncementsList(),
                 const SizedBox(height: AppSpacing.xxl),
+
+                // Gamified Leaderboard
+                FutureBuilder<List<LeetCodeStats>>(
+                  future: _leaderboardFuture,
+                  builder: (context, snapshot) {
+                     if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Padding(
+                          padding: EdgeInsets.only(bottom: AppSpacing.xxl),
+                          child: SkeletonCard(height: 200),
+                        );
+                     }
+                     if (!snapshot.hasData || snapshot.data!.isEmpty) return const SizedBox.shrink();
+                     return Column(
+                       children: [
+                         LeaderboardCard(topSolvers: snapshot.data!),
+                         const SizedBox(height: AppSpacing.xxl),
+                       ],
+                     );
+                  }
+                ),
 
                 // 4. TL Actions
                 if (showTLActions) ...[

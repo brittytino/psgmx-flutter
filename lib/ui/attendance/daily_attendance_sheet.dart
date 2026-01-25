@@ -23,14 +23,23 @@ class DailyAttendanceSheet extends StatefulWidget {
 
 class _DailyAttendanceSheetState extends State<DailyAttendanceSheet> {
   final Map<String, String> _statusMap = {};
+  bool _showAllStudents = false;
   
   @override
   void initState() {
     super.initState();
+    _loadData();
+  }
+
+  void _loadData() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final user = context.read<UserProvider>().currentUser;
-      if (user?.teamId != null) {
-        context.read<AttendanceProvider>().loadTeamMembers(user!.teamId!);
+      final provider = context.read<AttendanceProvider>();
+      
+      if (_showAllStudents) {
+         provider.loadAllUsers();
+      } else if (user?.teamId != null) {
+         provider.loadTeamMembers(user!.teamId!);
       }
     });
   }
@@ -54,6 +63,29 @@ class _DailyAttendanceSheetState extends State<DailyAttendanceSheet> {
             ],
           ),
           const SizedBox(height: AppSpacing.md),
+          if (context.watch<UserProvider>().isPlacementRep) ...[
+            Row(
+              children: [
+                const Text("View: ", style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(width: 8),
+                SegmentedButton<bool>(
+                  segments: const [
+                    ButtonSegment(value: false, label: Text("My Team")),
+                    ButtonSegment(value: true, label: Text("All Students")),
+                  ],
+                  selected: {_showAllStudents},
+                  onSelectionChanged: (Set<bool> newSelection) {
+                    setState(() {
+                      _showAllStudents = newSelection.first;
+                      _statusMap.clear(); // Clear local changes when switching
+                    });
+                    _loadData();
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+          ],
           Text(
             "Mark attendance for today. This can only be submitted once.",
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey),
@@ -147,13 +179,25 @@ class _DailyAttendanceSheetState extends State<DailyAttendanceSheet> {
   Future<void> _submit(BuildContext context, AttendanceProvider provider) async {
     // Show confirmation dialog logic here
     final user = context.read<UserProvider>().currentUser;
-    if (user?.teamId == null) return;
+    final isRep = context.read<UserProvider>().isPlacementRep;
+    
+    // Allow Rep to submit without teamId in All Students mode
+    if (!isRep && user?.teamId == null) return;
     
     try {
-      await provider.submitAttendance(user!.teamId!, _statusMap);
+      await provider.submitAttendance(
+        user?.teamId, // Can be null for Reps
+        _statusMap,
+        isRep: isRep
+      );
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Attendance Submitted Successfully")));
-        context.pop();
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Attendance Updated Successfully")));
+        if (!isRep) {
+          context.pop(); // Close for TLs
+        } else {
+           // For Reps, maybe refresh data or show success
+           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Saved. You can continue editing.")));
+        }
       }
     } catch (e) {
       if (context.mounted) {
