@@ -8,6 +8,8 @@ Built with  using **Flutter** and **Supabase**.
 ![Supabase](https://img.shields.io/badge/Supabase-Production-3ECF8E?logo=supabase&logoColor=white)
 ![Dart](https://img.shields.io/badge/Dart-3.0+-0175C2?logo=dart&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
+[![Build and Release](https://github.com/brittytino/psgmx-flutter/actions/workflows/release.yml/badge.svg)](https://github.com/brittytino/psgmx-flutter/actions/workflows/release.yml)
+
 
 ---
 
@@ -98,10 +100,14 @@ flutter build ios --release --no-codesign
 
 ---
 
-##  Releases
+##  Community & Support
 
-Builds are automatically generated via GitHub Actions. Check the **[Releases](../../releases)** page for the latest APKs.
+- **Contributing**: Check out our [Contributing Guide](CONTRIBUTING.md) to get started.
+- **Code of Conduct**: We expect all contributors to follow our [Code of Conduct](CODE_OF_CONDUCT.md).
+- **Security**: Please report vulnerabilities according to our [Security Policy](SECURITY.md).
+- **Issues**: Use [GitHub Issues](../../issues) for bug reports and feature requests.
 
 ---
 
-** 2026 PSG Placement Team**
+**© 2026 PSG Placement Team**
+
