@@ -11,12 +11,12 @@ class DataSeedService {
   /// Check if whitelist is empty and seed it if needed
   Future<void> ensureWhitelistSeeded() async {
     try {
-      // Check current count
+      // Check current count by fetching all emails
       final countResponse = await _supabaseService.client
           .from('whitelist')
-          .select('email', const FetchOptions(count: CountOption.exact));
+          .select('email');
       
-      final count = (countResponse as PostgrestResponse).count ?? 0;
+      final count = (countResponse as List).length;
       
       debugPrint('[Seeder] Whitelist has $count entries');
       

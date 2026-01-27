@@ -138,6 +138,7 @@ class UserProvider with ChangeNotifier {
     }
   }
 
+
   /// Listen for auth state changes (sign in, sign out)
   void _listenToAuthStateChanges() {
     _authService.authStateChanges.listen(
@@ -146,7 +147,6 @@ class UserProvider with ChangeNotifier {
         debugPrint('[UserProvider] Auth state changed: ${supabaseUser?.email}');
 
         if (supabaseUser != null) {
-          try {
           try {
             // Fetch profile (don't auto-create)
             _currentUser = await _authService.getUserProfile(supabaseUser.id);
