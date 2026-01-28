@@ -2,32 +2,40 @@
 
 All notable changes to PSG MCA Placement Prep App will be documented in this file.
 
-## [1.0.0] - 2026-01-21
+## [1.0.0] - 2026-01-28
 
-### Initial Release
+### Production Release
 
-#### Added
-- Flutter mobile application with Material 3 design
-- Firebase email link authentication (@psgtech.ac.in only)
+#### ✨ Features
+- Complete OTP-based authentication system with password setup
+- LeetCode stats integration with real-time leaderboard
+- Team-based attendance marking system (all 123 students from whitelist)
+- Announcement system with auto-expiry functionality
+- Birthday notifications
 - Role-based access control (Student, Team Leader, Coordinator, Placement Rep)
-- Attendance tracking with 8 PM server-side lock
-- Daily task management with LeetCode and CS topics
-- Responsive UI with adaptive layout (mobile/tablet)
-- Offline support with local caching
-- Firestore Rules for security and business logic
-- User seeding script for initial data population
-- Comprehensive error handling and logging
+- Modern Material 3 UI with dark mode support
+- Progress indicators for LeetCode API fetching
 
-#### Architecture
-- Free Tier Firebase (no scheduled Cloud Functions)
-- Provider for state management
-- GoRouter for navigation
-- MVVM pattern for code organization
+#### 🔧 Fixed Issues
+- OTP flow now requires password before account creation (single-step form)
+- Birthday notification permission errors on Android 12+ (inexact alarms)
+- LeetCode API progress indicators with real-time status
+- Leaderboard UI overflow (48px) resolved
+- Attendance system fetches from whitelist (all students available)
+- All opacity assertion errors fixed
 
-#### Security
-- Email domain validation
-- Whitelist-based onboarding
-- Role-based Firestore Rules
+#### 🏗️ Architecture
+- Provider-based state management
+- Supabase backend with PostgreSQL
+- RESTful API integration for LeetCode stats
+- Row-Level Security (RLS) policies
+- Whitelist as source of truth for student roster
+
+#### 📱 Platform Support
+- ✅ Android (API 21+)
+- ✅ iOS (iOS 12.0+)
+
+---
 - Server-side attendance lock enforcement
 - Audit logging for admin actions
 

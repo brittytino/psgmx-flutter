@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/user_provider.dart';
 import '../ui/auth/login_screen.dart';
-import '../ui/auth/set_password_screen.dart';
 import '../ui/auth/verify_otp_screen.dart';
 import '../ui/auth/forgot_password_screen.dart';
 import '../ui/root_layout.dart';
@@ -27,21 +26,17 @@ class AppRouter {
           builder: (context, state) => const LoginScreen(),
         ),
         GoRoute(
-          path: '/set_password',
-          builder: (context, state) => const SetPasswordScreen(),
-        ),
-        GoRoute(
           path: '/verify_otp',
           builder: (context, state) {
             final email = state.extra as String?;
             if (email == null) {
-              return const SetPasswordScreen(); // Fallback if no email
+              return const LoginScreen(); // Fallback if no email
             }
             return VerifyOtpScreen(email: email);
           },
         ),
         GoRoute(
-          path: '/forgot_password',
+          path: '/auth/forgot-password',
           builder: (context, state) => const ForgotPasswordScreen(),
         ),
         GoRoute(
@@ -67,12 +62,13 @@ class AppRouter {
         // Define auth screens (unauthenticated-only routes)
         final authPaths = {
           '/login',
-          '/set_password',
           '/verify_otp',
-          '/forgot_password'
+          '/auth/forgot-password'
         };
 
-        final isAuthPath = authPaths.contains(currentPath) || currentPath.startsWith('/verify_otp');
+        final isAuthPath = authPaths.contains(currentPath) || 
+                          currentPath.startsWith('/verify_otp') ||
+                          currentPath.startsWith('/auth/');
 
         if (isAuthenticated) {
           // If user is logged in but tries to access login/auth screens, redirect to home
@@ -80,9 +76,9 @@ class AppRouter {
             return '/';
           }
         } else {
-          // If user is NOT logged in and tries to access protected screens, redirect to signup
+          // If user is NOT logged in and tries to access protected screens, redirect to login
           if (!isAuthPath && currentPath != '/splash') {
-            return '/set_password'; // Default to signup for first-time users
+            return '/login';
           }
         }
 

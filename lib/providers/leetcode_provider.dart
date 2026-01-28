@@ -12,6 +12,9 @@ class LeetCodeProvider extends ChangeNotifier {
   bool _isLoading = false;
   bool get isLoading => _isLoading;
   
+  String _loadingMessage = '';
+  String get loadingMessage => _loadingMessage;
+  
   final Map<String, LeetCodeStats> _statsCache = {};
   Map<String, LeetCodeStats> get statsCache => _statsCache;
 
@@ -220,6 +223,7 @@ class LeetCodeProvider extends ChangeNotifier {
   /// This is called on app startup for all users
   Future<void> loadAllUsersFromDatabase() async {
     _isLoading = true;
+    _loadingMessage = 'Loading user stats...';
     notifyListeners();
     
     try {
@@ -229,6 +233,7 @@ class LeetCodeProvider extends ChangeNotifier {
       debugPrint('Error loading users from database: $e');
     } finally {
       _isLoading = false;
+      _loadingMessage = '';
       notifyListeners();
     }
   }
@@ -237,14 +242,19 @@ class LeetCodeProvider extends ChangeNotifier {
   /// This should only be called by authorized users
   Future<void> refreshAllUsersFromAPI() async {
     _isLoading = true;
+    _loadingMessage = 'Preparing refresh...';
     notifyListeners();
     
     try {
       // 0. ENSURE WHITELIST IS SEEDED (Auto-Populate if Empty)
+      _loadingMessage = 'Checking whitelist...';
+      notifyListeners();
       await _dataSeedService.ensureWhitelistSeeded();
       
       // 1. Get all leetcode usernames from WHITELIST (Source of Truth)
       // This checks EVERY student, not just those who signed up
+      _loadingMessage = 'Loading user list...';
+      notifyListeners();
       final usersResponse = await _supabaseService.client
           .from('whitelist')
           .select('leetcode_username')
@@ -261,6 +271,8 @@ class LeetCodeProvider extends ChangeNotifier {
       debugPrint('[LeetCode] Found ${usernames.length} students to refresh');
 
       // 2. Show current database data first (with names attached)
+      _loadingMessage = 'Loading cached data...';
+      notifyListeners();
       await fetchAllUsers();
 
       // 3. Fetch fresh data from LeetCode API
@@ -271,6 +283,7 @@ class LeetCodeProvider extends ChangeNotifier {
       debugPrint('Error refreshing from API: $e');
     } finally {
       _isLoading = false;
+      _loadingMessage = '';
       notifyListeners();
     }
   }
@@ -288,8 +301,13 @@ class LeetCodeProvider extends ChangeNotifier {
     int successCount = 0;
     int failCount = 0;
     
-    for (var username in usernames) {
+    for (var i = 0; i < usernames.length; i++) {
+      final username = usernames[i];
       try {
+        // Update progress message
+        _loadingMessage = 'Fetching ${i + 1}/${usernames.length} users...';
+        notifyListeners();
+        
         await Future.delayed(const Duration(milliseconds: 800)); // Rate limiting (slightly longer)
         final stats = await _fetchFromLeetCodeApi(username); // This saves to DB internally
         if (stats != null) {
@@ -298,7 +316,7 @@ class LeetCodeProvider extends ChangeNotifier {
           
           // Notify UI every 10 users for progressive loading
           if (successCount % 10 == 0) {
-            debugPrint('[LeetCode] 📊 Progress: $successCount/$usernames.length users synced');
+            debugPrint('[LeetCode] 📊 Progress: $successCount/${usernames.length} users synced');
             await fetchAllUsers();
           }
         } else {
@@ -313,6 +331,8 @@ class LeetCodeProvider extends ChangeNotifier {
     
     debugPrint('[LeetCode] ✅ Batch refresh complete: $successCount success, $failCount failed');
     _lastBatchUpdate = DateTime.now();
+    _loadingMessage = '';
+    notifyListeners();
     
     // Save timestamp to database for tracking
     await _saveLastRefreshTimestamp();

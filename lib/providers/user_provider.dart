@@ -225,6 +225,64 @@ class UserProvider with ChangeNotifier {
     }
   }
 
+  /// VERIFY OTP AND SET PASSWORD: Combined method for modern flow
+  ///
+  /// Called by ModernOtpScreen
+  /// - Verifies OTP and sets password in one transaction
+  /// - Creates user profile from whitelist
+  /// - Signs user in automatically
+  Future<void> verifyOtpAndSetPassword({
+    required String email,
+    required String otp,
+    required String password,
+  }) async {
+    try {
+      debugPrint('[UserProvider] Verifying OTP and setting password for: $email');
+
+      // Step 1: Verify OTP and create password (combined)
+      final authResponse = await _authService.verifyOtpAndCreatePassword(
+        email: email,
+        otp: otp,
+        password: password,
+      );
+
+      if (authResponse.session == null) {
+        throw Exception('Failed to create session');
+      }
+
+      debugPrint('[UserProvider] OTP verified and password set successfully');
+
+      // Step 2: Get authenticated user
+      final authUser = authResponse.user;
+      if (authUser == null) {
+        throw Exception('No authenticated user after signup');
+      }
+
+      debugPrint('[UserProvider] Creating user profile from whitelist...');
+
+      // Step 3: Create user profile from whitelist data
+      _currentUser = await _authService.createUserFromWhitelist(
+        authUser.id,
+        email,
+      );
+
+      debugPrint('[UserProvider] User profile created: ${_currentUser?.name}');
+
+      // Step 4: Schedule birthday notification if needed
+      _scheduleBirthdayNotificationIfNeeded();
+
+      notifyListeners();
+
+      // Wait for auth state to be fully updated
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      debugPrint('[UserProvider] Signup complete - user authenticated');
+    } catch (e) {
+      debugPrint('[UserProvider] verifyOtpAndSetPassword error: $e');
+      rethrow;
+    }
+  }
+
   /// COMPLETE SIGNUP WITH PASSWORD: Create password after OTP verified
   ///
   /// Called by CreatePasswordScreen (SECURE FLOW STEP 3)

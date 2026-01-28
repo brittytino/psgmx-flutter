@@ -118,10 +118,25 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard> {
           Consumer<LeetCodeProvider>(
             builder: (context, provider, child) {
               if (provider.isLoading && provider.allUsers.isEmpty) {
-                return const Center(
+                return Center(
                   child: Padding(
-                    padding: EdgeInsets.all(32.0),
-                    child: CircularProgressIndicator(),
+                    padding: const EdgeInsets.all(32.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const CircularProgressIndicator(),
+                        if (provider.loadingMessage.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          Text(
+                            provider.loadingMessage,
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                 );
               }
@@ -400,7 +415,7 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 10,
                         color: Colors.grey,
                       ),
@@ -522,9 +537,9 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard> {
       shrinkWrap: true,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 0.75, // Better card proportions
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
+        childAspectRatio: 0.78, // Adjusted for better fit on smaller screens
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
       ),
       itemCount: users.length,
       itemBuilder: (ctx, idx) {
@@ -611,9 +626,10 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard> {
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(10), // Reduced from 12 to prevent overflow
         child: Column(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisSize: MainAxisSize.min, // Prevent overflow
           children: [
             // Header: Rank Badge
             Row(

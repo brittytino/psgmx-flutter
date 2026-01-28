@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/user_provider.dart';
-import '../../core/theme/app_dimens.dart';
 
 /// Modern Login Screen - Dark Black + Orange Theme
 class LoginScreen extends StatefulWidget {
@@ -70,13 +69,24 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
     
     try {
+      // Try to detect if first time user (optional - if auth service has this method)
       final authService = context.read<UserProvider>().authService;
-      final isFirstTime = await authService.isFirstTimeUser(email);
+      
+      // Check if user exists
+      bool isFirstTime = false;
+      try {
+        isFirstTime = await authService.isFirstTimeUser(email);
+      } catch (e) {
+        // If method doesn't exist, assume not first time
+        isFirstTime = false;
+      }
+      
+      if (!mounted) return;
       
       if (isFirstTime) {
+        setState(() => _isLoading = false);
+        
         if (mounted) {
-          setState(() => _isLoading = false);
-          
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Welcome! Let\'s set up your account with an OTP.'),
@@ -85,7 +95,13 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           );
           
-          context.push('/auth/set-password', extra: {'email': email});
+          // Navigate to OTP signup
+          final success = await context.read<UserProvider>().requestOtp(email: email);
+          if (success && mounted) {
+            context.push('/verify_otp', extra: email);
+          } else if (mounted) {
+            setState(() => _generalError = 'Email not found in student records.');
+          }
         }
         return;
       }
@@ -105,7 +121,14 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _generalError = e.toString();
+          String error = e.toString();
+          // Clean up error messages
+          if (error.contains('Invalid login credentials')) {
+            error = 'Invalid email or password. Please try again.';
+          } else if (error.contains('Email not confirmed')) {
+            error = 'Please verify your email first.';
+          }
+          _generalError = error;
         });
       }
     } finally {
@@ -292,7 +315,31 @@ class _LoginScreenState extends State<LoginScreen> {
                       SizedBox(
                         width: double.infinity,
                         child: OutlinedButton(
-                          onPressed: _isLoading ? null : () => context.push('/auth/set-password'),
+                          onPressed: _isLoading ? null : () async {
+                            // Navigate to signup flow
+                            if (_validateEmail()) {
+                              setState(() => _isLoading = true);
+                              try {
+                                final email = _emailController.text.trim().toLowerCase();
+                                final success = await context.read<UserProvider>().requestOtp(email: email);
+                                if (mounted) {
+                                  if (success) {
+                                    context.push('/verify_otp', extra: email);
+                                  } else {
+                                    setState(() => _generalError = 'Email not found in student records.');
+                                  }
+                                }
+                              } catch (e) {
+                                if (mounted) {
+                                  setState(() => _generalError = e.toString());
+                                }
+                              } finally {
+                                if (mounted) {
+                                  setState(() => _isLoading = false);
+                                }
+                              }
+                            }
+                          },
                           child: const Text('Sign Up (First Time)'),
                         ),
                       ),
