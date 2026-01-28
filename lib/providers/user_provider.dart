@@ -16,41 +16,42 @@ class UserProvider with ChangeNotifier {
   AppUser? _currentUser;
   bool _isLoading = true;
   bool _initComplete = false;
-  
+
   // Simulation Mode for Placement Reps
   UserRole? _simulatedRole;
 
-  UserProvider({required AuthService authService}) : _authService = authService {
+  UserProvider({required AuthService authService})
+      : _authService = authService {
     _init();
   }
 
   AppUser? get currentUser => _currentUser;
   bool get isLoading => _isLoading;
   bool get initComplete => _initComplete;
-  
+
   bool get isSimulating => _simulatedRole != null;
   UserRole? get simulatedRole => _simulatedRole;
-  
+
   // Expose auth service for first-time user detection
   AuthService get authService => _authService;
 
   // EFFECTIVE ROLES (Use these for UI logic)
   // If simulating, strictly return simulation status.
   // If not simulating, return actual role.
-  bool get isStudent => _simulatedRole != null 
-      ? _simulatedRole == UserRole.student 
+  bool get isStudent => _simulatedRole != null
+      ? _simulatedRole == UserRole.student
       : (_currentUser?.isStudent ?? false);
 
-  bool get isTeamLeader => _simulatedRole != null 
-      ? _simulatedRole == UserRole.teamLeader 
+  bool get isTeamLeader => _simulatedRole != null
+      ? _simulatedRole == UserRole.teamLeader
       : (_currentUser?.isTeamLeader ?? false);
 
-  bool get isCoordinator => _simulatedRole != null 
-      ? _simulatedRole == UserRole.coordinator 
+  bool get isCoordinator => _simulatedRole != null
+      ? _simulatedRole == UserRole.coordinator
       : (_currentUser?.isCoordinator ?? false);
-      
-  bool get isPlacementRep => _simulatedRole != null 
-      ? _simulatedRole == UserRole.placementRep 
+
+  bool get isPlacementRep => _simulatedRole != null
+      ? _simulatedRole == UserRole.placementRep
       : (_currentUser?.isPlacementRep ?? false);
 
   // True Admin Access (Never simulated away)
@@ -62,10 +63,10 @@ class UserProvider with ChangeNotifier {
     _simulatedRole = role;
     notifyListeners();
   }
-  
+
   // Public retry method for Splash Screen Failsafe
   void retryInit() {
-    _init(); 
+    _init();
   }
 
   void _init() {
@@ -89,22 +90,22 @@ class UserProvider with ChangeNotifier {
         try {
           debugPrint(
               '[UserProvider] Fetching user document for: ${supabaseUser.email}');
-          
+
           // Fetch user profile (DO NOT AUTO-CREATE)
           // If null, it means we have a session (OTP Verified) but no profile (Password not set yet).
           // This allows AppRouter to keep us on the Verify/Create Password screen.
           _currentUser = await _authService.getUserProfile(supabaseUser.id);
-          
+
           if (_currentUser != null) {
             debugPrint(
                 '[UserProvider] User document loaded: ${_currentUser?.email}');
             // Schedule birthday notification if enabled and DOB exists
             _scheduleBirthdayNotificationIfNeeded();
           } else {
-             debugPrint('[UserProvider] Session active but no user profile found. Assuming incomplete signup.');
-             // Do NOT sign out here. We need the session to create the password.
+            debugPrint(
+                '[UserProvider] Session active but no user profile found. Assuming incomplete signup.');
+            // Do NOT sign out here. We need the session to create the password.
           }
-
         } catch (e) {
           debugPrint('[UserProvider] Error fetching user document: $e');
           // Still mark init as complete
@@ -112,8 +113,8 @@ class UserProvider with ChangeNotifier {
           _isLoading = false;
           _initComplete = true;
           notifyListeners();
-          
-          // Only sign out on genuine connection errors if we really want to, 
+
+          // Only sign out on genuine connection errors if we really want to,
           // but better to leave it for retry.
           return;
         }
@@ -138,7 +139,6 @@ class UserProvider with ChangeNotifier {
     }
   }
 
-
   /// Listen for auth state changes (sign in, sign out)
   void _listenToAuthStateChanges() {
     _authService.authStateChanges.listen(
@@ -150,13 +150,14 @@ class UserProvider with ChangeNotifier {
           try {
             // Fetch profile (don't auto-create)
             _currentUser = await _authService.getUserProfile(supabaseUser.id);
-            
+
             if (_currentUser != null) {
-               debugPrint('[UserProvider] User loaded: ${_currentUser?.email}');
-               // Schedule birthday notification if enabled
-               _scheduleBirthdayNotificationIfNeeded();
+              debugPrint('[UserProvider] User loaded: ${_currentUser?.email}');
+              // Schedule birthday notification if enabled
+              _scheduleBirthdayNotificationIfNeeded();
             } else {
-               debugPrint('[UserProvider] User signed in (OTP) but no profile yet.');
+              debugPrint(
+                  '[UserProvider] User signed in (OTP) but no profile yet.');
             }
           } catch (e) {
             debugPrint('[UserProvider] Error fetching user: $e');
@@ -237,7 +238,8 @@ class UserProvider with ChangeNotifier {
     required String password,
   }) async {
     try {
-      debugPrint('[UserProvider] Verifying OTP and setting password for: $email');
+      debugPrint(
+          '[UserProvider] Verifying OTP and setting password for: $email');
 
       // Step 1: Verify OTP and create password (combined)
       final authResponse = await _authService.verifyOtpAndCreatePassword(
@@ -266,7 +268,12 @@ class UserProvider with ChangeNotifier {
         email,
       );
 
-      debugPrint('[UserProvider] User profile created: ${_currentUser?.name}');
+      if (_currentUser == null) {
+        throw Exception('Failed to create user profile in database');
+      }
+
+      debugPrint(
+          '[UserProvider] ✅ User profile created successfully: ${_currentUser?.name}');
 
       // Step 4: Schedule birthday notification if needed
       _scheduleBirthdayNotificationIfNeeded();
@@ -276,7 +283,8 @@ class UserProvider with ChangeNotifier {
       // Wait for auth state to be fully updated
       await Future.delayed(const Duration(milliseconds: 300));
 
-      debugPrint('[UserProvider] Signup complete - user authenticated');
+      debugPrint(
+          '[UserProvider] ✅ Signup complete - user authenticated with database profile');
     } catch (e) {
       debugPrint('[UserProvider] verifyOtpAndSetPassword error: $e');
       rethrow;
@@ -301,27 +309,28 @@ class UserProvider with ChangeNotifier {
       await _authService.createPasswordAfterOtpVerification(password);
 
       debugPrint('[UserProvider] Password created successfully');
-      
+
       // Step 2: Get authenticated user ID
       final authUser = _authService.currentUser;
       if (authUser == null) {
         throw Exception('No authenticated user after password creation');
       }
-      
+
       debugPrint('[UserProvider] Creating user profile from whitelist...');
-      
+
       // Step 3: PRODUCTION - Create user from whitelist data
       // This populates reg_no, name, batch, team_id, dob, leetcode_username, roles
       _currentUser = await _authService.createUserFromWhitelist(
         authUser.id,
         email,
       );
-      
-      debugPrint('[UserProvider] User profile created: ${_currentUser?.name} (${_currentUser?.regNo})');
-      
+
+      debugPrint(
+          '[UserProvider] User profile created: ${_currentUser?.name} (${_currentUser?.regNo})');
+
       // Step 4: Schedule birthday notification if DOB exists
       _scheduleBirthdayNotificationIfNeeded();
-      
+
       notifyListeners();
 
       // Wait for auth state to be fully updated
@@ -426,12 +435,11 @@ class UserProvider with ChangeNotifier {
       final dobStr = newDob.toIso8601String().split('T')[0];
       await Supabase.instance.client
           .from('users')
-          .update({'dob': dobStr})
-          .eq('id', _currentUser!.uid);
-          
+          .update({'dob': dobStr}).eq('id', _currentUser!.uid);
+
       _currentUser = _currentUser!.copyWith(dob: newDob);
       notifyListeners();
-      
+
       // Reschedule birthday notification with new DOB
       _scheduleBirthdayNotificationIfNeeded();
     } catch (e) {
@@ -445,12 +453,13 @@ class UserProvider with ChangeNotifier {
     try {
       await Supabase.instance.client
           .from('users')
-          .update({'birthday_notifications_enabled': enabled})
-          .eq('id', _currentUser!.uid);
-          
-      _currentUser = _currentUser!.copyWith(birthdayNotificationsEnabled: enabled);
+          .update({'birthday_notifications_enabled': enabled}).eq(
+              'id', _currentUser!.uid);
+
+      _currentUser =
+          _currentUser!.copyWith(birthdayNotificationsEnabled: enabled);
       notifyListeners();
-      
+
       // Schedule or cancel birthday notification
       _scheduleBirthdayNotificationIfNeeded();
     } catch (e) {
@@ -464,9 +473,8 @@ class UserProvider with ChangeNotifier {
     try {
       await Supabase.instance.client
           .from('users')
-          .update({'leetcode_username': username})
-          .eq('id', _currentUser!.uid);
-          
+          .update({'leetcode_username': username}).eq('id', _currentUser!.uid);
+
       _currentUser = _currentUser!.copyWith(leetcodeUsername: username);
       notifyListeners();
     } catch (e) {
@@ -480,28 +488,29 @@ class UserProvider with ChangeNotifier {
     try {
       await Supabase.instance.client
           .from('users')
-          .update({'leetcode_notifications_enabled': enabled})
-          .eq('id', _currentUser!.uid);
-          
-      _currentUser = _currentUser!.copyWith(leetcodeNotificationsEnabled: enabled);
+          .update({'leetcode_notifications_enabled': enabled}).eq(
+              'id', _currentUser!.uid);
+
+      _currentUser =
+          _currentUser!.copyWith(leetcodeNotificationsEnabled: enabled);
       notifyListeners();
-      
+
       // Update local schedule
       if (enabled) {
-         await NotificationService().scheduleLeetCodeReminders();
+        await NotificationService().scheduleLeetCodeReminders();
       } else {
-         await NotificationService().cancelLeetCodeReminders();
+        await NotificationService().cancelLeetCodeReminders();
       }
     } catch (e) {
       debugPrint('Error updating leetcode notif setting: $e');
       rethrow;
     }
   }
-  
+
   /// Schedule birthday notification if user has DOB and notifications enabled
   void _scheduleBirthdayNotificationIfNeeded() {
     if (_currentUser == null) return;
-    
+
     try {
       if (_currentUser!.dob != null) {
         NotificationService().scheduleBirthdayNotification(

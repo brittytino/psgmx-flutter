@@ -67,11 +67,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final email = _emailController.text.trim().toLowerCase();
     setState(() => _isLoading = true);
-    
+
     try {
       // Try to detect if first time user (optional - if auth service has this method)
       final authService = context.read<UserProvider>().authService;
-      
+
       // Check if user exists
       bool isFirstTime = false;
       try {
@@ -80,12 +80,12 @@ class _LoginScreenState extends State<LoginScreen> {
         // If method doesn't exist, assume not first time
         isFirstTime = false;
       }
-      
+
       if (!mounted) return;
-      
+
       if (isFirstTime) {
         setState(() => _isLoading = false);
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -94,24 +94,26 @@ class _LoginScreenState extends State<LoginScreen> {
               duration: Duration(seconds: 3),
             ),
           );
-          
+
           // Navigate to OTP signup
-          final success = await context.read<UserProvider>().requestOtp(email: email);
+          final success =
+              await context.read<UserProvider>().requestOtp(email: email);
           if (success && mounted) {
             context.push('/verify_otp', extra: email);
           } else if (mounted) {
-            setState(() => _generalError = 'Email not found in student records.');
+            setState(
+                () => _generalError = 'Email not found in student records.');
           }
         }
         return;
       }
-      
+
       // Returning user - validate password
       if (!_validatePassword()) {
         setState(() => _isLoading = false);
         return;
       }
-      
+
       final password = _passwordController.text;
 
       await Provider.of<UserProvider>(context, listen: false).signIn(
@@ -149,42 +151,53 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Logo
+                // Modern Logo with gradient
                 Container(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFF6600),
-                    borderRadius: BorderRadius.circular(20),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFF6600), Color(0xFFFF8833)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFF6600).withAlpha(80),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
                   ),
                   child: const Icon(
-                    Icons.school,
-                    size: 50,
+                    Icons.school_rounded,
+                    size: 56,
                     color: Colors.white,
                   ),
                 ),
-                
+
                 const SizedBox(height: 32),
-                
+
                 // Title
                 Text(
                   'PSG MCA Prep',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
-                
+
                 const SizedBox(height: 8),
-                
+
                 Text(
                   'Sign in to continue your progress',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: const Color(0xFFB3B3B3),
-                  ),
+                        color: const Color(0xFFB3B3B3),
+                      ),
                 ),
-                
+
                 const SizedBox(height: 48),
-                
+
                 // Login Form Card
                 Container(
                   padding: const EdgeInsets.all(24),
@@ -203,9 +216,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       Text(
                         'College Email',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
                       ),
                       const SizedBox(height: 8),
                       TextField(
@@ -215,30 +228,36 @@ class _LoginScreenState extends State<LoginScreen> {
                         style: const TextStyle(color: Colors.white),
                         decoration: InputDecoration(
                           hintText: 'john.doe@psgtech.ac.in',
-                          prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF666666)),
+                          prefixIcon: const Icon(Icons.alternate_email_rounded,
+                              color: Color(0xFFFF6600)),
                           errorText: _emailError,
                         ),
                         onChanged: (_) {
                           if (_emailError != null) _validateEmail();
                         },
                       ),
-                      
+
                       const SizedBox(height: 24),
-                      
+
                       // Password Field
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
                             'Password',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                            ),
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
                           ),
                           TextButton(
-                            onPressed: () => context.push('/auth/forgot-password'),
-                            child: const Text('Forgot?', style: TextStyle(color: Color(0xFFFF6600))),
+                            onPressed: () =>
+                                context.push('/auth/forgot-password'),
+                            child: const Text('Forgot?',
+                                style: TextStyle(color: Color(0xFFFF6600))),
                           ),
                         ],
                       ),
@@ -250,13 +269,17 @@ class _LoginScreenState extends State<LoginScreen> {
                         style: const TextStyle(color: Colors.white),
                         decoration: InputDecoration(
                           hintText: '••••••••',
-                          prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF666666)),
+                          prefixIcon: const Icon(Icons.lock_rounded,
+                              color: Color(0xFFFF6600)),
                           suffixIcon: IconButton(
                             icon: Icon(
-                              _showPassword ? Icons.visibility : Icons.visibility_off,
-                              color: const Color(0xFF666666),
+                              _showPassword
+                                  ? Icons.visibility_rounded
+                                  : Icons.visibility_off_rounded,
+                              color: const Color(0xFF999999),
                             ),
-                            onPressed: () => setState(() => _showPassword = !_showPassword),
+                            onPressed: () =>
+                                setState(() => _showPassword = !_showPassword),
                           ),
                           errorText: _passwordError,
                         ),
@@ -264,9 +287,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           if (_passwordError != null) _validatePassword();
                         },
                       ),
-                      
+
                       const SizedBox(height: 32),
-                      
+
                       // Error Message
                       if (_generalError != null)
                         Container(
@@ -275,22 +298,25 @@ class _LoginScreenState extends State<LoginScreen> {
                           decoration: BoxDecoration(
                             color: Colors.redAccent.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.redAccent, width: 1),
+                            border:
+                                Border.all(color: Colors.redAccent, width: 1),
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.error_outline, color: Colors.redAccent, size: 20),
+                              const Icon(Icons.error_outline,
+                                  color: Colors.redAccent, size: 20),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   _generalError!,
-                                  style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+                                  style: const TextStyle(
+                                      color: Colors.redAccent, fontSize: 13),
                                 ),
                               ),
                             ],
                           ),
                         ),
-                      
+
                       // Sign In Button
                       SizedBox(
                         width: double.infinity,
@@ -308,53 +334,63 @@ class _LoginScreenState extends State<LoginScreen> {
                               : const Text('Sign In'),
                         ),
                       ),
-                      
+
                       const SizedBox(height: 16),
-                      
+
                       // Sign Up Button
                       SizedBox(
                         width: double.infinity,
-                        child: OutlinedButton(
-                          onPressed: _isLoading ? null : () async {
-                            // Navigate to signup flow
-                            if (_validateEmail()) {
-                              setState(() => _isLoading = true);
-                              try {
-                                final email = _emailController.text.trim().toLowerCase();
-                                final success = await context.read<UserProvider>().requestOtp(email: email);
-                                if (mounted) {
-                                  if (success) {
-                                    context.push('/verify_otp', extra: email);
-                                  } else {
-                                    setState(() => _generalError = 'Email not found in student records.');
+                        child: OutlinedButton.icon(
+                          onPressed: _isLoading
+                              ? null
+                              : () async {
+                                  // Navigate to signup flow
+                                  if (_validateEmail()) {
+                                    setState(() => _isLoading = true);
+                                    try {
+                                      final email = _emailController.text
+                                          .trim()
+                                          .toLowerCase();
+                                      final success = await context
+                                          .read<UserProvider>()
+                                          .requestOtp(email: email);
+                                      if (mounted) {
+                                        if (success) {
+                                          context.push('/verify_otp',
+                                              extra: email);
+                                        } else {
+                                          setState(() => _generalError =
+                                              'Email not found in student records.');
+                                        }
+                                      }
+                                    } catch (e) {
+                                      if (mounted) {
+                                        setState(
+                                            () => _generalError = e.toString());
+                                      }
+                                    } finally {
+                                      if (mounted) {
+                                        setState(() => _isLoading = false);
+                                      }
+                                    }
                                   }
-                                }
-                              } catch (e) {
-                                if (mounted) {
-                                  setState(() => _generalError = e.toString());
-                                }
-                              } finally {
-                                if (mounted) {
-                                  setState(() => _isLoading = false);
-                                }
-                              }
-                            }
-                          },
-                          child: const Text('Sign Up (First Time)'),
+                                },
+                          icon: const Icon(Icons.person_add_rounded, size: 20),
+                          label: const Text('Create New Account'),
                         ),
                       ),
                     ],
                   ),
                 ),
-                
+
                 const SizedBox(height: 32),
-                
+
                 // Footer
                 Text(
                   '© 2025 PSG College of Technology',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: const Color(0xFF666666),
-                  ),
+                        color: const Color(0xFF666666),
+                      ),
                 ),
               ],
             ),

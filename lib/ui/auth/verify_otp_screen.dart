@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import '../../providers/user_provider.dart';
 
 /// VerifyOtpScreen: Secure OTP verification before password creation
-/// 
+///
 /// User receives OTP via email and enters it here
 /// After verification, they create a password to complete signup
 class VerifyOtpScreen extends StatefulWidget {
@@ -37,6 +37,7 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
   }
 
   /// Create account: Verify OTP + Set Password
+  /// ONLY navigates after database save is complete
   Future<void> _createAccount() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -55,7 +56,7 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
     try {
       debugPrint('[VerifyOtpScreen] Creating account...');
 
-      // Complete signup: verify OTP + set password
+      // Complete signup: verify OTP + set password + create user profile in database
       final provider = context.read<UserProvider>();
       await provider.verifyOtpAndSetPassword(
         email: widget.email,
@@ -63,25 +64,42 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
         password: _passwordController.text,
       );
 
-      debugPrint('[VerifyOtpScreen] Account created successfully!');
+      // This point is reached ONLY after:
+      // 1. OTP is verified
+      // 2. Password is set in Supabase Auth
+      // 3. User profile is created in database from whitelist
+      // 4. Birthday notification is scheduled
+
+      debugPrint(
+          '[VerifyOtpScreen] ✅ Account created and saved to database successfully!');
 
       if (!mounted) return;
-      
+
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('✅ Account created successfully!'),
+          content: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.white),
+              SizedBox(width: 8),
+              Expanded(
+                  child: Text('Account created successfully! Welcome aboard!')),
+            ],
+          ),
           backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
         ),
       );
 
-      // Navigate to home
+      // Small delay for user to see success message
       await Future.delayed(const Duration(milliseconds: 500));
       if (!mounted) return;
+
+      // Navigate to home - user is fully authenticated with database profile
       context.go('/');
     } catch (e) {
       if (!mounted) return;
-      debugPrint('[VerifyOtpScreen] Error: $e');
+      debugPrint('[VerifyOtpScreen] ❌ Error: $e');
       setState(() {
         String error = e.toString();
         // Clean up error messages
@@ -89,6 +107,8 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
           error = 'Invalid or expired OTP. Please request a new one.';
         } else if (error.contains('Email not confirmed')) {
           error = 'Please enter the OTP code sent to your email.';
+        } else if (error.contains('already exists')) {
+          error = 'Account already exists. Please sign in instead.';
         }
         _error = error;
         _isLoading = false;
@@ -246,8 +266,7 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
                                 : Icons.visibility_off_rounded,
                           ),
                           onPressed: () => setState(
-                            () =>
-                                _showConfirmPassword = !_showConfirmPassword,
+                            () => _showConfirmPassword = !_showConfirmPassword,
                           ),
                         ),
                         border: OutlineInputBorder(
