@@ -105,7 +105,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
             children: [
               _NotificationList(notifications: allNotifications),
               _NotificationList(
-                notifications: allNotifications.where((n) => !n.isRead).toList(),
+                notifications: allNotifications.where((n) => n.isRead == false || n.isRead == null).toList(),
               ),
               _NotificationList(
                 notifications: allNotifications
@@ -218,13 +218,13 @@ class _NotificationCard extends StatelessWidget {
       child: Card(
         margin: const EdgeInsets.only(bottom: AppSpacing.sm),
         elevation: 0,
-        color: notification.isRead
+        color: (notification.isRead == true)
             ? colorScheme.surface
             : colorScheme.primaryContainer.withValues(alpha: 0.1),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.lg),
           side: BorderSide(
-            color: notification.isRead
+            color: (notification.isRead == true)
                 ? colorScheme.outline.withValues(alpha: 0.2)
                 : colorScheme.primary.withValues(alpha: 0.3),
             width: 1,
@@ -232,7 +232,7 @@ class _NotificationCard extends StatelessWidget {
         ),
         child: InkWell(
           onTap: () async {
-            if (!notification.isRead) {
+            if (notification.isRead != true) {
               await notifService.markAsRead(notification.id);
             }
           },
@@ -270,14 +270,14 @@ class _NotificationCard extends StatelessWidget {
                               notification.title,
                               style: GoogleFonts.inter(
                                 fontSize: 15,
-                                fontWeight: notification.isRead
+                                fontWeight: (notification.isRead == true)
                                     ? FontWeight.w500
                                     : FontWeight.w600,
                                 color: colorScheme.onSurface,
                               ),
                             ),
                           ),
-                          if (!notification.isRead)
+                          if (notification.isRead != true)
                             Container(
                               width: 8,
                               height: 8,
@@ -324,7 +324,7 @@ class _NotificationCard extends StatelessWidget {
       case model.NotificationType.alert:
         return colorScheme.error;
       case model.NotificationType.motivation:
-        return colorScheme.tertiary ?? colorScheme.secondary;
+        return colorScheme.tertiary;
       case model.NotificationType.reminder:
         return colorScheme.primary;
       case model.NotificationType.announcement:
@@ -388,7 +388,7 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'You're all caught up!',
+            "You're all caught up!",
             style: GoogleFonts.inter(
               fontSize: 14,
               color: colorScheme.onSurfaceVariant,

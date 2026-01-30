@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:provider/provider.dart';
-import 'dart:io';
 import '../../providers/user_provider.dart';
 import '../../services/task_upload_service.dart';
-import '../../core/theme/app_dimens.dart';
 
 class ModernBulkUploadDialog extends StatefulWidget {
   const ModernBulkUploadDialog({super.key});
@@ -295,7 +292,12 @@ class _ModernBulkUploadDialogState extends State<ModernBulkUploadDialog> {
 
     try {
       final uploadService = TaskUploadService();
-      final fileBytes = await File(_selectedFile!.path!).readAsBytes();
+      
+      // Get file bytes from PlatformFile
+      final fileBytes = _selectedFile!.bytes;
+      if (fileBytes == null) {
+        throw Exception('Could not read file data');
+      }
 
       // Parse file
       final sheets = await uploadService.parseUploadFile(
@@ -306,7 +308,7 @@ class _ModernBulkUploadDialogState extends State<ModernBulkUploadDialog> {
       // Upload tasks
       final result = await uploadService.uploadTasks(
         sheets: sheets,
-        uploadedBy: userProvider.currentUser!.id,
+        uploadedBy: userProvider.currentUser!.uid,
         fileName: _selectedFile!.name,
       );
 

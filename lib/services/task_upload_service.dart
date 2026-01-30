@@ -261,14 +261,6 @@ class TaskUploadService {
     }
   }
 
-  TopicType _detectTopicType(String sheetName) {
-    final lower = sheetName.toLowerCase();
-    if (lower.contains('leet') || lower.contains('question')) {
-      return TopicType.leetcode;
-    }
-    return TopicType.core;
-  }
-
   DateTime _parseDate(String dateString) {
     try {
       // Try various date formats

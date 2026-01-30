@@ -3,6 +3,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:permission_handler/permission_handler.dart';
+import '../models/notification.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -37,6 +38,57 @@ class NotificationService {
     );
     
     _isInitialized = true;
+  }
+
+  // Mock notification storage for demo purposes
+  final List<AppNotification> _mockNotifications = [];
+
+  Future<List<AppNotification>> getNotifications() async {
+    // Return mock notifications for demo
+    if (_mockNotifications.isEmpty) {
+      _mockNotifications.addAll([
+        AppNotification(
+          id: '1',
+          title: 'Welcome to PSGMX!',
+          message: 'Start your placement preparation journey with us.',
+          notificationType: NotificationType.announcement,
+          targetAudience: 'all',
+          generatedAt: DateTime.now().subtract(const Duration(hours: 2)),
+        ),
+        AppNotification(
+          id: '2',
+          title: 'Daily LeetCode Reminder',
+          message: 'Don\'t forget to solve today\'s problem!',
+          notificationType: NotificationType.reminder,
+          targetAudience: 'all',
+          generatedAt: DateTime.now().subtract(const Duration(hours: 1)),
+        ),
+      ]);
+    }
+    return _mockNotifications;
+  }
+
+  Future<void> markAsRead(String notificationId) async {
+    final index = _mockNotifications.indexWhere((n) => n.id == notificationId);
+    if (index != -1) {
+      _mockNotifications[index] = _mockNotifications[index].copyWith(
+        isRead: true,
+        readAt: DateTime.now(),
+      );
+    }
+  }
+
+  Future<void> markAllAsRead() async {
+    for (int i = 0; i < _mockNotifications.length; i++) {
+      _mockNotifications[i] = _mockNotifications[i].copyWith(
+        isRead: true,
+        readAt: DateTime.now(),
+      );
+    }
+  }
+
+  Future<void> deleteNotification(String notificationId) async {
+    _mockNotifications.removeWhere((n) => n.id == notificationId);
   }
 
   Future<void> scheduleLeetCodeReminders() async {

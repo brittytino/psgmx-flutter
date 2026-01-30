@@ -137,6 +137,11 @@ class AppNotification {
     return DateTime.now().isAfter(validUntil!);
   }
 
+  // Convenience getters for compatibility
+  NotificationType get type => notificationType;
+  DateTime get createdAt => generatedAt;
+  String get body => message;
+
   AppNotification copyWith({
     String? id,
     String? title,

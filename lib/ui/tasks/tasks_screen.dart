@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:io';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:excel/excel.dart' hide Border;
 import 'package:intl/intl.dart';
 import '../../providers/user_provider.dart';
 import '../../services/supabase_db_service.dart';
@@ -544,7 +541,6 @@ class _RepTaskManagementViewState extends State<_RepTaskManagementView> {
 
   @override
   Widget build(BuildContext context) {
-    final userProvider = Provider.of<UserProvider>(context, listen: false);
     final taskUploadService = TaskUploadService();
 
     return Column(
@@ -632,7 +628,7 @@ class _RepTaskManagementViewState extends State<_RepTaskManagementView> {
                     children: [
                       // Date Header
                       Padding(
-                        padding: const EdgeInsets.only(bottom: 8, top: index == 0 ? 0 : 16),
+                        padding: EdgeInsets.only(bottom: 8, top: index == 0 ? 0 : 16),
                         child: Text(
                           DateFormat('EEEE, MMMM d, yyyy').format(date),
                           style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -990,7 +986,7 @@ class _EditTaskDialogState extends State<_EditTaskDialog> {
           child: const Text('Cancel'),
         ),
         FilledButton(
-          onPressed: _isLoading ? null : () => _saveTask(userProvider.user!.uid),
+          onPressed: _isLoading ? null : () => _saveTask(userProvider.currentUser!.uid),
           child: _isLoading
               ? const SizedBox(
                   width: 16,
