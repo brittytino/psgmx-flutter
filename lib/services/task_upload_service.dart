@@ -98,11 +98,16 @@ class TaskUploadService {
   // BULK UPLOAD - CSV/XLSX PARSING
   // ========================================
 
-  Future<List<TaskUploadSheet>> parseUploadFile({
-    required Uint8List fileBytes,
-    required String fileName,
-  }) async {
+  /// Parse Excel file with proper error handling
+  Future<List<TaskUploadSheet>> parseExcelFile(
+    Uint8List fileBytes,
+    String fileName,
+  ) async {
     try {
+      if (fileBytes.isEmpty) {
+        throw Exception('File is empty or could not be read');
+      }
+
       if (fileName.endsWith('.csv')) {
         return await _parseCsvFile(fileBytes);
       } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
@@ -113,6 +118,13 @@ class TaskUploadService {
     } catch (e) {
       throw Exception('Failed to parse file: ${e.toString()}');
     }
+  }
+
+  Future<List<TaskUploadSheet>> parseUploadFile({
+    required Uint8List fileBytes,
+    required String fileName,
+  }) async {
+    return parseExcelFile(fileBytes, fileName);
   }
 
   Future<List<TaskUploadSheet>> _parseCsvFile(Uint8List fileBytes) async {

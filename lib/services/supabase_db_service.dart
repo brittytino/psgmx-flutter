@@ -89,7 +89,7 @@ class SupabaseDbService {
     // marked by the team leader vs a rep override?
     // Usually one record per student.
     final count = await _supabase
-        .from('attendance')
+        .from('attendance_records')
         .count()
         .eq('team_id', teamId)
         .eq('date', date);
@@ -120,7 +120,7 @@ class SupabaseDbService {
         .toList();
 
     await _supabase
-        .from('attendance')
+        .from('attendance_records')
         .upsert(validRecords, onConflict: 'date, student_id');
   }
 
@@ -141,7 +141,7 @@ class SupabaseDbService {
     final teamId = studentRes['team_id'];
 
     // 2. Upsert Attendance
-    await _supabase.from('attendance').upsert({
+    await _supabase.from('attendance_records').upsert({
       'date': date,
       'student_id': studentId,
       'team_id': teamId ?? 'NA',
@@ -165,7 +165,7 @@ class SupabaseDbService {
 
   Stream<List<AttendanceRecord>> getStudentAttendance(String studentId) {
     return _supabase
-        .from('attendance')
+        .from('attendance_records')
         .stream(primaryKey: ['id'])
         .eq('student_id', studentId)
         .order('date', ascending: false)
@@ -223,21 +223,34 @@ class SupabaseDbService {
   }
 
   Future<Map<String, dynamic>> getPlacementStats() async {
-    // 1. Total Students from WHITELIST (source of truth - all 123 students)
-    final whitelistCount = await _supabase.from('whitelist').count();
+    try {
+      // 1. Total Students from USERS table (all 123 students now in users)
+      final usersResponse = await _supabase
+          .from('users')
+          .select()
+          .eq('roles->>isStudent', 'true');
+      final totalStudents = (usersResponse as List).length;
 
-    // 2. Count today's attendance
-    final today = DateTime.now().toIso8601String().split('T')[0];
-    final attendanceCount = await _supabase
-        .from('attendance')
-        .count()
-        .eq('date', today)
-        .eq('status', 'PRESENT');
+      // 2. Count today's attendance
+      final today = DateTime.now().toIso8601String().split('T')[0];
+      final attendanceResponse = await _supabase
+          .from('attendance_records')
+          .select()
+          .eq('date', today)
+          .eq('status', 'PRESENT');
+      final todayPresent = (attendanceResponse as List).length;
 
-    return {
-      'total_students': whitelistCount,
-      'today_present': attendanceCount,
-    };
+      return {
+        'total_students': totalStudents,
+        'today_present': todayPresent,
+      };
+    } catch (e) {
+      // Return safe defaults if query fails
+      return {
+        'total_students': 0,
+        'today_present': 0,
+      };
+    }
   }
 
   Future<List<AppUser>> getAllStudents() async {

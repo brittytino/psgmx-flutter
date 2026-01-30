@@ -41,12 +41,13 @@ class RoleSimulation {
     );
   }
 
-  factory RoleSimulation.coordinator() {
-    return const RoleSimulation(
-      simulatedRoles: UserRoles(
+  factory RoleSimulation.coordinator({String? teamId}) {
+    return RoleSimulation(
+      simulatedRoles: const UserRoles(
         isStudent: true,
         isCoordinator: true,
       ),
+      simulatedTeamId: teamId,
       isActive: true,
     );
   }
@@ -191,8 +192,8 @@ class EnhancedAuthService {
     await enableRoleSimulation(RoleSimulation.teamLeader(teamId));
   }
 
-  Future<void> simulateCoordinator() async {
-    await enableRoleSimulation(RoleSimulation.coordinator());
+  Future<void> simulateCoordinator({String? teamId}) async {
+    await enableRoleSimulation(RoleSimulation.coordinator(teamId: teamId));
   }
 
   Future<void> _saveSimulationState() async {

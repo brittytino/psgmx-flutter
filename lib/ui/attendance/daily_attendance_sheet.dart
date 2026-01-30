@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../providers/attendance_provider.dart';
 import '../../providers/user_provider.dart';
+import '../../services/attendance_schedule_service.dart';
 import '../../core/theme/app_dimens.dart';
 
 class DailyAttendanceSheet extends StatefulWidget {
@@ -403,7 +404,35 @@ class _DailyAttendanceSheetState extends State<DailyAttendanceSheet> {
     
     if (!isRep && user?.teamId == null) return;
 
-    // Validation checks?
+    // Check if today is scheduled for team leaders
+    if (!isRep) {
+      final scheduleService = AttendanceScheduleService();
+      final isTodayScheduled = await scheduleService.isDateScheduled(DateTime.now());
+      
+      if (!isTodayScheduled) {
+        if (context.mounted) {
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text("No Class Today"),
+              content: const Text(
+                "Attendance marking is only available on scheduled class dates. "
+                "Please contact the placement rep if you believe this is an error."
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text("OK"),
+                ),
+              ],
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    // Validation checks
     final absentCount = _statusMap.values.where((s) => s == 'ABSENT').length;
     final total = provider.teamMembers.length;
 

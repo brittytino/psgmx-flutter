@@ -84,7 +84,8 @@ class _RoleSimulationWidgetState extends State<RoleSimulationWidget> {
                   label: 'Coordinator',
                   mode: SimulationMode.coordinator,
                   icon: Icons.school,
-                  color: Colors.blue,
+                  color: const Color(0xFFEA580C),
+                  needsTeam: true,
                 ),
                 _buildRoleChip(
                   context,
@@ -100,10 +101,13 @@ class _RoleSimulationWidgetState extends State<RoleSimulationWidget> {
                   mode: SimulationMode.student,
                   icon: Icons.person,
                   color: Colors.orange,
+                  needsTeam: true,
                 ),
               ],
             ),
-            if (_mode == SimulationMode.teamLeader || _mode == SimulationMode.student)
+            if (_mode == SimulationMode.coordinator || 
+                _mode == SimulationMode.teamLeader || 
+                _mode == SimulationMode.student)
               Padding(
                 padding: const EdgeInsets.only(top: 16),
                 child: _buildTeamSelector(),
@@ -189,7 +193,11 @@ class _RoleSimulationWidgetState extends State<RoleSimulationWidget> {
           await widget.authService.disableRoleSimulation();
           break;
         case SimulationMode.coordinator:
-          await widget.authService.simulateCoordinator();
+          if (_selectedTeamId != null) {
+            await widget.authService.simulateCoordinator(teamId: _selectedTeamId);
+          } else {
+            return; // Wait for team selection
+          }
           break;
         case SimulationMode.teamLeader:
           if (_selectedTeamId != null) {
@@ -232,7 +240,9 @@ class _RoleSimulationWidgetState extends State<RoleSimulationWidget> {
       case SimulationMode.none:
         return 'Back to Placement Rep view';
       case SimulationMode.coordinator:
-        return 'Now viewing as Coordinator';
+        return _selectedTeamId != null
+            ? 'Now viewing as Coordinator ($_selectedTeamId)'
+            : 'Now viewing as Coordinator';
       case SimulationMode.teamLeader:
         return 'Now viewing as Team Leader ($_selectedTeamId)';
       case SimulationMode.student:

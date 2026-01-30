@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../providers/leetcode_provider.dart';
 import '../../../models/leetcode_stats.dart';
+import '../../../services/connectivity_service.dart';
 import '../../../core/theme/app_dimens.dart';
+import '../../widgets/offline_error_view.dart';
 
 class ModernLeaderboard extends StatefulWidget {
   const ModernLeaderboard({super.key});
@@ -70,6 +72,10 @@ class _ModernLeaderboardState extends State<ModernLeaderboard> {
               );
             }
             if (snapshot.hasError) {
+              final isOffline = !ConnectivityService().hasConnection;
+              if (isOffline) {
+                return CompactOfflineView();
+              }
               return Center(child: Text("Error: ${snapshot.error}"));
             }
 

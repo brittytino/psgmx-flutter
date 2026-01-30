@@ -43,17 +43,64 @@ class _NotificationsScreenState extends State<NotificationsScreen> with SingleTi
           ),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.done_all),
-            onPressed: () async {
-              await notifService.markAllAsRead();
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('All notifications marked as read')),
-                );
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (value) async {
+              if (value == 'markAllRead') {
+                await notifService.markAllAsRead();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('All notifications marked as read')),
+                  );
+                  setState(() {}); // Refresh
+                }
+              } else if (value == 'test') {
+                // Request permissions first
+                final hasPermission = await notifService.requestPermissions();
+                if (!hasPermission && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please enable notifications in settings'),
+                      duration: Duration(seconds: 3),
+                    ),
+                  );
+                  return;
+                }
+                
+                await notifService.showTestNotification();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Test notification sent! 🔔'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                  setState(() {}); // Refresh the list
+                }
               }
             },
-            tooltip: 'Mark all as read',
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'markAllRead',
+                child: Row(
+                  children: [
+                    Icon(Icons.done_all, size: 20),
+                    SizedBox(width: 12),
+                    Text('Mark all as read'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'test',
+                child: Row(
+                  children: [
+                    Icon(Icons.notification_add, size: 20),
+                    SizedBox(width: 12),
+                    Text('Send test notification'),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
         bottom: TabBar(

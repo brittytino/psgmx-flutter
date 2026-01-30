@@ -13,8 +13,9 @@ import 'services/supabase_service.dart';
 import 'services/supabase_db_service.dart';
 import 'services/quote_service.dart';
 import 'services/notification_service.dart';
-import 'services/connectivity_service.dart';
+
 import 'ui/widgets/error_boundary.dart';
+import 'ui/widgets/modern_offline_banner.dart';
 import 'core/theme/app_theme.dart';
 
 void main() async {
@@ -61,6 +62,7 @@ class PsgMxApp extends StatelessWidget {
         Provider<SupabaseDbService>.value(value: supabaseDbService),
         Provider<AuthService>.value(value: authService),
         Provider<QuoteService>.value(value: quoteService),
+        Provider<NotificationService>.value(value: NotificationService()),
         ChangeNotifierProvider(
           create: (_) => UserProvider(authService: authService),
         ),
@@ -107,7 +109,7 @@ class _PsgMxAppInnerState extends State<PsgMxAppInner> {
       themeMode: ThemeMode.system,
       routerConfig: _router,
       builder: (context, child) {
-        return OfflineBanner(child: child ?? const SizedBox());
+        return ModernOfflineBanner(child: child ?? const SizedBox());
       },
     );
   }

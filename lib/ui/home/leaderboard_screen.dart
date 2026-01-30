@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/leetcode_provider.dart';
 import '../../models/leetcode_stats.dart';
+import '../../services/connectivity_service.dart';
 import '../../core/theme/app_dimens.dart';
+import '../widgets/offline_error_view.dart';
 
 class LeaderboardScreen extends StatelessWidget {
   const LeaderboardScreen({super.key});
@@ -20,6 +22,20 @@ class LeaderboardScreen extends StatelessWidget {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
+          
+          if (snapshot.hasError) {
+            final isOffline = !ConnectivityService().hasConnection;
+            if (isOffline) {
+              return OfflineErrorView(
+                title: 'Unable to Load Leaderboard',
+                message: 'Connect to the internet to view rankings',
+              );
+            }
+            return Center(
+              child: Text('Error: ${snapshot.error}'),
+            );
+          }
+          
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
             return const Center(child: Text("No data available yet."));
           }

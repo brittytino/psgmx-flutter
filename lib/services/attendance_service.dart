@@ -170,7 +170,7 @@ class AttendanceService {
         };
       }).toList();
 
-      await _supabase.from('attendance').upsert(records);
+      await _supabase.from('attendance_records').upsert(records);
     } catch (e) {
       throw Exception('Failed to mark attendance: ${e.toString()}');
     }
@@ -183,7 +183,7 @@ class AttendanceService {
     try {
       final dateString = date.toIso8601String().split('T')[0];
       final response = await _supabase
-          .from('attendance')
+          .from('attendance_records')
           .select()
           .eq('student_id', studentId)
           .eq('date', dateString)
@@ -203,7 +203,7 @@ class AttendanceService {
     try {
       final dateString = date.toIso8601String().split('T')[0];
       final response = await _supabase
-          .from('attendance')
+          .from('attendance_records')
           .select()
           .eq('team_id', teamId)
           .eq('date', dateString)
@@ -224,7 +224,7 @@ class AttendanceService {
   }) async {
     try {
       var query = _supabase
-          .from('attendance')
+          .from('attendance_records')
           .select()
           .eq('student_id', studentId);
 
@@ -347,7 +347,7 @@ class AttendanceService {
     try {
       // Get existing attendance
       final existing = await _supabase
-          .from('attendance')
+          .from('attendance_records')
           .select()
           .eq('id', attendanceId)
           .single();
@@ -356,7 +356,7 @@ class AttendanceService {
 
       // Update attendance
       await _supabase
-          .from('attendance')
+          .from('attendance_records')
           .update({
             'status': newStatus.displayName,
             'updated_at': DateTime.now().toIso8601String(),
@@ -428,7 +428,7 @@ class AttendanceService {
       }
 
       if (records.isNotEmpty) {
-        await _supabase.from('attendance').upsert(records);
+        await _supabase.from('attendance_records').upsert(records);
       }
     } catch (e) {
       throw Exception('Failed to initialize attendance: ${e.toString()}');

@@ -9,6 +9,7 @@ import '../../services/notification_service.dart';
 import '../../services/attendance_service.dart';
 import '../../core/theme/app_dimens.dart';
 import '../widgets/premium_card.dart';
+import '../widgets/notification_bell_icon.dart';
 import 'widgets/leetcode_card.dart';
 import 'widgets/leetcode_leaderboard.dart';
 import 'widgets/attendance_action_card.dart';
@@ -262,8 +263,6 @@ class _HomeScreenState extends State<HomeScreen> {
              ),
              const Spacer(),
              const _NotificationBell(),
-             const SizedBox(width: AppSpacing.sm),
-             _RoleBadge(userProvider: userProvider),
           ],
         ),
       ),
@@ -310,101 +309,13 @@ class _NotificationBell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        IconButton(
-          onPressed: () {
-            // TODO: Navigate to notifications screen
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Notifications feature coming soon!')),
-            );
-          },
-          icon: Icon(
-            Icons.notifications_outlined,
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
-          style: IconButton.styleFrom(
-            backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-          ),
-        ),
-        // Badge (example - connect to real notification count later)
-        Positioned(
-          right: 8,
-          top: 8,
-          child: Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.error,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: Theme.of(context).scaffoldBackgroundColor,
-                width: 2,
-              ),
-            ),
-            constraints: const BoxConstraints(
-              minWidth: 16,
-              minHeight: 16,
-            ),
-            child: Text(
-              '3',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onError,
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _RoleBadge extends StatelessWidget {
-  final UserProvider userProvider;
-  const _RoleBadge({required this.userProvider});
-
-  @override
-  Widget build(BuildContext context) {
-    Color badgeColor = Theme.of(context).colorScheme.secondary;
-    String roleLabel = 'Guest';
-
-    if (userProvider.isPlacementRep) {
-      badgeColor = const Color(0xFF9333EA); 
-      roleLabel = 'Rep';
-    } else if (userProvider.isCoordinator) {
-      badgeColor = const Color(0xFFEA580C); 
-      roleLabel = 'Coord';
-    } else if (userProvider.isTeamLeader) {
-      badgeColor = const Color(0xFF2563EB); 
-      roleLabel = 'Lead';
-    } else {
-      badgeColor = const Color(0xFF16A34A); 
-      roleLabel = 'Student';
-    }
-
-    if (userProvider.isSimulating) {
-      roleLabel = 'SIM: $roleLabel';
-      badgeColor = Theme.of(context).colorScheme.error;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
-      decoration: BoxDecoration(
-        color: badgeColor.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(AppRadius.pill),
-        border: Border.all(color: badgeColor.withValues(alpha: 0.2)),
-      ),
-      child: Text(
-        roleLabel.toUpperCase(),
-        style: TextStyle(
-          color: badgeColor,
-          fontSize: 10,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 0.5,
-        ),
+    return Consumer<NotificationService>(
+      builder: (context, notifService, _) => FutureBuilder<List<dynamic>>(
+        future: notifService.getNotifications(),
+        builder: (context, snapshot) {
+          final unreadCount = snapshot.data?.where((n) => n.isRead != true).length ?? 0;
+          return NotificationBellIcon(unreadCount: unreadCount);
+        },
       ),
     );
   }

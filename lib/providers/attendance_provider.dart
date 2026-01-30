@@ -145,9 +145,9 @@ class AttendanceProvider extends ChangeNotifier {
     if (rows.isNotEmpty) {
       if (isRep) {
         // Upsert for Reps
-        await _supabaseService.client.from('attendance').upsert(rows);
+        await _supabaseService.client.from('attendance_records').upsert(rows);
       } else {
-        await _supabaseService.client.from('attendance').insert(rows);
+        await _supabaseService.client.from('attendance_records').insert(rows);
       }
       
       if (!isRep && teamId != null) {

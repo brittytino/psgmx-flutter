@@ -3,7 +3,9 @@ import 'package:provider/provider.dart';
 import '../../providers/user_provider.dart';
 import '../../models/app_user.dart';
 import '../../core/theme/app_dimens.dart';
+import '../../services/notification_service.dart';
 import '../widgets/premium_card.dart';
+import '../widgets/notification_bell_icon.dart';
 import '../settings/settings_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -28,7 +30,15 @@ class ProfileScreen extends StatelessWidget {
             title: const Text("My Profile"),
             centerTitle: false,
             actions: [
-               const _NotificationBellIcon(),
+               Consumer<NotificationService>(
+                 builder: (context, notifService, _) => FutureBuilder<List<dynamic>>(
+                   future: notifService.getNotifications(),
+                   builder: (context, snapshot) {
+                     final unreadCount = snapshot.data?.where((n) => n.isRead != true).length ?? 0;
+                     return NotificationBellIcon(unreadCount: unreadCount);
+                   },
+                 ),
+               ),
                IconButton(
                  icon: const Icon(Icons.settings_outlined),
                  onPressed: () {
@@ -151,8 +161,17 @@ class ProfileScreen extends StatelessWidget {
                             value: provider.simulatedRole == UserRole.teamLeader,
                             activeTrackColor: Theme.of(context).colorScheme.error,
                             onChanged: (v) => provider.setSimulationRole(v ? UserRole.teamLeader : null),
-                          ),
-                       ],
+                        ),
+                        Divider(height: 1, indent: 56, color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
+                        SwitchListTile(
+                          title: const Text("Simulate Coordinator"),
+                          subtitle: const Text("View app as access level: Coordinator"),
+                          secondary: Icon(Icons.school_outlined, color: isSimulating ? Theme.of(context).colorScheme.error : null),
+                          value: provider.simulatedRole == UserRole.coordinator,
+                          activeTrackColor: Theme.of(context).colorScheme.error,
+                          onChanged: (v) => provider.setSimulationRole(v ? UserRole.coordinator : null),
+                        ),
+                     ],
                      ),
                    ),
                    const SizedBox(height: AppSpacing.xl),
@@ -358,45 +377,6 @@ class _SectionLabel extends StatelessWidget {
           color: Theme.of(context).colorScheme.primary,
           letterSpacing: 1.2
         )
-      ),
-    );
-  }
-}
-
-class _NotificationBellIcon extends StatelessWidget {
-  const _NotificationBellIcon();
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      onPressed: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Notifications coming soon!')),
-        );
-      },
-      icon: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Icon(
-            Icons.notifications_outlined,
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
-          Positioned(
-            right: 0,
-            top: 0,
-            child: Container(
-              padding: const EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.error,
-                shape: BoxShape.circle,
-              ),
-              constraints: const BoxConstraints(
-                minWidth: 8,
-                minHeight: 8,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

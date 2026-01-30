@@ -6,11 +6,13 @@ import 'package:intl/intl.dart';
 import '../../providers/user_provider.dart';
 import '../../services/supabase_db_service.dart';
 import '../../services/task_upload_service.dart';
+import '../../services/connectivity_service.dart';
 import '../../models/daily_task.dart';
 import '../../core/theme/app_dimens.dart';
 import '../widgets/premium_card.dart';
 import '../widgets/premium_empty_state.dart';
-import 'modern_bulk_upload_dialog.dart';
+import '../widgets/offline_error_view.dart';
+import 'bulk_upload_screen.dart';
 
 class TasksScreen extends StatelessWidget {
   const TasksScreen({super.key});
@@ -34,8 +36,7 @@ class TasksScreen extends StatelessWidget {
 // ==========================================
 
 class _StudentTasksView extends StatefulWidget {
-  final bool isEmbedded;
-  const _StudentTasksView({this.isEmbedded = false});
+  const _StudentTasksView();
 
   @override
   State<_StudentTasksView> createState() => _StudentTasksViewState();
@@ -52,20 +53,19 @@ class _StudentTasksViewState extends State<_StudentTasksView> {
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          if (!widget.isEmbedded)
-            SliverAppBar(
-              pinned: true,
-              floating: true,
-              title: const Text("Daily Roadmap"),
-              centerTitle: false,
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.calendar_today_outlined),
-                  onPressed: _pickDate,
-                  tooltip: "Jump to Date",
-                )
-              ],
-            ),
+          SliverAppBar(
+            pinned: true,
+            floating: true,
+            title: const Text("Daily Roadmap"),
+            centerTitle: false,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.calendar_today_outlined),
+                onPressed: _pickDate,
+                tooltip: "Jump to Date",
+              )
+            ],
+          ),
           
           // Date Navigator Sticky Header
           SliverToBoxAdapter(
@@ -75,7 +75,7 @@ class _StudentTasksViewState extends State<_StudentTasksView> {
                 date: _selectedDate,
                 onNext: () => setState(() => _selectedDate = _selectedDate.add(const Duration(days: 1))),
                 onPrev: () => setState(() => _selectedDate = _selectedDate.subtract(const Duration(days: 1))),
-                onTitleTap: widget.isEmbedded ? _pickDate : null,
+                onTitleTap: null,
               ),
             ),
           ),
@@ -589,6 +589,18 @@ class _RepTaskManagementViewState extends State<_RepTaskManagementView> {
               }
 
               if (snapshot.hasError) {
+                // Check if it's a connection error
+                final isOffline = !ConnectivityService().hasConnection;
+                if (isOffline) {
+                  return Center(
+                    child: CompactOfflineView(
+                      onRetry: () {
+                        setState(() {});
+                      },
+                    ),
+                  );
+                }
+                
                 return Center(
                   child: Text('Error: ${snapshot.error}'),
                 );
@@ -1207,68 +1219,6 @@ class _BulkUploadForm extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xxl),
-        child: PremiumCard(
-          padding: const EdgeInsets.all(AppSpacing.xl),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(AppSpacing.xl),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.upload_file,
-                  size: 64,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              Text(
-                "Bulk Task Upload",
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Text(
-                "Upload multiple tasks at once using Excel file",
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              FilledButton.icon(
-                onPressed: () async {
-                  final result = await showDialog<bool>(
-                    context: context,
-                    builder: (ctx) => const ModernBulkUploadDialog(),
-                  );
-                  
-                  if (result == true && context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Tasks uploaded successfully')),
-                    );
-                  }
-                },
-                icon: const Icon(Icons.file_upload_outlined),
-                label: const Text("Start Bulk Upload"),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.xxl,
-                    vertical: AppSpacing.md,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    return const BulkUploadScreen();
   }
 }

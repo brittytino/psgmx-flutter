@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import '../../core/theme/app_dimens.dart';
+import '../../services/notification_service.dart';
 import '../widgets/premium_card.dart';
+import '../widgets/notification_bell_icon.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -32,8 +35,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             centerTitle: true,
-            actions: const [
-              _NotificationBellIcon(),
+            actions: [
+              Consumer<NotificationService>(
+                builder: (context, notifService, _) => FutureBuilder<List<dynamic>>(
+                  future: notifService.getNotifications(),
+                  builder: (context, snapshot) {
+                    final unreadCount = snapshot.data?.where((n) => n.isRead != true).length ?? 0;
+                    return NotificationBellIcon(unreadCount: unreadCount);
+                  },
+                ),
+              ),
             ],
           ),
           SliverPadding(
@@ -377,41 +388,4 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 
-class _NotificationBellIcon extends StatelessWidget {
-  const _NotificationBellIcon();
 
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      onPressed: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Notifications coming soon!')),
-        );
-      },
-      icon: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Icon(
-            Icons.notifications_outlined,
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
-          Positioned(
-            right: 0,
-            top: 0,
-            child: Container(
-              padding: const EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.error,
-                shape: BoxShape.circle,
-              ),
-              constraints: const BoxConstraints(
-                minWidth: 8,
-                minHeight: 8,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

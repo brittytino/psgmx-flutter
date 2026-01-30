@@ -18,10 +18,50 @@ class NotificationService {
 
     tz.initializeTimeZones();
     
-    // Android
+    // Android - Create notification channels
+    const AndroidNotificationChannel mainChannel = AndroidNotificationChannel(
+      'psgmx_channel_main',
+      'PSGMX Notifications',
+      description: 'Important updates and announcements from PSGMX',
+      importance: Importance.high,
+      playSound: true,
+      enableVibration: true,
+      enableLights: true,
+      ledColor: Color(0xFFFF6600),
+    );
+    
+    const AndroidNotificationChannel leetcodeChannel = AndroidNotificationChannel(
+      'psgmx_leetcode',
+      'LeetCode Reminders',
+      description: 'Daily LeetCode problem reminders',
+      importance: Importance.defaultImportance,
+      playSound: true,
+    );
+    
+    const AndroidNotificationChannel birthdayChannel = AndroidNotificationChannel(
+      'psgmx_birthday',
+      'Birthday Notifications',
+      description: 'Birthday wishes and celebrations',
+      importance: Importance.high,
+      playSound: true,
+      enableVibration: true,
+    );
+    
+    // Register channels
+    await _notifications
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(mainChannel);
+    await _notifications
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(leetcodeChannel);
+    await _notifications
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(birthdayChannel);
+    
+    // Android initialization
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
     
-    // iOS
+    // iOS initialization
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: false, 
       requestBadgePermission: false,
@@ -34,6 +74,7 @@ class NotificationService {
       settings,
       onDidReceiveNotificationResponse: (details) {
         debugPrint('Notification tapped: ${details.payload}');
+        // TODO: Navigate to specific screen based on payload
       },
     );
     
@@ -283,21 +324,129 @@ class NotificationService {
     required int id, 
     required String title, 
     required String body, 
-    String? payload
+    String? payload,
+    NotificationType type = NotificationType.announcement,
   }) async {
-    const androidDetails = AndroidNotificationDetails(
+    // Choose sound and styling based on notification type
+    final androidDetails = AndroidNotificationDetails(
       'psgmx_channel_main', 
       'PSGMX Notifications',
+      channelDescription: 'Important updates and announcements from PSGMX',
       importance: Importance.max, 
       priority: Priority.high,
-      color: Color(0xFFFF6600),
+      color: const Color(0xFFFF6600),
+      playSound: true,
+      enableVibration: true,
+      enableLights: true,
+      ledColor: const Color(0xFFFF6600),
+      ledOnMs: 1000,
+      ledOffMs: 500,
+      styleInformation: BigTextStyleInformation(
+        body,
+        htmlFormatBigText: true,
+        contentTitle: title,
+        htmlFormatContentTitle: true,
+        summaryText: _getNotificationTypeName(type),
+        htmlFormatSummaryText: false,
+      ),
+      icon: '@mipmap/ic_launcher',
     );
-    const details = NotificationDetails(android: androidDetails, iOS: DarwinNotificationDetails());
+    
+    const iosDetails = DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+      badgeNumber: 1,
+    );
+    
+    final details = NotificationDetails(
+      android: androidDetails, 
+      iOS: iosDetails,
+    );
     
     await _notifications.show(id, title, body, details, payload: payload);
+    
+    // Add to in-app notification list
+    _mockNotifications.insert(0, AppNotification(
+      id: id.toString(),
+      title: title,
+      message: body,
+      notificationType: type,
+      targetAudience: 'all',
+      generatedAt: DateTime.now(),
+      isRead: false,
+    ));
+  }
+  
+  String _getNotificationTypeName(NotificationType type) {
+    switch (type) {
+      case NotificationType.alert:
+        return '⚠️ Alert';
+      case NotificationType.motivation:
+        return '✨ Motivation';
+      case NotificationType.reminder:
+        return '⏰ Reminder';
+      case NotificationType.announcement:
+        return '📢 Announcement';
+    }
   }
 
   Future<void> cancelAll() async {
     await _notifications.cancelAll();
+  }
+  
+  /// Show a test notification to demonstrate the feature
+  Future<void> showTestNotification() async {
+    await showNotification(
+      id: DateTime.now().millisecondsSinceEpoch % 100000,
+      title: '🎉 Welcome to PSGMX Notifications!',
+      body: 'Stay updated with announcements, reminders, and motivational messages. You\'ll never miss important updates!',
+      type: NotificationType.announcement,
+    );
+  }
+  
+  /// Send a motivational notification
+  Future<void> showMotivationalNotification(String message) async {
+    await showNotification(
+      id: DateTime.now().millisecondsSinceEpoch % 100000,
+      title: '✨ Daily Motivation',
+      body: message,
+      type: NotificationType.motivation,
+    );
+  }
+  
+  /// Send a reminder notification
+  Future<void> showReminderNotification(String title, String message) async {
+    await showNotification(
+      id: DateTime.now().millisecondsSinceEpoch % 100000,
+      title: '⏰ $title',
+      body: message,
+      type: NotificationType.reminder,
+    );
+  }
+  
+  /// Send an alert notification
+  Future<void> showAlertNotification(String title, String message) async {
+    await showNotification(
+      id: DateTime.now().millisecondsSinceEpoch % 100000,
+      title: '⚠️ $title',
+      body: message,
+      type: NotificationType.alert,
+    );
+  }
+  
+  /// Send an announcement notification
+  Future<void> showAnnouncementNotification(String title, String message) async {
+    await showNotification(
+      id: DateTime.now().millisecondsSinceEpoch % 100000,
+      title: '📢 $title',
+      body: message,
+      type: NotificationType.announcement,
+    );
+  }
+  
+  /// Get unread notification count
+  int getUnreadCount(List<AppNotification> notifications) {
+    return notifications.where((n) => n.isRead != true).length;
   }
 }

@@ -3,8 +3,8 @@ import 'package:provider/provider.dart';
 import '../providers/user_provider.dart';
 import 'home/home_screen.dart';
 import 'tasks/tasks_screen.dart';
-import 'attendance/attendance_screen.dart';
-import 'reports/reports_screen.dart';
+import 'attendance/comprehensive_attendance_screen.dart';
+import 'reports/modern_reports_screen.dart';
 import 'profile/profile_screen.dart';
 
 class RootLayout extends StatefulWidget {
@@ -30,9 +30,9 @@ class _RootLayoutState extends State<RootLayout> {
     final screens = [
       const HomeScreen(),
       const TasksScreen(),
-      const AttendanceScreen(),
+      const ComprehensiveAttendanceScreen(),
       if (userProvider.isCoordinator || userProvider.isPlacementRep || userProvider.hasActualAdminAccess) 
-        const ReportsScreen(),
+        const ModernReportsScreen(),
       const ProfileScreen(),
     ];
 
