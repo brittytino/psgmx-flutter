@@ -331,8 +331,7 @@ class _QuoteCard extends StatelessWidget {
       future: service.getDailyQuote(),
       builder: (context, snapshot) {
         final data = snapshot.data;
-        final quote = data?['text'] ?? 'Loading your daily insight...';
-        final author = data?['author'] ?? '';
+        final quote = data?['text'] ?? 'Make today count...';
 
         return PremiumCard(
           backgroundColor: Theme.of(context).colorScheme.primary,
@@ -347,45 +346,30 @@ class _QuoteCard extends StatelessWidget {
                       color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(AppRadius.sm),
                     ),
-                    child: const Icon(Icons.wb_sunny_outlined, color: Colors.white, size: 14),
+                    child: const Icon(Icons.auto_awesome, color: Colors.white, size: 14),
                   ),
-                  const SizedBox(width: AppSpacing.sm),
+                  const Spacer(),
                   Text(
-                    'DAILY MOTIVATION',
+                    '✨',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.9),
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2,
+                      color: Colors.white.withValues(alpha: 0.8),
+                      fontSize: 16,
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: AppSpacing.lg),
               Text(
-                quote,
+                '"$quote"',
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 16,
-                  height: 1.4,
+                  fontSize: 17,
+                  height: 1.5,
                   fontWeight: FontWeight.w600,
+                  fontStyle: FontStyle.italic,
                   fontFamily: 'Inter',
                 ),
               ),
-              if (author.isNotEmpty) ...[
-                const SizedBox(height: AppSpacing.md),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Text(
-                    '- $author',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.8),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ]
             ],
           ),
         );

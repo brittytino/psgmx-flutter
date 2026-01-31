@@ -73,10 +73,12 @@ class AttendanceRecord {
   });
 
   factory AttendanceRecord.fromMap(Map<String, dynamic> data) {
+    // Support both student_id and user_id columns
+    final studentIdValue = data['student_id'] ?? data['user_id'] ?? '';
     return AttendanceRecord(
       id: data['id'] ?? '',
       date: DateTime.parse(data['date']),
-      studentId: data['student_id'] ?? '',
+      studentId: studentIdValue,
       studentName: data['student_name'] ?? '',
       regNo: data['reg_no'] ?? '',
       teamId: data['team_id'] ?? '',
@@ -91,7 +93,7 @@ class AttendanceRecord {
   Map<String, dynamic> toMap() {
     return {
       'date': date.toIso8601String().split('T')[0],
-      'student_id': studentId,
+      'user_id': studentId,
       'team_id': teamId,
       'status': status.displayName,
       'marked_by': markedBy,
@@ -228,7 +230,7 @@ class EnhancedAttendanceService {
       final records = studentStatuses.entries.map((entry) {
         return {
           'date': dateStr,
-          'student_id': entry.key,
+          'user_id': entry.key,
           'team_id': teamId,
           'status': entry.value.displayName,
           'marked_by': markedBy,
@@ -238,7 +240,7 @@ class EnhancedAttendanceService {
       // Upsert all records
       await _supabase
           .from('attendance_records')
-          .upsert(records, onConflict: 'date,student_id');
+          .upsert(records, onConflict: 'date,user_id');
     } catch (e) {
       throw Exception('Failed to mark team attendance: $e');
     }
@@ -272,8 +274,8 @@ class EnhancedAttendanceService {
     try {
       final response = await _supabase
           .from('attendance_records')
-          .select('*, users!attendance_records_student_id_fkey(name, reg_no)')
-          .eq('student_id', studentId)
+          .select('*, users!attendance_records_user_id_fkey(name, reg_no)')
+          .eq('user_id', studentId)
           .order('date', ascending: false);
 
       return (response as List).map((data) {
@@ -328,7 +330,7 @@ class EnhancedAttendanceService {
     try {
       var query = _supabase
           .from('attendance_records')
-          .select('*, users!attendance_records_student_id_fkey(name, reg_no)')
+          .select('*, users!attendance_records_user_id_fkey(name, reg_no)')
           .eq('team_id', teamId);
 
       if (startDate != null) {
@@ -360,7 +362,7 @@ class EnhancedAttendanceService {
     try {
       var query = _supabase
           .from('attendance_records')
-          .select('*, users!attendance_records_student_id_fkey(name, reg_no)');
+          .select('*, users!attendance_records_user_id_fkey(name, reg_no)');
 
       if (startDate != null) {
         query = query.gte('date', startDate.toIso8601String().split('T')[0]);

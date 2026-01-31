@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../../providers/leetcode_provider.dart';
 import '../../../models/leetcode_stats.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../services/supabase_service.dart';
 
+/// Modern LeetCode Leaderboard with proper theme support
+/// Features: Top 3 podium, paginated grid, weekly/overall toggle, refresh for placement reps
 class LeetCodeLeaderboard extends StatefulWidget {
   const LeetCodeLeaderboard({super.key});
 
@@ -12,30 +15,40 @@ class LeetCodeLeaderboard extends StatefulWidget {
   State<LeetCodeLeaderboard> createState() => _LeetCodeLeaderboardState();
 }
 
-class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard> {
+class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
+    with TickerProviderStateMixin {
   bool _isWeekly = true;
   bool _isRefreshing = false;
   int _currentPage = 0;
   static const int _usersPerPage = 14;
 
+  late AnimationController _refreshAnimationController;
+
   @override
   void initState() {
     super.initState();
+    _refreshAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    );
     _initializeLeaderboard();
+  }
+
+  @override
+  void dispose() {
+    _refreshAnimationController.dispose();
+    super.dispose();
   }
 
   Future<void> _initializeLeaderboard() async {
     final provider = context.read<LeetCodeProvider>();
-    // Just load from database - fast, no network calls
     await provider.loadAllUsersFromDatabase();
   }
 
   Future<void> _refreshLeaderboard() async {
-    // Check if user is placement rep
     final user = context.read<SupabaseService>().client.auth.currentUser;
     if (user == null) return;
 
-    // Get user role from database
     final userData = await context
         .read<SupabaseService>()
         .client
@@ -48,12 +61,15 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard> {
     final isPlacementRep = roles?['isPlacementRep'] ?? false;
 
     if (!isPlacementRep) {
-      // Show error for non-placement reps
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('⚠️ Only Placement Representatives can refresh data'),
-            backgroundColor: Colors.orange,
+          SnackBar(
+            content: const Text(
+                '⚠️ Only Placement Representatives can refresh data'),
+            backgroundColor: Colors.orange.shade700,
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         );
       }
@@ -61,47 +77,126 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard> {
     }
 
     setState(() => _isRefreshing = true);
+    _refreshAnimationController.repeat();
+
     try {
-      // Show confirmation dialog
+      final isDark = Theme.of(context).brightness == Brightness.dark;
       final shouldRefresh = await showDialog<bool>(
         context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Refresh All Students?'),
-          content: const Text(
-            'This will fetch fresh LeetCode data for all 123 students.\n\n'
-            'It may take 1-2 minutes.\n\nContinue?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Refresh All'),
-            ),
-          ],
-        ),
+        builder: (context) => _buildRefreshDialog(isDark),
       );
 
       if (shouldRefresh == true) {
         final leetCodeProvider = context.read<LeetCodeProvider>();
-        
-        // Use the provider captured before async/await
         await leetCodeProvider.refreshAllUsersFromAPI();
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('✅ Refresh complete! All stats updated.'),
-              backgroundColor: Colors.green,
+            SnackBar(
+              content: const Text('✅ Refresh complete! All stats updated.'),
+              backgroundColor: Colors.green.shade700,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
             ),
           );
         }
       }
     } finally {
-      if (mounted) setState(() => _isRefreshing = false);
+      if (mounted) {
+        setState(() => _isRefreshing = false);
+        _refreshAnimationController.stop();
+        _refreshAnimationController.reset();
+      }
     }
+  }
+
+  Widget _buildRefreshDialog(bool isDark) {
+    final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final textPrimary = isDark ? Colors.white : Colors.grey.shade900;
+    final textSecondary = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+
+    return AlertDialog(
+      backgroundColor: cardBg,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF6600).withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child:
+                const Icon(Icons.refresh, color: Color(0xFFFF6600), size: 24),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            'Refresh All Students?',
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+              color: textPrimary,
+            ),
+          ),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'This will fetch fresh LeetCode data for all 123 students.',
+            style: GoogleFonts.inter(fontSize: 14, color: textSecondary),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.amber.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.timer_outlined, color: Colors.amber, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'This may take 1-2 minutes',
+                    style: GoogleFonts.inter(
+                        fontSize: 13, color: Colors.amber.shade700),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: Text(
+            'Cancel',
+            style: GoogleFonts.inter(color: textSecondary),
+          ),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, true),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFFF6600),
+            foregroundColor: Colors.white,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          ),
+          child: Text(
+            'Refresh All',
+            style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -113,35 +208,12 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
           _buildHeader(isDark),
           const SizedBox(height: AppSpacing.lg),
-
-          // Leaderboard Content
           Consumer<LeetCodeProvider>(
             builder: (context, provider, child) {
               if (provider.isLoading && provider.allUsers.isEmpty) {
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const CircularProgressIndicator(),
-                        if (provider.loadingMessage.isNotEmpty) ...[
-                          const SizedBox(height: 16),
-                          Text(
-                            provider.loadingMessage,
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                );
+                return _buildLoadingState(isDark, provider.loadingMessage);
               }
 
               final users = _getSortedUsers(provider.allUsers);
@@ -150,13 +222,9 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard> {
                 return _buildEmptyState(isDark);
               }
 
-              // Users (Full List)
-              final displayUsers = users;
+              final top3 = users.take(3).toList();
+              final rest = users.skip(3).toList();
 
-              final top3 = displayUsers.take(3).toList();
-              final rest = displayUsers.skip(3).toList();
-
-              // Calculate pagination
               final totalPages = (rest.length / _usersPerPage).ceil();
               final startIndex = _currentPage * _usersPerPage;
               final endIndex =
@@ -165,23 +233,14 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard> {
 
               return Column(
                 children: [
-                  // Top 3 Podium
                   if (top3.isNotEmpty) _buildTop3Podium(top3, isDark),
                   const SizedBox(height: AppSpacing.xl),
-
-                  // Toggle
                   _buildToggle(isDark),
                   const SizedBox(height: AppSpacing.lg),
-
-                  // Stats Summary
-                  _buildStatsSummary(displayUsers.length, isDark),
+                  _buildStatsSummary(users.length, isDark),
                   const SizedBox(height: AppSpacing.lg),
-
-                  // Rest of users in grid with pagination
                   if (paginatedUsers.isNotEmpty)
                     _buildUserGrid(paginatedUsers, 4 + startIndex, isDark),
-
-                  // Pagination Controls
                   if (totalPages > 1) ...[
                     const SizedBox(height: AppSpacing.lg),
                     _buildPaginationControls(totalPages, isDark),
@@ -190,6 +249,53 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard> {
               );
             },
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoadingState(bool isDark, String message) {
+    final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final textSecondary = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+
+    return Container(
+      padding: const EdgeInsets.all(48),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 48,
+            height: 48,
+            child: CircularProgressIndicator(
+              strokeWidth: 3,
+              valueColor:
+                  const AlwaysStoppedAnimation<Color>(Color(0xFFFF6600)),
+              backgroundColor:
+                  isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+            ),
+          ),
+          if (message.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                color: textSecondary,
+                fontSize: 14,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -206,87 +312,148 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard> {
   }
 
   Widget _buildHeader(bool isDark) {
+    final textPrimary = isDark ? Colors.white : Colors.grey.shade900;
+    final textSecondary = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+
     return Row(
       children: [
         Container(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: const Color(0xFFFFD700).withValues(alpha: 30/255),
-            borderRadius: BorderRadius.circular(12),
+            gradient: LinearGradient(
+              colors: [
+                const Color(0xFFFFD700).withValues(alpha: 0.2),
+                const Color(0xFFFFA500).withValues(alpha: 0.1),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(14),
           ),
           child: const Icon(
-            Icons.emoji_events,
+            Icons.emoji_events_rounded,
             color: Color(0xFFFFD700),
-            size: 24,
+            size: 26,
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 14),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 "LeetCode Leaderboard",
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                style: GoogleFonts.poppins(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: textPrimary,
+                ),
               ),
               Text(
                 "${_isWeekly ? 'Weekly' : 'All-Time'} Top Performers",
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.grey,
-                    ),
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  color: textSecondary,
+                ),
               ),
             ],
           ),
         ),
-        // Refresh Button - Only show for Placement Reps
         FutureBuilder<bool>(
           future: _checkIsPlacementRep(),
           builder: (context, snapshot) {
             final isPlacementRep = snapshot.data ?? false;
 
             if (!isPlacementRep) {
-              // Show info icon instead
               return IconButton(
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('📊 Auto-Refresh'),
-                      content: const Text(
-                        'LeetCode stats are refreshed daily automatically.\n\n'
-                        'Only Placement Representatives can manually refresh.',
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('OK'),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.info_outline),
+                onPressed: () => _showAutoRefreshInfo(isDark),
+                icon: Icon(
+                  Icons.info_outline_rounded,
+                  color: textSecondary,
+                ),
                 tooltip: "Auto-refreshed daily",
               );
             }
 
-            // Show refresh button for placement reps
-            return IconButton(
-              onPressed: _isRefreshing ? null : _refreshLeaderboard,
-              icon: _isRefreshing
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.refresh),
-              tooltip: "Refresh All Stats (Placement Rep)",
+            return AnimatedBuilder(
+              animation: _refreshAnimationController,
+              builder: (context, child) {
+                return Transform.rotate(
+                  angle: _refreshAnimationController.value * 2 * 3.14159,
+                  child: IconButton(
+                    onPressed: _isRefreshing ? null : _refreshLeaderboard,
+                    icon: _isRefreshing
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                  Color(0xFFFF6600)),
+                            ),
+                          )
+                        : const Icon(Icons.refresh_rounded,
+                            color: Color(0xFFFF6600)),
+                    tooltip: "Refresh All Stats",
+                  ),
+                );
+              },
             );
           },
         ),
       ],
+    );
+  }
+
+  void _showAutoRefreshInfo(bool isDark) {
+    final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final textPrimary = isDark ? Colors.white : Colors.grey.shade900;
+    final textSecondary = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: cardBg,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.blue.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.auto_mode_rounded,
+                  color: Colors.blue, size: 24),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Auto-Refresh',
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: textPrimary,
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'LeetCode stats are refreshed daily automatically.\n\n'
+          'Only Placement Representatives can manually refresh all student data.',
+          style: GoogleFonts.inter(fontSize: 14, color: textSecondary),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF6600),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text('Got it',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -312,23 +479,18 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard> {
 
   Widget _buildTop3Podium(List<LeetCodeStats> top3, bool isDark) {
     return SizedBox(
-      height: 320, // Increased to fit content
+      height: 320,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // 2nd Place
           if (top3.length > 1)
             Expanded(child: _buildPodiumCard(top3[1], 2, 140, isDark)),
-          const SizedBox(width: 6),
-
-          // 1st Place (Taller)
+          const SizedBox(width: 8),
           if (top3.isNotEmpty)
-            Expanded(child: _buildPodiumCard(top3[0], 1, 160, isDark)),
-          const SizedBox(width: 6),
-
-          // 3rd Place
+            Expanded(child: _buildPodiumCard(top3[0], 1, 165, isDark)),
+          const SizedBox(width: 8),
           if (top3.length > 2)
-            Expanded(child: _buildPodiumCard(top3[2], 3, 140, isDark)),
+            Expanded(child: _buildPodiumCard(top3[2], 3, 130, isDark)),
         ],
       ),
     );
@@ -336,116 +498,134 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard> {
 
   Widget _buildPodiumCard(
       LeetCodeStats user, int rank, double height, bool isDark) {
-    final medalColor = rank == 1
-        ? const Color(0xFFFFD700) // Gold
-        : rank == 2
-            ? const Color(0xFFC0C0C0) // Silver
-            : const Color(0xFFCD7F32); // Bronze
+    final medalColors = {
+      1: const Color(0xFFFFD700), // Gold
+      2: const Color(0xFFC0C0C0), // Silver
+      3: const Color(0xFFCD7F32), // Bronze
+    };
+    final medalColor = medalColors[rank] ?? Colors.grey;
 
-    final bgColor = isDark ? Colors.grey[900] : Colors.white;
+    final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final textPrimary = isDark ? Colors.white : Colors.grey.shade900;
+    final textSecondary = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        // Medal Badge - compact
+        // Crown/Star Badge
         Container(
-          padding: const EdgeInsets.all(4),
+          padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: medalColor,
+            gradient: LinearGradient(
+              colors: [
+                medalColor,
+                medalColor.withValues(alpha: 0.7),
+              ],
+            ),
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: medalColor.withValues(alpha: 80/255),
-                blurRadius: 4,
+                color: medalColor.withValues(alpha: 0.5),
+                blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
             ],
           ),
           child: Icon(
-            rank == 1 ? Icons.star : Icons.star_border,
+            rank == 1 ? Icons.star_rounded : Icons.star_border_rounded,
             color: Colors.white,
-            size: 16,
+            size: rank == 1 ? 20 : 16,
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 6),
 
-        // Avatar with profile picture
+        // Avatar
         Container(
-          width: 44,
-          height: 44,
+          width: rank == 1 ? 54 : 46,
+          height: rank == 1 ? 54 : 46,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            border: Border.all(color: medalColor.withValues(alpha: 100/255), width: 2),
+            border: Border.all(color: medalColor, width: rank == 1 ? 3 : 2),
+            boxShadow: [
+              BoxShadow(
+                color: medalColor.withValues(alpha: 0.4),
+                blurRadius: 8,
+                spreadRadius: 1,
+              ),
+            ],
           ),
           child: ClipOval(
-            child: user.profilePicture != null && user.profilePicture!.isNotEmpty
-                ? Image.network(
-                    user.profilePicture!,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => _buildDefaultAvatar(user, isDark, medalColor),
-                  )
-                : _buildDefaultAvatar(user, isDark, medalColor),
+            child:
+                user.profilePicture != null && user.profilePicture!.isNotEmpty
+                    ? Image.network(
+                        user.profilePicture!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            _buildDefaultAvatar(user, isDark, medalColor),
+                      )
+                    : _buildDefaultAvatar(user, isDark, medalColor),
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 6),
 
         // Card
         Container(
           height: height,
           decoration: BoxDecoration(
-            color: bgColor,
-            border: Border.all(color: medalColor.withValues(alpha: 100/255), width: 2),
-            borderRadius: BorderRadius.circular(12),
+            color: cardBg,
+            border:
+                Border.all(color: medalColor.withValues(alpha: 0.5), width: 2),
+            borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 10/255),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
+                color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            mainAxisSize: MainAxisSize.min,
             children: [
-              // Name only (no username to save space)
+              // Name
               Text(
                 user.name ?? user.username,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: GoogleFonts.poppins(
                   fontWeight: FontWeight.bold,
-                  fontSize: 11,
-                  color: isDark ? Colors.white : Colors.black87,
+                  fontSize: 12,
+                  color: textPrimary,
                 ),
               ),
 
-              // Stats - compact
+              // Score
               Text(
                 "${_isWeekly ? user.weeklyScore : user.totalSolved}",
-                style: TextStyle(
-                  fontSize: 24,
+                style: GoogleFonts.poppins(
+                  fontSize: rank == 1 ? 28 : 24,
                   fontWeight: FontWeight.bold,
                   color: medalColor,
                 ),
               ),
               Text(
                 _isWeekly ? "Weekly" : "Total",
-                style: TextStyle(
+                style: GoogleFonts.inter(
                   fontSize: 10,
-                  color: isDark ? Colors.grey[400] : Colors.grey[600],
+                  color: textSecondary,
                 ),
               ),
 
-              // Mini stats - compact
+              // Difficulty Stats
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _buildMiniStat("E", user.easySolved, Colors.green, 10),
-                  _buildMiniStat("M", user.mediumSolved, Colors.orange, 10),
-                  _buildMiniStat("H", user.hardSolved, Colors.red, 10),
+                  _buildMiniStat("E", user.easySolved, const Color(0xFF4CAF50)),
+                  _buildMiniStat(
+                      "M", user.mediumSolved, const Color(0xFFFF9800)),
+                  _buildMiniStat("H", user.hardSolved, const Color(0xFFF44336)),
                 ],
               ),
             ],
@@ -455,38 +635,38 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard> {
     );
   }
 
-  Widget _buildMiniStat(String label, int value, Color color, double size) {
+  Widget _buildMiniStat(String label, int value, Color color) {
     return Column(
       children: [
         Text(
           label,
-          style: TextStyle(
-            fontSize: size,
+          style: GoogleFonts.inter(
+            fontSize: 9,
             color: color,
             fontWeight: FontWeight.bold,
           ),
         ),
         Text(
           "$value",
-          style: TextStyle(
-            fontSize: size + 2,
+          style: GoogleFonts.poppins(
+            fontSize: 12,
             fontWeight: FontWeight.bold,
+            color: color,
           ),
         ),
       ],
     );
   }
 
-
-
-
   Widget _buildToggle(bool isDark) {
+    final toggleBg = isDark ? const Color(0xFF262626) : Colors.grey.shade200;
+
     return Center(
       child: Container(
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
-          color: isDark ? Colors.grey[850] : Colors.grey[200],
-          borderRadius: BorderRadius.circular(25),
+          color: toggleBg,
+          borderRadius: BorderRadius.circular(28),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -500,28 +680,38 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard> {
   }
 
   Widget _buildToggleButton(String label, bool isSelected, bool isDark) {
+    final selectedBg = const Color(0xFFFF6600);
+    final unselectedText = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+
     return GestureDetector(
       onTap: () {
         setState(() {
           _isWeekly = label.contains("Weekly");
+          _currentPage = 0; // Reset pagination on toggle
         });
       },
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeInOut,
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected
-              ? (isDark ? Colors.grey[700] : Colors.grey[800])
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
+          color: isSelected ? selectedBg : Colors.transparent,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: selectedBg.withValues(alpha: 0.4),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
         ),
         child: Text(
           label,
-          style: TextStyle(
-            color: isSelected
-                ? Colors.white
-                : (isDark ? Colors.grey[400] : Colors.grey[600]),
-            fontWeight: FontWeight.bold,
+          style: GoogleFonts.inter(
+            color: isSelected ? Colors.white : unselectedText,
+            fontWeight: FontWeight.w600,
             fontSize: 13,
           ),
         ),
@@ -535,7 +725,7 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard> {
       shrinkWrap: true,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 0.78, // Adjusted for better fit on smaller screens
+        childAspectRatio: 0.78,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
       ),
@@ -549,161 +739,186 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard> {
   }
 
   Widget _buildEmptyState(bool isDark) {
+    final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final textPrimary = isDark ? Colors.white : Colors.grey.shade900;
+    final textSecondary = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+
     return Container(
-      padding: const EdgeInsets.all(32),
+      padding: const EdgeInsets.all(40),
       decoration: BoxDecoration(
-        color: isDark ? Colors.grey[900] : Colors.grey[100],
-        borderRadius: BorderRadius.circular(16),
+        color: cardBg,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         children: [
-          Icon(Icons.code, size: 64, color: Colors.grey[400]),
-          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF6600).withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.code_rounded,
+              size: 48,
+              color: Color(0xFFFF6600),
+            ),
+          ),
+          const SizedBox(height: 20),
           Text(
             "No LeetCode Data Available",
-            style: TextStyle(
-              fontSize: 16,
+            style: GoogleFonts.poppins(
+              fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: isDark ? Colors.grey[300] : Colors.grey[700],
+              color: textPrimary,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             "Add your LeetCode username in Profile to get started",
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[500],
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              color: textSecondary,
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           ElevatedButton.icon(
             onPressed: _refreshLeaderboard,
-            icon: const Icon(Icons.refresh, size: 18),
-            label: const Text("Refresh"),
+            icon: const Icon(Icons.refresh_rounded, size: 20),
+            label: Text(
+              "Refresh Data",
+              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF6600),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
+            ),
           ),
         ],
       ),
     );
   }
 
-  // Modern card design with better visuals
   Widget _buildModernUserCard(LeetCodeStats user, int rank, bool isDark) {
-    final bgColor = isDark ? Colors.grey[900] : Colors.white;
-    final borderColor = isDark ? Colors.grey[800] : Colors.grey[200];
+    final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final borderColor = isDark ? const Color(0xFF2D2D2D) : Colors.grey.shade200;
+    final textPrimary = isDark ? Colors.white : Colors.grey.shade900;
+    final textSecondary = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
 
-    // Gradient for top performers
     final isTopPerformer = rank <= 10;
-    final gradientColors = isTopPerformer
-        ? [
-            Theme.of(context).primaryColor.withValues(alpha: 40/255),
-            Theme.of(context).primaryColor.withValues(alpha: 10/255),
-          ]
-        : [bgColor!, bgColor];
+    final accentColor = const Color(0xFFFF6600);
 
     return Container(
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: gradientColors,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
+        color: cardBg,
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: isTopPerformer
-              ? Theme.of(context).primaryColor.withValues(alpha: 100/255)
-              : borderColor!,
+          color:
+              isTopPerformer ? accentColor.withValues(alpha: 0.4) : borderColor,
           width: isTopPerformer ? 2 : 1,
         ),
         boxShadow: [
           BoxShadow(
-            color:
-                isDark ? Colors.black.withValues(alpha: 20/255) : Colors.black.withValues(alpha: 8/255),
+            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.08),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Padding(
-        padding:
-            const EdgeInsets.all(10), // Reduced from 12 to prevent overflow
+        padding: const EdgeInsets.all(12),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          mainAxisSize: MainAxisSize.min, // Prevent overflow
           children: [
-            // Header: Rank Badge
+            // Rank Badge
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: isTopPerformer
-                          ? [const Color(0xFFFFD700), const Color(0xFFFFA500)]
-                          : [Colors.grey[300]!, Colors.grey[400]!],
-                    ),
+                    gradient: isTopPerformer
+                        ? const LinearGradient(
+                            colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
+                          )
+                        : LinearGradient(
+                            colors: isDark
+                                ? [Colors.grey.shade700, Colors.grey.shade800]
+                                : [Colors.grey.shade300, Colors.grey.shade400],
+                          ),
                     borderRadius: BorderRadius.circular(14),
                     boxShadow: isTopPerformer
                         ? [
                             BoxShadow(
-                              color: const Color(0xFFFFD700).withValues(alpha: 60/255),
-                              blurRadius: 8,
+                              color: const Color(0xFFFFD700)
+                                  .withValues(alpha: 0.4),
+                              blurRadius: 6,
                             ),
                           ]
-                        : [],
+                        : null,
                   ),
                   child: Text(
                     "#$rank",
-                    style: TextStyle(
+                    style: GoogleFonts.poppins(
                       fontWeight: FontWeight.bold,
-                      color: isTopPerformer ? Colors.white : Colors.grey[700],
+                      color: isTopPerformer
+                          ? Colors.white
+                          : (isDark
+                              ? Colors.grey.shade300
+                              : Colors.grey.shade700),
                       fontSize: 12,
                     ),
                   ),
                 ),
                 if (isTopPerformer)
-                  const Icon(Icons.star, color: Color(0xFFFFD700), size: 18),
+                  const Icon(Icons.star_rounded,
+                      color: Color(0xFFFFD700), size: 20),
               ],
             ),
 
-            // Avatar with Profile Picture
+            // Avatar
             Container(
-              width: 60,
-              height: 60,
+              width: 56,
+              height: 56,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
                   colors: [
-                    Theme.of(context).primaryColor.withValues(alpha: 80/255),
-                    Theme.of(context).primaryColor.withValues(alpha: 40/255),
+                    accentColor.withValues(alpha: 0.3),
+                    accentColor.withValues(alpha: 0.1),
                   ],
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Theme.of(context).primaryColor.withValues(alpha: 40/255),
+                    color: accentColor.withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
                 ],
               ),
-              child: Container(
+              child: Padding(
                 padding: const EdgeInsets.all(2),
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.transparent,
-                ),
                 child: ClipOval(
-                  child: user.profilePicture != null && user.profilePicture!.isNotEmpty
+                  child: user.profilePicture != null &&
+                          user.profilePicture!.isNotEmpty
                       ? Image.network(
                           user.profilePicture!,
                           fit: BoxFit.cover,
-                          width: 56,
-                          height: 56,
-                          errorBuilder: (_, __, ___) => _buildDefaultAvatar(user, isDark, Theme.of(context).primaryColor),
+                          errorBuilder: (_, __, ___) =>
+                              _buildDefaultAvatar(user, isDark, accentColor),
                         )
-                      : _buildDefaultAvatar(user, isDark, Theme.of(context).primaryColor),
+                      : _buildDefaultAvatar(user, isDark, accentColor),
                 ),
               ),
             ),
@@ -716,9 +931,10 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: GoogleFonts.poppins(
                     fontWeight: FontWeight.bold,
-                    fontSize: 14,
+                    fontSize: 13,
+                    color: textPrimary,
                   ),
                 ),
                 if (user.name != null)
@@ -727,22 +943,22 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: GoogleFonts.inter(
                       fontSize: 11,
-                      color: isDark ? Colors.grey[400] : Colors.grey[600],
+                      color: textSecondary,
                     ),
                   ),
               ],
             ),
 
-            // Main Score
+            // Score
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor.withValues(alpha: 30/255),
-                borderRadius: BorderRadius.circular(12),
+                color: accentColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: Theme.of(context).primaryColor.withValues(alpha: 80/255),
+                  color: accentColor.withValues(alpha: 0.3),
                   width: 1.5,
                 ),
               ),
@@ -750,20 +966,20 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard> {
                 children: [
                   Text(
                     "${_isWeekly ? user.weeklyScore : user.totalSolved}",
-                    style: TextStyle(
+                    style: GoogleFonts.poppins(
                       fontWeight: FontWeight.bold,
-                      fontSize: 26,
-                      color: Theme.of(context).primaryColor,
+                      fontSize: 24,
+                      color: accentColor,
                       height: 1.0,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     _isWeekly ? "Weekly" : "Total",
-                    style: TextStyle(
+                    style: GoogleFonts.inter(
                       fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: isDark ? Colors.grey[400] : Colors.grey[700],
+                      fontWeight: FontWeight.w500,
+                      color: textSecondary,
                     ),
                   ),
                 ],
@@ -774,13 +990,13 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard> {
             Row(
               children: [
                 _buildDifficultyChip(
-                    "E", user.easySolved, const Color(0xFF4CAF50)),
+                    "E", user.easySolved, const Color(0xFF4CAF50), isDark),
                 const SizedBox(width: 6),
                 _buildDifficultyChip(
-                    "M", user.mediumSolved, const Color(0xFFFF9800)),
+                    "M", user.mediumSolved, const Color(0xFFFF9800), isDark),
                 const SizedBox(width: 6),
                 _buildDifficultyChip(
-                    "H", user.hardSolved, const Color(0xFFF44336)),
+                    "H", user.hardSolved, const Color(0xFFF44336), isDark),
               ],
             ),
           ],
@@ -789,32 +1005,32 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard> {
     );
   }
 
-  Widget _buildDifficultyChip(String label, int value, Color color) {
+  Widget _buildDifficultyChip(
+      String label, int value, Color color, bool isDark) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 6),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 25/255),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withValues(alpha: 100/255), width: 1.5),
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withValues(alpha: 0.4), width: 1.5),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               label,
-              style: TextStyle(
+              style: GoogleFonts.inter(
                 fontSize: 10,
                 color: color,
                 fontWeight: FontWeight.bold,
-                letterSpacing: 0.5,
               ),
             ),
             const SizedBox(height: 2),
             Text(
               "$value",
-              style: TextStyle(
-                fontSize: 14,
+              style: GoogleFonts.poppins(
+                fontSize: 13,
                 fontWeight: FontWeight.bold,
                 color: color,
                 height: 1.0,
@@ -827,43 +1043,62 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard> {
   }
 
   Widget _buildStatsSummary(int totalUsers, bool isDark) {
+    final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final borderColor = isDark ? const Color(0xFF2D2D2D) : Colors.grey.shade200;
+    final textPrimary = isDark ? Colors.white : Colors.grey.shade900;
+    final textSecondary = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+    final accentColor = const Color(0xFFFF6600);
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Theme.of(context).primaryColor.withValues(alpha: 20/255),
-            Theme.of(context).primaryColor.withValues(alpha: 5/255),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Theme.of(context).primaryColor.withValues(alpha: 40/255),
-          width: 1,
-        ),
+        color: cardBg,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: borderColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           _buildSummaryItem(
-            Icons.people,
+            Icons.people_rounded,
             "$totalUsers",
-            "Total Students",
-            isDark,
+            "Students",
+            accentColor,
+            textPrimary,
+            textSecondary,
           ),
-          Container(width: 1, height: 40, color: Colors.grey[400]),
+          Container(
+            width: 1,
+            height: 44,
+            color: borderColor,
+          ),
           _buildSummaryItem(
-            Icons.code,
+            Icons.code_rounded,
             "LeetCode",
-            "Live Rankings",
-            isDark,
+            "Rankings",
+            Colors.green,
+            textPrimary,
+            textSecondary,
           ),
-          Container(width: 1, height: 40, color: Colors.grey[400]),
+          Container(
+            width: 1,
+            height: 44,
+            color: borderColor,
+          ),
           _buildSummaryItem(
-            Icons.trending_up,
+            Icons.trending_up_rounded,
             _isWeekly ? "Weekly" : "Overall",
-            "Competition",
-            isDark,
+            "Mode",
+            Colors.blue,
+            textPrimary,
+            textSecondary,
           ),
         ],
       ),
@@ -871,60 +1106,63 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard> {
   }
 
   Widget _buildSummaryItem(
-      IconData icon, String value, String label, bool isDark) {
+    IconData icon,
+    String value,
+    String label,
+    Color iconColor,
+    Color textPrimary,
+    Color textSecondary,
+  ) {
     return Column(
       children: [
-        Icon(icon, color: Theme.of(context).primaryColor, size: 24),
-        const SizedBox(height: 4),
+        Icon(icon, color: iconColor, size: 24),
+        const SizedBox(height: 6),
         Text(
           value,
-          style: TextStyle(
+          style: GoogleFonts.poppins(
             fontWeight: FontWeight.bold,
-            fontSize: 16,
-            color: isDark ? Colors.white : Colors.black87,
+            fontSize: 15,
+            color: textPrimary,
           ),
         ),
         Text(
           label,
-          style: TextStyle(
+          style: GoogleFonts.inter(
             fontSize: 11,
-            color: isDark ? Colors.grey[400] : Colors.grey[600],
+            color: textSecondary,
           ),
         ),
       ],
     );
   }
 
-
-
   Widget _buildPaginationControls(int totalPages, bool isDark) {
+    final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final borderColor = isDark ? const Color(0xFF2D2D2D) : Colors.grey.shade200;
+    final iconColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: isDark ? Colors.grey[850] : Colors.grey[100],
-        borderRadius: BorderRadius.circular(16),
+        color: cardBg,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: borderColor),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Previous Button
           IconButton(
-            onPressed: _currentPage > 0
-                ? () {
-                    setState(() {
-                      _currentPage--;
-                    });
-                  }
-                : null,
-            icon: const Icon(Icons.chevron_left),
+            onPressed:
+                _currentPage > 0 ? () => setState(() => _currentPage--) : null,
+            icon: Icon(
+              Icons.chevron_left_rounded,
+              color: _currentPage > 0 ? const Color(0xFFFF6600) : iconColor,
+            ),
             tooltip: "Previous Page",
           ),
-
-          // Page Indicators
           ...List.generate(
             totalPages.clamp(0, 5),
             (index) {
-              // Show first page, current page, and last page
               int pageToShow;
               if (totalPages <= 5) {
                 pageToShow = index;
@@ -937,21 +1175,19 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard> {
                 if (index == 4) return _buildPageDot(totalPages - 1, isDark);
                 pageToShow = _currentPage - 2 + index;
               }
-
               return _buildPageDot(pageToShow, isDark);
             },
           ),
-
-          // Next Button
           IconButton(
             onPressed: _currentPage < totalPages - 1
-                ? () {
-                    setState(() {
-                      _currentPage++;
-                    });
-                  }
+                ? () => setState(() => _currentPage++)
                 : null,
-            icon: const Icon(Icons.chevron_right),
+            icon: Icon(
+              Icons.chevron_right_rounded,
+              color: _currentPage < totalPages - 1
+                  ? const Color(0xFFFF6600)
+                  : iconColor,
+            ),
             tooltip: "Next Page",
           ),
         ],
@@ -961,51 +1197,59 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard> {
 
   Widget _buildPageDot(int page, bool isDark) {
     final isActive = page == _currentPage;
+    final inactiveColor =
+        isDark ? const Color(0xFF2D2D2D) : Colors.grey.shade200;
+    final inactiveTextColor =
+        isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          _currentPage = page;
-        });
-      },
-      child: Container(
+      onTap: () => setState(() => _currentPage = page),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
         margin: const EdgeInsets.symmetric(horizontal: 4),
-        width: isActive ? 32 : 28,
-        height: 32,
+        width: isActive ? 36 : 32,
+        height: 36,
         decoration: BoxDecoration(
-          color: isActive
-              ? Theme.of(context).primaryColor
-              : (isDark ? Colors.grey[700] : Colors.grey[300]),
-          borderRadius: BorderRadius.circular(8),
+          color: isActive ? const Color(0xFFFF6600) : inactiveColor,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFFFF6600).withValues(alpha: 0.4),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
         ),
         child: Center(
           child: Text(
             "${page + 1}",
-            style: TextStyle(
-              color: isActive
-                  ? Colors.white
-                  : (isDark ? Colors.grey[400] : Colors.grey[700]),
-              fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-              fontSize: 12,
+            style: GoogleFonts.poppins(
+              color: isActive ? Colors.white : inactiveTextColor,
+              fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+              fontSize: 13,
             ),
           ),
         ),
       ),
     );
   }
-  
-  /// Build default avatar for users without profile pictures
-  Widget _buildDefaultAvatar(LeetCodeStats user, bool isDark, [Color? accentColor]) {
+
+  Widget _buildDefaultAvatar(LeetCodeStats user, bool isDark,
+      [Color? accentColor]) {
+    final color = accentColor ?? const Color(0xFFFF6600);
+    final bgColor = isDark ? const Color(0xFF262626) : Colors.grey.shade100;
+
     return Container(
-      color: (accentColor ?? Theme.of(context).primaryColor).withValues(alpha: 0.15),
+      color: bgColor,
       child: Center(
         child: Icon(
           Icons.person_rounded,
-          size: 24,
-          color: accentColor ?? Theme.of(context).primaryColor,
+          size: 26,
+          color: color,
         ),
       ),
     );
   }
 }
-
-

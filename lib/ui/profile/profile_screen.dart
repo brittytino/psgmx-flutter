@@ -7,6 +7,7 @@ import '../../services/notification_service.dart';
 import '../widgets/premium_card.dart';
 import '../widgets/notification_bell_icon.dart';
 import '../settings/settings_screen.dart';
+import 'help_support_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -236,7 +237,12 @@ class ProfileScreen extends StatelessWidget {
                         leading: const Icon(Icons.help_outline),
                         title: const Text("Help & Support"),
                         trailing: const Icon(Icons.chevron_right, size: 18),
-                        onTap: () {},
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const HelpSupportScreen()),
+                          );
+                        },
                       ),
                     ],
                   ),

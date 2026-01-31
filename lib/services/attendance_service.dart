@@ -161,7 +161,7 @@ class AttendanceService {
       final records = studentStatuses.map((entry) {
         return {
           'date': dateString,
-          'student_id': entry['student_id'],
+          'user_id': entry['user_id'] ?? entry['student_id'],
           'team_id': entry['team_id'],
           'status': entry['status'],
           'marked_by': markedBy,
@@ -185,7 +185,7 @@ class AttendanceService {
       final response = await _supabase
           .from('attendance_records')
           .select()
-          .eq('student_id', studentId)
+          .eq('user_id', studentId)
           .eq('date', dateString)
           .maybeSingle();
 
@@ -207,7 +207,7 @@ class AttendanceService {
           .select()
           .eq('team_id', teamId)
           .eq('date', dateString)
-          .order('student_id');
+          .order('user_id');
 
       return (response as List)
           .map((data) => Attendance.fromMap(data))
@@ -226,7 +226,7 @@ class AttendanceService {
       var query = _supabase
           .from('attendance_records')
           .select()
-          .eq('student_id', studentId);
+          .eq('user_id', studentId);
 
       if (startDate != null) {
         final startString = startDate.toIso8601String().split('T')[0];
@@ -367,7 +367,7 @@ class AttendanceService {
       final auditLog = AuditLog.createAttendanceOverride(
         actorId: overriddenBy,
         attendanceId: attendanceId,
-        studentId: existing['student_id'],
+        studentId: existing['user_id'] ?? existing['student_id'],
         oldStatus: oldStatus,
         newStatus: newStatus.displayName,
         date: DateTime.parse(existing['date']),
@@ -419,7 +419,7 @@ class AttendanceService {
 
           records.add({
             'date': day.date.toIso8601String().split('T')[0],
-            'student_id': studentId,
+            'user_id': studentId,
             'team_id': studentTeamMap[studentId] ?? '',
             'status': status,
             'marked_by': 'system',
@@ -439,9 +439,9 @@ class AttendanceService {
       try {
         // 1. Get all attendance records for the student
         final response = await _supabase
-            .from('attendance')
+            .from('attendance_records')
             .select('date, status')
-            .eq('student_id', studentId);
+            .eq('user_id', studentId);
 
         final records = response as List;
         int totalWorkingDays = 0;
@@ -467,5 +467,42 @@ class AttendanceService {
         debugPrint("Error calculating attendance: $e");
         return 0.0;
       }
+  }
+
+  // ========================================
+  // BULK ATTENDANCE FOR PLACEMENT REP
+  // ========================================
+
+  /// Get all attendance records for a specific date
+  Future<List<Attendance>> getAttendanceForDate(DateTime date) async {
+    try {
+      final dateString = date.toIso8601String().split('T')[0];
+      final response = await _supabase
+          .from('attendance_records')
+          .select()
+          .eq('date', dateString);
+
+      return (response as List)
+          .map((data) => Attendance.fromMap(data))
+          .toList();
+    } catch (e) {
+      debugPrint('Failed to get attendance for date: $e');
+      return [];
+    }
+  }
+
+  /// Bulk upsert attendance records (insert or update)
+  Future<void> bulkUpsertAttendance(List<Map<String, dynamic>> records) async {
+    try {
+      if (records.isEmpty) return;
+
+      // Use upsert to insert or update based on user_id + date
+      await _supabase.from('attendance_records').upsert(
+        records,
+        onConflict: 'user_id,date',
+      );
+    } catch (e) {
+      throw Exception('Failed to save bulk attendance: ${e.toString()}');
+    }
   }
 }

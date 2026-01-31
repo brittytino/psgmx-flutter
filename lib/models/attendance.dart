@@ -32,6 +32,7 @@ class Attendance {
   final String id;
   final DateTime date;
   final String studentId;
+  final String? userId; // Alternative field name in DB
   final String teamId;
   final AttendanceStatus status;
   final String markedBy;
@@ -43,6 +44,7 @@ class Attendance {
     required this.id,
     required this.date,
     required this.studentId,
+    this.userId,
     required this.teamId,
     required this.status,
     required this.markedBy,
@@ -54,10 +56,13 @@ class Attendance {
         updatedAt = updatedAt ?? DateTime.now();
 
   factory Attendance.fromMap(Map<String, dynamic> data) {
+    // Support both student_id and user_id columns
+    final studentIdValue = data['student_id'] ?? data['user_id'] ?? '';
     return Attendance(
       id: data['id'] ?? '',
       date: DateTime.parse(data['date']),
-      studentId: data['student_id'] ?? '',
+      studentId: studentIdValue,
+      userId: data['user_id'],
       teamId: data['team_id'] ?? '',
       status: AttendanceStatus.fromString(data['status'] ?? 'NA'),
       markedBy: data['marked_by'] ?? '',
@@ -77,7 +82,7 @@ class Attendance {
     return {
       'id': id,
       'date': date.toIso8601String().split('T')[0],
-      'student_id': studentId,
+      'user_id': studentId,
       'team_id': teamId,
       'status': status.displayName,
       'marked_by': markedBy,
@@ -138,8 +143,10 @@ class AttendanceSummary {
   });
 
   factory AttendanceSummary.fromMap(Map<String, dynamic> data) {
+    // Support both student_id and user_id columns
+    final studentIdValue = data['student_id'] ?? data['user_id'] ?? '';
     return AttendanceSummary(
-      studentId: data['student_id'] ?? '',
+      studentId: studentIdValue,
       email: data['email'] ?? '',
       regNo: data['reg_no'] ?? '',
       name: data['name'] ?? '',

@@ -10,16 +10,56 @@ import '../../models/attendance.dart';
 import '../../models/scheduled_date.dart';
 import '../widgets/premium_card.dart';
 
+/// Comprehensive Attendance Screen with Role-Based Access Control
+/// 
+/// ACCESS RULES:
+/// - Students: Only "My Attendance" tab (personal attendance history)
+/// - Team Leaders: "My Attendance" + "My Team" tabs
+/// - Coordinators: "My Attendance" + "My Team" + "Schedule Classes" tabs
+/// - Placement Rep: FULL ACCESS - All tabs including "Overall" and "Mark Attendance"
 class ComprehensiveAttendanceScreen extends StatelessWidget {
   const ComprehensiveAttendanceScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context);
+    
+    // Role checks (considering simulation mode)
+    final isStudent = !userProvider.isTeamLeader && !userProvider.isCoordinator && !userProvider.isPlacementRep;
+    final isTeamLeader = userProvider.isTeamLeader;
+    final isCoordinator = userProvider.isCoordinator;
     final isPlacementRep = userProvider.isPlacementRep || userProvider.isActualPlacementRep;
+    
+    // Determine which tabs to show based on role
+    List<Widget> tabs = [];
+    List<Widget> tabViews = [];
+    
+    // Everyone gets "My Attendance"
+    tabs.add(const Tab(text: 'My Attendance'));
+    tabViews.add(const _MyAttendanceTab());
+    
+    // Team Leaders and above get "My Team"
+    if (isTeamLeader || isCoordinator || isPlacementRep) {
+      tabs.add(const Tab(text: 'My Team'));
+      tabViews.add(const _MyTeamAttendanceTab());
+    }
+    
+    // Coordinators get "Schedule Classes" (read-only scheduling)
+    if (isCoordinator && !isPlacementRep) {
+      tabs.add(const Tab(text: 'Schedule'));
+      tabViews.add(const _ScheduleClassesTab());
+    }
+    
+    // Only Placement Rep gets full access including "Overall"
+    if (isPlacementRep) {
+      tabs.add(const Tab(text: 'Schedule'));
+      tabViews.add(const _ScheduleClassesTab());
+      tabs.add(const Tab(text: 'Overall'));
+      tabViews.add(const _OverallAttendanceTab());
+    }
 
     return DefaultTabController(
-      length: isPlacementRep ? 3 : 2,
+      length: tabs.length,
       child: Scaffold(
         body: NestedScrollView(
           headerSliverBuilder: (context, innerBoxIsScrolled) => [
@@ -39,25 +79,15 @@ class ComprehensiveAttendanceScreen extends StatelessWidget {
                     ),
                   ),
                   child: TabBar(
-                    isScrollable: false,
-                    tabAlignment: TabAlignment.fill,
-                    tabs: [
-                      const Tab(text: 'My Attendance'),
-                      const Tab(text: 'My Team'),
-                      if (isPlacementRep) const Tab(text: 'Overall'),
-                    ],
+                    isScrollable: tabs.length > 3,
+                    tabAlignment: tabs.length > 3 ? TabAlignment.start : TabAlignment.fill,
+                    tabs: tabs,
                   ),
                 ),
               ),
             ),
           ],
-          body: TabBarView(
-            children: [
-              const _MyAttendanceTab(),
-              const _MyTeamAttendanceTab(),
-              if (isPlacementRep) const _OverallAttendanceTab(),
-            ],
-          ),
+          body: TabBarView(children: tabViews),
         ),
       ),
     );
@@ -535,6 +565,343 @@ class _MyTeamAttendanceTabState extends State<_MyTeamAttendanceTab> {
 }
 
 // ========================================
+// SCHEDULE CLASSES TAB (Coordinators & Placement Rep)
+// ========================================
+class _ScheduleClassesTab extends StatefulWidget {
+  const _ScheduleClassesTab();
+
+  @override
+  State<_ScheduleClassesTab> createState() => _ScheduleClassesTabState();
+}
+
+class _ScheduleClassesTabState extends State<_ScheduleClassesTab> {
+  late AttendanceScheduleService _scheduleService;
+  List<ScheduledDate> _scheduledDates = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _scheduleService = AttendanceScheduleService();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+    try {
+      final scheduled = await _scheduleService.getUpcomingScheduledDates();
+      if (mounted) {
+        setState(() {
+          _scheduledDates = scheduled;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading schedule: $e')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final userProvider = Provider.of<UserProvider>(context);
+    final isPlacementRep = userProvider.isPlacementRep || userProvider.isActualPlacementRep;
+    
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: ListView(
+        padding: const EdgeInsets.all(AppSpacing.screenPadding),
+        children: [
+          // Header
+          PremiumCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.calendar_month, color: Colors.blue, size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Scheduled Classes',
+                            style: GoogleFonts.poppins(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            '${_scheduledDates.length} upcoming classes',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Only Placement Rep can add new schedules
+                    if (isPlacementRep)
+                      IconButton(
+                        onPressed: () => _showAddScheduleDialog(context),
+                        icon: const Icon(Icons.add_circle, color: Colors.blue),
+                        tooltip: 'Add Schedule',
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+
+          // Info for coordinators
+          if (!isPlacementRep)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, color: Colors.amber, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Only Placement Representatives can modify schedules',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: Colors.amber[800],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (!isPlacementRep) const SizedBox(height: AppSpacing.lg),
+
+          // Scheduled dates list
+          if (_scheduledDates.isEmpty)
+            Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 48),
+                  Icon(Icons.event_busy, size: 64, color: Colors.grey[400]),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No upcoming classes scheduled',
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            ...List.generate(_scheduledDates.length, (index) {
+              final schedule = _scheduledDates[index];
+              final isToday = DateUtils.isSameDay(schedule.date, DateTime.now());
+              final isPast = schedule.date.isBefore(DateTime.now());
+              
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: PremiumCard(
+                  color: isToday 
+                      ? Theme.of(context).primaryColor.withValues(alpha: 0.08)
+                      : isPast 
+                          ? (isDark ? Colors.grey[850] : Colors.grey[100])
+                          : null,
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          color: isToday 
+                              ? Theme.of(context).primaryColor
+                              : isPast 
+                                  ? Colors.grey
+                                  : Colors.blue,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              DateFormat('dd').format(schedule.date),
+                              style: GoogleFonts.poppins(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            Text(
+                              DateFormat('MMM').format(schedule.date).toUpperCase(),
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white.withValues(alpha: 0.9),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  DateFormat('EEEE').format(schedule.date),
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    color: isPast ? Colors.grey : null,
+                                  ),
+                                ),
+                                if (isToday) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context).primaryColor,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      'TODAY',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                                if (isPast) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      'PAST',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              schedule.notes ?? 'Placement Class',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (isPlacementRep && !isPast)
+                        IconButton(
+                          onPressed: () => _deleteSchedule(schedule.id),
+                          icon: Icon(Icons.delete_outline, color: Colors.red[400], size: 22),
+                          tooltip: 'Remove',
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showAddScheduleDialog(BuildContext context) async {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final selectedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now().add(const Duration(days: 1)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      helpText: 'Select Class Date',
+    );
+
+    if (selectedDate != null && mounted) {
+      try {
+        await _scheduleService.addScheduledDate(
+          date: selectedDate,
+          scheduledBy: userProvider.currentUser?.uid ?? 'unknown',
+        );
+        await _loadData();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Class scheduled for ${DateFormat('MMM dd, yyyy').format(selectedDate)}'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error scheduling: $e'), backgroundColor: Colors.red),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _deleteSchedule(String scheduleId) async {
+    try {
+      await _scheduleService.deleteScheduledDate(scheduleId);
+      await _loadData();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Schedule removed'), backgroundColor: Colors.orange),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+}
+
+// ========================================
 // OVERALL ATTENDANCE TAB (Placement Rep Only)
 // ========================================
 class _OverallAttendanceTab extends StatefulWidget {
@@ -595,10 +962,112 @@ class _OverallAttendanceTabState extends State<_OverallAttendanceTab> {
         children: [
           _buildScheduledDatesCard(),
           const SizedBox(height: AppSpacing.lg),
+          _buildMarkAttendanceCard(),
+          const SizedBox(height: AppSpacing.lg),
           _buildOverallStatsCard(),
           const SizedBox(height: AppSpacing.lg),
           _buildStudentsList(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMarkAttendanceCard() {
+    return PremiumCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.green.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.how_to_reg, color: Colors.green, size: 28),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Mark Attendance',
+                      style: GoogleFonts.poppins(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      'Mark attendance for all 123 students',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => _showBulkAttendanceSheet(DateTime.now()),
+                  icon: const Icon(Icons.today),
+                  label: const Text('Today'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.all(16),
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _selectDateAndMarkAttendance(),
+                  icon: const Icon(Icons.calendar_month),
+                  label: const Text('Select Date'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.all(16),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _selectDateAndMarkAttendance() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now().add(const Duration(days: 30)),
+    );
+
+    if (date != null && mounted) {
+      _showBulkAttendanceSheet(date);
+    }
+  }
+
+  void _showBulkAttendanceSheet(DateTime date) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) => _BulkAttendanceSheet(
+        date: date,
+        allStudents: _allStudents,
+        onSaved: () {
+          _loadData();
+        },
       ),
     );
   }
@@ -1204,6 +1673,485 @@ class _MultiDatePickerDialogState extends State<_MultiDatePickerDialog> {
       spacing: 0,
       runSpacing: 0,
       children: dayWidgets,
+    );
+  }
+}
+
+// ========================================
+// BULK ATTENDANCE SHEET FOR PLACEMENT REP
+// ========================================
+class _BulkAttendanceSheet extends StatefulWidget {
+  final DateTime date;
+  final List<AttendanceSummary> allStudents;
+  final VoidCallback onSaved;
+
+  const _BulkAttendanceSheet({
+    required this.date,
+    required this.allStudents,
+    required this.onSaved,
+  });
+
+  @override
+  State<_BulkAttendanceSheet> createState() => _BulkAttendanceSheetState();
+}
+
+class _BulkAttendanceSheetState extends State<_BulkAttendanceSheet> {
+  late Map<String, AttendanceStatus> _attendanceMap;
+  late AttendanceService _attendanceService;
+  bool _isSaving = false;
+  String _searchQuery = '';
+  String _filterStatus = 'all'; // all, present, absent
+
+  @override
+  void initState() {
+    super.initState();
+    _attendanceService = AttendanceService();
+    _attendanceMap = {};
+    
+    // Initialize all students as present by default
+    for (var student in widget.allStudents) {
+      _attendanceMap[student.studentId] = AttendanceStatus.present;
+    }
+    
+    _loadExistingAttendance();
+  }
+
+  Future<void> _loadExistingAttendance() async {
+    try {
+      // Load existing attendance for this date
+      final existing = await _attendanceService.getAttendanceForDate(widget.date);
+      
+      if (mounted) {
+        setState(() {
+          for (var record in existing) {
+            final id = record.userId ?? record.studentId;
+            if (id.isNotEmpty) {
+              _attendanceMap[id] = record.status;
+            }
+          }
+        });
+      }
+    } catch (e) {
+      // Ignore errors, just use defaults
+    }
+  }
+
+  List<AttendanceSummary> get _filteredStudents {
+    var students = widget.allStudents;
+    
+    // Apply search filter
+    if (_searchQuery.isNotEmpty) {
+      students = students.where((s) {
+        return s.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+               s.regNo.toLowerCase().contains(_searchQuery.toLowerCase());
+      }).toList();
+    }
+    
+    // Apply status filter
+    if (_filterStatus == 'present') {
+      students = students.where((s) => 
+        _attendanceMap[s.studentId] == AttendanceStatus.present
+      ).toList();
+    } else if (_filterStatus == 'absent') {
+      students = students.where((s) => 
+        _attendanceMap[s.studentId] == AttendanceStatus.absent
+      ).toList();
+    }
+    
+    return students;
+  }
+
+  int get _presentCount => _attendanceMap.values
+      .where((s) => s == AttendanceStatus.present).length;
+  
+  int get _absentCount => _attendanceMap.values
+      .where((s) => s == AttendanceStatus.absent).length;
+
+  void _toggleStatus(String studentId) {
+    setState(() {
+      if (_attendanceMap[studentId] == AttendanceStatus.present) {
+        _attendanceMap[studentId] = AttendanceStatus.absent;
+      } else {
+        _attendanceMap[studentId] = AttendanceStatus.present;
+      }
+    });
+  }
+
+  void _markAllPresent() {
+    setState(() {
+      for (var key in _attendanceMap.keys) {
+        _attendanceMap[key] = AttendanceStatus.present;
+      }
+    });
+  }
+
+  void _markAllAbsent() {
+    setState(() {
+      for (var key in _attendanceMap.keys) {
+        _attendanceMap[key] = AttendanceStatus.absent;
+      }
+    });
+  }
+
+  Future<void> _saveAttendance() async {
+    setState(() => _isSaving = true);
+
+    try {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final markedBy = userProvider.currentUser!.uid;
+
+      // Build attendance records with team_id from student data
+      final records = _attendanceMap.entries.map((entry) {
+        // Find the student to get their team_id
+        final student = widget.allStudents.firstWhere(
+          (s) => s.studentId == entry.key,
+          orElse: () => widget.allStudents.first,
+        );
+        
+        return {
+          'user_id': entry.key,
+          'date': widget.date.toIso8601String().split('T')[0],
+          'status': entry.value == AttendanceStatus.present ? 'PRESENT' : 'ABSENT',
+          'marked_by': markedBy,
+          'team_id': student.teamId ?? 'G1', // Include team_id (required field)
+          'created_at': DateTime.now().toIso8601String(),
+        };
+      }).toList();
+
+      await _attendanceService.bulkUpsertAttendance(records);
+
+      if (mounted) {
+        widget.onSaved();
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 8),
+                Text('Attendance saved for ${DateFormat('MMM dd, yyyy').format(widget.date)}'),
+              ],
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving attendance: $e')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dateStr = DateFormat('EEEE, MMMM dd, yyyy').format(widget.date);
+    final isToday = DateFormat('yyyy-MM-dd').format(widget.date) == 
+                    DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.9,
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          // Handle
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          
+          // Header
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isToday 
+                            ? Colors.green.withValues(alpha: 0.1) 
+                            : Colors.blue.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        isToday ? Icons.today : Icons.calendar_month,
+                        color: isToday ? Colors.green : Colors.blue,
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isToday ? "Today's Attendance" : 'Mark Attendance',
+                            style: GoogleFonts.poppins(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            dateStr,
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+                
+                const SizedBox(height: AppSpacing.lg),
+                
+                // Stats row
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildStatChip(
+                        'Present',
+                        _presentCount,
+                        Colors.green,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: _buildStatChip(
+                        'Absent',
+                        _absentCount,
+                        Colors.red,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: _buildStatChip(
+                        'Total',
+                        widget.allStudents.length,
+                        Colors.blue,
+                      ),
+                    ),
+                  ],
+                ),
+                
+                const SizedBox(height: AppSpacing.lg),
+                
+                // Quick actions
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _markAllPresent,
+                        icon: const Icon(Icons.check_circle, size: 18),
+                        label: const Text('All Present'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.green,
+                          side: const BorderSide(color: Colors.green),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _markAllAbsent,
+                        icon: const Icon(Icons.cancel, size: 18),
+                        label: const Text('All Absent'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.red,
+                          side: const BorderSide(color: Colors.red),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                
+                const SizedBox(height: AppSpacing.md),
+                
+                // Search and filter
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        decoration: InputDecoration(
+                          hintText: 'Search by name or reg no...',
+                          prefixIcon: const Icon(Icons.search, size: 20),
+                          isDense: true,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
+                        ),
+                        onChanged: (value) {
+                          setState(() => _searchQuery = value);
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    PopupMenuButton<String>(
+                      icon: Icon(
+                        Icons.filter_list,
+                        color: _filterStatus != 'all' ? Colors.blue : null,
+                      ),
+                      onSelected: (value) {
+                        setState(() => _filterStatus = value);
+                      },
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(value: 'all', child: Text('All')),
+                        const PopupMenuItem(value: 'present', child: Text('Present Only')),
+                        const PopupMenuItem(value: 'absent', child: Text('Absent Only')),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          
+          // Student list
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+              itemCount: _filteredStudents.length,
+              itemBuilder: (context, index) {
+                final student = _filteredStudents[index];
+                final status = _attendanceMap[student.studentId] ?? AttendanceStatus.present;
+                final isPresent = status == AttendanceStatus.present;
+
+                return Card(
+                  margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: isPresent 
+                          ? Colors.green.withValues(alpha: 0.1) 
+                          : Colors.red.withValues(alpha: 0.1),
+                      child: Text(
+                        student.name[0].toUpperCase(),
+                        style: TextStyle(
+                          color: isPresent ? Colors.green : Colors.red,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    title: Text(
+                      student.name,
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: Text(
+                      '${student.regNo} • ${student.teamId ?? "No Team"}',
+                      style: GoogleFonts.inter(fontSize: 12),
+                    ),
+                    trailing: Switch(
+                      value: isPresent,
+                      onChanged: (_) => _toggleStatus(student.studentId),
+                      activeTrackColor: Colors.green.withValues(alpha: 0.5),
+                      thumbColor: WidgetStateProperty.resolveWith((states) {
+                        if (states.contains(WidgetState.selected)) {
+                          return Colors.green;
+                        }
+                        return Colors.red;
+                      }),
+                      trackColor: WidgetStateProperty.resolveWith((states) {
+                        if (states.contains(WidgetState.selected)) {
+                          return Colors.green.withValues(alpha: 0.5);
+                        }
+                        return Colors.red.withValues(alpha: 0.3);
+                      }),
+                    ),
+                    onTap: () => _toggleStatus(student.studentId),
+                  ),
+                );
+              },
+            ),
+          ),
+          
+          // Save button
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            decoration: BoxDecoration(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _isSaving ? null : _saveAttendance,
+                  icon: _isSaving 
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.save),
+                  label: Text(_isSaving ? 'Saving...' : 'Save Attendance'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.all(16),
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatChip(String label, int count, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        children: [
+          Text(
+            count.toString(),
+            style: GoogleFonts.inter(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: color,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

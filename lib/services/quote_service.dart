@@ -1,11 +1,12 @@
-import '../core/constants/daily_quotes.dart';
+import '../core/constants/daily_inspirations.dart';
 
 class QuoteService {
+  /// Get today's inspirational message
+  /// No "Daily Motivation" label - just pure inspiration
   Future<Map<String, String>> getDailyQuote() async {
-    // Return deterministic local quote
     return {
-      'text': DailyQuotes.getQuoteForToday(),
-      'author': DailyQuotes.getAuthorForToday(),
+      'text': DailyInspirations.getMessageForToday(),
+      'author': '', // No author attribution for cleaner UI
     };
   }
 }

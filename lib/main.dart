@@ -13,35 +13,42 @@ import 'services/supabase_service.dart';
 import 'services/supabase_db_service.dart';
 import 'services/quote_service.dart';
 import 'services/notification_service.dart';
+import 'services/leetcode_auto_refresh_service.dart';
+import 'services/update_service.dart';
 
 import 'ui/widgets/error_boundary.dart';
 import 'ui/widgets/modern_offline_banner.dart';
+import 'ui/update/update_gate.dart';
 import 'core/theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize Global Error Handling
   ErrorWidget.builder = (FlutterErrorDetails details) {
     debugPrint('[GLOBAL ERROR] ${details.exception}');
     return GlobalErrorWidget(errorDetails: details);
   };
-  
+
   try {
     debugPrint('[APP] Initializing NotificationService...');
     await NotificationService().init();
-    
+
     debugPrint('[APP] Initializing Supabase...');
     await Supabase.initialize(
       url: SupabaseConfig.supabaseUrl,
       anonKey: SupabaseConfig.supabaseAnonKey,
     );
     debugPrint('[APP] Supabase initialized successfully');
+
+    debugPrint('[APP] Initializing UpdateService...');
+    await UpdateService().initialize();
+    debugPrint('[APP] UpdateService initialized successfully');
   } catch (e) {
     debugPrint('[APP ERROR] Initialization failed: $e');
     rethrow;
   }
-  
+
   runApp(const PsgMxApp());
 }
 
@@ -63,6 +70,7 @@ class PsgMxApp extends StatelessWidget {
         Provider<AuthService>.value(value: authService),
         Provider<QuoteService>.value(value: quoteService),
         Provider<NotificationService>.value(value: NotificationService()),
+        ChangeNotifierProvider<UpdateService>.value(value: UpdateService()),
         ChangeNotifierProvider(
           create: (_) => UserProvider(authService: authService),
         ),
@@ -90,6 +98,7 @@ class PsgMxAppInner extends StatefulWidget {
 
 class _PsgMxAppInnerState extends State<PsgMxAppInner> {
   late final GoRouter _router;
+  LeetCodeAutoRefreshService? _autoRefreshService;
 
   @override
   void initState() {
@@ -97,6 +106,30 @@ class _PsgMxAppInnerState extends State<PsgMxAppInner> {
     // Access provider via context inside initState (listen: false)
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     _router = AppRouter.createRouter(userProvider);
+
+    // Initialize LeetCode auto-refresh service for daily updates
+    _initAutoRefresh();
+  }
+
+  void _initAutoRefresh() {
+    // Schedule after build to ensure providers are ready
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final leetCodeProvider =
+          Provider.of<LeetCodeProvider>(context, listen: false);
+      final supabaseService =
+          Provider.of<SupabaseService>(context, listen: false);
+
+      _autoRefreshService =
+          LeetCodeAutoRefreshService(leetCodeProvider, supabaseService);
+      _autoRefreshService!.start();
+      debugPrint('[APP] LeetCode auto-refresh service started');
+    });
+  }
+
+  @override
+  void dispose() {
+    _autoRefreshService?.dispose();
+    super.dispose();
   }
 
   @override
@@ -109,7 +142,11 @@ class _PsgMxAppInnerState extends State<PsgMxAppInner> {
       themeMode: ThemeMode.system,
       routerConfig: _router,
       builder: (context, child) {
-        return ModernOfflineBanner(child: child ?? const SizedBox());
+        // Wrap with UpdateGate to enforce version checks
+        // Then ModernOfflineBanner for connectivity status
+        return UpdateGate(
+          child: ModernOfflineBanner(child: child ?? const SizedBox()),
+        );
       },
     );
   }
