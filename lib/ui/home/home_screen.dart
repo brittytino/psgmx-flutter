@@ -760,71 +760,137 @@ class _RealAttendanceStats extends StatelessWidget {
   Widget build(BuildContext context) {
     final streakService = AttendanceStreakService();
 
-    return FutureBuilder<List<dynamic>>(
-      future: Future.wait([
-        streakService.getMyAttendanceStreak(),
-        streakService.getMyAttendanceCalculation(),
-      ]),
+    return FutureBuilder<AttendanceCalculation>(
+      future: streakService.getMyAttendanceCalculation(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const SizedBox(
-            height: 80,
+            height: 120,
             child: Center(child: CircularProgressIndicator()),
           );
         }
 
-        final streak =
-            snapshot.data?[0] as AttendanceStreak? ?? AttendanceStreak.empty();
-        final calculation = snapshot.data?[1] as AttendanceCalculation? ??
-            AttendanceCalculation.empty();
+        final calculation = snapshot.data ?? AttendanceCalculation.empty();
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: _buildAttendanceStat(
-                    context,
-                    '${calculation.attendancePercentage.toStringAsFixed(1)}%',
-                    'Attendance',
-                    calculation.attendancePercentage >= 75
-                        ? Colors.green
-                        : Colors.red,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: _buildAttendanceStat(
-                    context,
-                    '${streak.currentStreak}',
-                    'Days Streak',
-                    Colors.orange,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.sm),
-
-            // A4: Attendance Calculation Explanation
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
-              child: Row(
+            PremiumCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.info_outline,
-                    size: 14,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      calculation.explanation,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
-                            fontSize: 11,
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(AppSpacing.sm),
+                        decoration: BoxDecoration(
+                          color: (calculation.attendancePercentage >= 75
+                                  ? Colors.green
+                                  : Colors.red)
+                              .withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                        ),
+                        child: Icon(
+                          calculation.attendancePercentage >= 75
+                              ? Icons.check_circle_outline
+                              : Icons.warning_amber_rounded,
+                          color: calculation.attendancePercentage >= 75
+                              ? Colors.green
+                              : Colors.red,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Attendance',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelMedium
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${calculation.attendancePercentage.toStringAsFixed(1)}%',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .headlineMedium
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: calculation.attendancePercentage >=
+                                            75
+                                        ? Colors.green
+                                        : Colors.red,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Present/Total Days
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '${calculation.presentCount}/${calculation.totalClassDays}',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleLarge
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
                           ),
+                          Text(
+                            'Days Present',
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
+                                    ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  // Explanation
+                  Container(
+                    padding: const EdgeInsets.all(AppSpacing.sm),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .surfaceContainer
+                          .withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          size: 16,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(width: AppSpacing.xs),
+                        Expanded(
+                          child: Text(
+                            calculation.explanation,
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
+                                      fontSize: 12,
+                                    ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -833,31 +899,6 @@ class _RealAttendanceStats extends StatelessWidget {
           ],
         );
       },
-    );
-  }
-
-  Widget _buildAttendanceStat(
-      BuildContext context, String value, String label, Color color) {
-    return PremiumCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-          ),
-        ],
-      ),
     );
   }
 }

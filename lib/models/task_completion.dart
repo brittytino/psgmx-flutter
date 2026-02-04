@@ -107,6 +107,8 @@ class UserTaskStatus {
   final String? teamId;
   final bool completed;
   final DateTime? completedAt;
+  final String? verifiedByName;
+  final DateTime? verifiedAt;
 
   const UserTaskStatus({
     required this.odId,
@@ -115,6 +117,8 @@ class UserTaskStatus {
     this.teamId,
     required this.completed,
     this.completedAt,
+    this.verifiedByName,
+    this.verifiedAt,
   });
 
   factory UserTaskStatus.fromMap(Map<String, dynamic> data) {
@@ -126,6 +130,10 @@ class UserTaskStatus {
       completed: data['completed'] ?? false,
       completedAt: data['completed_at'] != null
           ? DateTime.parse(data['completed_at'])
+          : null,
+      verifiedByName: data['verified_by_name'],
+      verifiedAt: data['verified_at'] != null
+          ? DateTime.parse(data['verified_at'])
           : null,
     );
   }

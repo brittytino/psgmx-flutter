@@ -182,37 +182,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
 
                 const SizedBox(height: AppSpacing.xl),
-
-                // Logout Button
-                Center(
-                  child: ElevatedButton.icon(
-                    onPressed: _isLoggingOut ? null : () => _confirmSignOut(context, userProvider),
-                    icon: _isLoggingOut 
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.logout),
-                    label: Text(
-                      _isLoggingOut ? 'Signing out...' : 'Logout',
-                      style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor:
-                          Theme.of(context).colorScheme.errorContainer,
-                      foregroundColor:
-                          Theme.of(context).colorScheme.onErrorContainer,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.xl,
-                        vertical: AppSpacing.md,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xl),
               ]),
             ),
           ),
@@ -364,39 +333,132 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildThemeSelector(BuildContext context, ThemeProvider themeProvider) {
-    return Column(
-      children: [
-        _buildThemeOption(
-          context,
-          title: 'System Default',
-          subtitle: 'Follow device settings',
-          icon: Icons.settings_suggest,
-          isSelected: themeProvider.themeMode == ThemeMode.system,
-          onTap: () => themeProvider.setThemeMode(ThemeMode.system),
-        ),
-        const Divider(height: 1),
-        _buildThemeOption(
-          context,
-          title: 'Light Mode',
-          subtitle: 'Always use light theme',
-          icon: Icons.light_mode,
-          isSelected: themeProvider.themeMode == ThemeMode.light,
-          onTap: () => themeProvider.setThemeMode(ThemeMode.light),
-        ),
-        const Divider(height: 1),
-        _buildThemeOption(
-          context,
-          title: 'Dark Mode',
-          subtitle: 'Always use dark theme',
-          icon: Icons.dark_mode,
-          isSelected: themeProvider.themeMode == ThemeMode.dark,
-          onTap: () => themeProvider.setThemeMode(ThemeMode.dark),
-        ),
-      ],
+    final isDark = themeProvider.themeMode == ThemeMode.dark;
+    final isSystem = themeProvider.themeMode == ThemeMode.system;
+    
+    return Padding(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Row(
+        children: [
+          // Sun Icon (Light Mode)
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            decoration: BoxDecoration(
+              color: !isDark && !isSystem
+                  ? Theme.of(context).colorScheme.primaryContainer
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+            child: Icon(
+              Icons.light_mode,
+              color: !isDark && !isSystem
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
+              size: 20,
+            ),
+          ),
+          
+          const SizedBox(width: AppSpacing.md),
+          
+          // Toggle Switch
+          Expanded(
+            child: Center(
+              child: Container(
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainer,
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // System Option
+                    _buildThemeToggleOption(
+                      context,
+                      label: 'System',
+                      isSelected: isSystem,
+                      onTap: () => themeProvider.setThemeMode(ThemeMode.system),
+                    ),
+                    // Light Option
+                    _buildThemeToggleOption(
+                      context,
+                      label: 'Light',
+                      isSelected: !isDark && !isSystem,
+                      onTap: () => themeProvider.setThemeMode(ThemeMode.light),
+                    ),
+                    // Dark Option
+                    _buildThemeToggleOption(
+                      context,
+                      label: 'Dark',
+                      isSelected: isDark && !isSystem,
+                      onTap: () => themeProvider.setThemeMode(ThemeMode.dark),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          
+          const SizedBox(width: AppSpacing.md),
+          
+          // Moon Icon (Dark Mode)
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            decoration: BoxDecoration(
+              color: isDark && !isSystem
+                  ? Theme.of(context).colorScheme.primaryContainer
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+            child: Icon(
+              Icons.dark_mode,
+              color: isDark && !isSystem
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
+              size: 20,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildThemeOption(
+  Widget _buildThemeToggleOption(
+    BuildContext context, {
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.xs,
+        ),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? Theme.of(context).colorScheme.primary
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected
+                ? Theme.of(context).colorScheme.onPrimary
+                : Theme.of(context).colorScheme.onSurfaceVariant,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+            fontSize: 13,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildThemeOption_OLD(
     BuildContext context, {
     required String title,
     required String subtitle,

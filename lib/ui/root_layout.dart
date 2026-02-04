@@ -26,17 +26,20 @@ class _RootLayoutState extends State<RootLayout> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    // Dynamic Screen List based on Role
+    // Check if simulating - use active role permissions, not actual role
+    final showReports = (userProvider.isCoordinator || userProvider.isPlacementRep) && 
+                        !userProvider.isSimulating;
+
+    // Dynamic Screen List based on ACTIVE Role (respects simulation)
     final screens = [
       const HomeScreen(),
       const TasksScreen(),
       const ComprehensiveAttendanceScreen(),
-      if (userProvider.isCoordinator || userProvider.isPlacementRep || userProvider.hasActualAdminAccess) 
-        const ModernReportsScreen(),
+      if (showReports) const ModernReportsScreen(),
       const ProfileScreen(),
     ];
 
-    // Dynamic Navigation Items
+    // Dynamic Navigation Items based on ACTIVE Role (respects simulation)
     final navItems = [
       NavigationDestination(
         icon: const Icon(Icons.home_outlined), 
@@ -53,7 +56,7 @@ class _RootLayoutState extends State<RootLayout> {
         selectedIcon: Icon(Icons.calendar_today, color: Theme.of(context).colorScheme.primary), 
         label: 'Attendance'
       ),
-      if (userProvider.isCoordinator || userProvider.isPlacementRep || userProvider.hasActualAdminAccess)
+      if (showReports)
         NavigationDestination(
           icon: const Icon(Icons.bar_chart_outlined), 
           selectedIcon: Icon(Icons.bar_chart, color: Theme.of(context).colorScheme.primary), 

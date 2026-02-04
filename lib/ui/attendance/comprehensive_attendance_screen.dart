@@ -25,13 +25,15 @@ class ComprehensiveAttendanceScreen extends StatelessWidget {
     final userProvider = Provider.of<UserProvider>(context);
     
     // Determine effective role (considering simulation mode)
-    // Use hierarchical check: PlacementRep > Coordinator > TeamLeader > Student
     final isActualPlacementRep = userProvider.isActualPlacementRep;
     final isPlacementRep = userProvider.isPlacementRep;
     final isCoordinator = userProvider.isCoordinator;
     final isTeamLeader = userProvider.isTeamLeader;
     
-    // Build tabs based on STRICT role hierarchy
+    // Check if user is simulating a different role
+    final isSimulating = isActualPlacementRep && !isPlacementRep;
+    
+    // Build tabs based on CURRENT ACTIVE role (respects simulation)
     List<Widget> tabs = [];
     List<Widget> tabViews = [];
     
@@ -39,20 +41,20 @@ class ComprehensiveAttendanceScreen extends StatelessWidget {
     tabs.add(const Tab(text: 'My Attendance'));
     tabViews.add(const _MyAttendanceTab());
     
-    // 2. Team Leaders, Coordinators, and Placement Rep get "My Team"
-    if (isTeamLeader || isCoordinator || isPlacementRep) {
+    // 2. Team Leaders, Coordinators, and Placement Rep get "My Team" (when not student)
+    if (isTeamLeader || isCoordinator || (isPlacementRep && !isSimulating)) {
       tabs.add(const Tab(text: 'My Team'));
       tabViews.add(const _MyTeamAttendanceTab());
     }
     
-    // 3. Coordinators and Placement Rep get "Schedule"
-    if (isCoordinator || isPlacementRep) {
+    // 3. Coordinators and Placement Rep get "Schedule" (when not student/team leader)
+    if (isCoordinator || (isActualPlacementRep && !isSimulating)) {
       tabs.add(const Tab(text: 'Schedule'));
       tabViews.add(const _ScheduleClassesTab());
     }
     
-    // 4. Only ACTUAL Placement Rep gets "Overall" (not when simulating other roles)
-    if (isActualPlacementRep) {
+    // 4. Only ACTUAL Placement Rep gets "Overall" (NEVER shown when simulating)
+    if (isActualPlacementRep && !isSimulating) {
       tabs.add(const Tab(text: 'Overall'));
       tabViews.add(const _OverallAttendanceTab());
     }
@@ -79,7 +81,12 @@ class ComprehensiveAttendanceScreen extends StatelessWidget {
         body: NestedScrollView(
           headerSliverBuilder: (context, innerBoxIsScrolled) => [
             SliverAppBar(
-              title: const Text('Attendance'),
+              title: Text(
+                'Attendance',
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               pinned: true,
               floating: true,
               forceElevated: innerBoxIsScrolled,
@@ -87,6 +94,7 @@ class ComprehensiveAttendanceScreen extends StatelessWidget {
                 preferredSize: const Size.fromHeight(56),
                 child: Container(
                   decoration: BoxDecoration(
+                    color: Theme.of(context).scaffoldBackgroundColor,
                     border: Border(
                       bottom: BorderSide(
                         color: Theme.of(context).dividerColor.withValues(alpha: 0.1),
@@ -96,14 +104,29 @@ class ComprehensiveAttendanceScreen extends StatelessWidget {
                   child: TabBar(
                     isScrollable: isScrollable,
                     tabAlignment: tabAlignment,
+                    labelColor: Theme.of(context).colorScheme.primary,
+                    unselectedLabelColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                     labelStyle: GoogleFonts.inter(
                       fontWeight: FontWeight.w600,
-                      fontSize: 14,
+                      fontSize: 15,
+                      letterSpacing: 0.5,
                     ),
                     unselectedLabelStyle: GoogleFonts.inter(
                       fontWeight: FontWeight.w500,
-                      fontSize: 14,
+                      fontSize: 15,
                     ),
+                    indicatorSize: TabBarIndicatorSize.label,
+                    indicator: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(
+                          color: Theme.of(context).colorScheme.primary,
+                          width: 3,
+                        ),
+                      ),
+                    ),
+                    dividerColor: Colors.transparent,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    labelPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     tabs: tabs,
                   ),
                 ),
@@ -352,8 +375,10 @@ class _MyTeamAttendanceTabState extends State<_MyTeamAttendanceTab> {
   late AttendanceService _attendanceService;
   late AttendanceScheduleService _scheduleService;
   List<AttendanceSummary> _teamMembers = [];
+  List<Map<String, dynamic>> _allTeams = [];
   bool _isLoading = true;
   bool _isTodayScheduled = false;
+  bool _showAllTeams = false; // Toggle state
 
   @override
   void initState() {
@@ -374,13 +399,18 @@ class _MyTeamAttendanceTabState extends State<_MyTeamAttendanceTab> {
       _isTodayScheduled = await _scheduleService.isDateScheduled(today);
 
       if (teamId != null) {
+        // Load My Team data
         final members = await _attendanceService.getTeamAttendanceSummary(
           teamId: teamId,
         );
 
+        // Load All Teams data
+        final allTeams = await _attendanceService.getAllTeamsAttendanceSummary();
+
         if (mounted) {
           setState(() {
             _teamMembers = members;
+            _allTeams = allTeams;
             _isLoading = false;
           });
         }
@@ -401,10 +431,114 @@ class _MyTeamAttendanceTabState extends State<_MyTeamAttendanceTab> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_teamMembers.isEmpty) {
+    if (_teamMembers.isEmpty && _allTeams.isEmpty) {
       return const Center(
         child: Text('No team members found'),
       );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: ListView(
+        padding: const EdgeInsets.all(AppSpacing.screenPadding),
+        children: [
+          // Toggle Switch Header
+          _buildToggleHeader(),
+          const SizedBox(height: AppSpacing.lg),
+          
+          // Content based on toggle
+          if (_showAllTeams)
+            ..._buildAllTeamsView()
+          else
+            ..._buildMyTeamView(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildToggleHeader() {
+    return PremiumCard(
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              _showAllTeams ? 'All Teams Leaderboard' : 'My Team',
+              style: GoogleFonts.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainer,
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildToggleButton(
+                  label: 'My Team',
+                  isSelected: !_showAllTeams,
+                  onTap: () => setState(() => _showAllTeams = false),
+                ),
+                _buildToggleButton(
+                  label: 'All Teams',
+                  isSelected: _showAllTeams,
+                  onTap: () => setState(() => _showAllTeams = true),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildToggleButton({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? Theme.of(context).colorScheme.primary
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.inter(
+            color: isSelected
+                ? Theme.of(context).colorScheme.onPrimary
+                : Theme.of(context).colorScheme.onSurfaceVariant,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+            fontSize: 13,
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildMyTeamView() {
+    if (_teamMembers.isEmpty) {
+      return [
+        const Center(
+          child: Padding(
+            padding: EdgeInsets.all(AppSpacing.xl),
+            child: Text('No team members found'),
+          ),
+        ),
+      ];
     }
 
     final avgPercentage = _teamMembers.fold<double>(
@@ -413,19 +547,127 @@ class _MyTeamAttendanceTabState extends State<_MyTeamAttendanceTab> {
         ) /
         _teamMembers.length;
 
-    return RefreshIndicator(
-      onRefresh: _loadData,
-      child: ListView(
-        padding: const EdgeInsets.all(AppSpacing.screenPadding),
-        children: [
-          _buildTeamSummaryCard(avgPercentage),
-          const SizedBox(height: AppSpacing.lg),
-          if (!_isTodayScheduled) _buildNoClassTodayCard(),
-          if (!_isTodayScheduled) const SizedBox(height: AppSpacing.lg),
-          ..._teamMembers.map((member) => _buildMemberCard(member)),
-        ],
-      ),
-    );
+    return [
+      _buildTeamSummaryCard(avgPercentage),
+      const SizedBox(height: AppSpacing.lg),
+      if (!_isTodayScheduled) _buildNoClassTodayCard(),
+      if (!_isTodayScheduled) const SizedBox(height: AppSpacing.lg),
+      ..._teamMembers.map((member) => _buildMemberCard(member)),
+    ];
+  }
+
+  List<Widget> _buildAllTeamsView() {
+    if (_allTeams.isEmpty) {
+      return [
+        const Center(
+          child: Padding(
+            padding: EdgeInsets.all(AppSpacing.xl),
+            child: Text('No teams data available'),
+          ),
+        ),
+      ];
+    }
+
+    return _allTeams.asMap().entries.map((entry) {
+      final index = entry.key;
+      final team = entry.value;
+      final avgPercentage = team['average_percentage'] as double;
+      final memberCount = team['member_count'] as int;
+      final teamName = team['team_name'] as String;
+      
+      // Medal/Rank colors
+      Color rankColor;
+      IconData rankIcon;
+      if (index == 0) {
+        rankColor = const Color(0xFFFFD700); // Gold
+        rankIcon = Icons.emoji_events;
+      } else if (index == 1) {
+        rankColor = const Color(0xFFC0C0C0); // Silver
+        rankIcon = Icons.workspace_premium;
+      } else if (index == 2) {
+        rankColor = const Color(0xFFCD7F32); // Bronze
+        rankIcon = Icons.military_tech;
+      } else {
+        rankColor = Colors.grey;
+        rankIcon = Icons.group;
+      }
+
+      return Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.md),
+        child: PremiumCard(
+          child: Row(
+            children: [
+              // Rank Badge
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: rankColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(rankIcon, color: rankColor, size: 20),
+                    Text(
+                      '#${index + 1}',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: rankColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      teamName,
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '$memberCount members',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '${avgPercentage.toStringAsFixed(1)}%',
+                    style: GoogleFonts.inter(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: avgPercentage >= 75 ? Colors.green : Colors.red,
+                    ),
+                  ),
+                  Text(
+                    'Average',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    }).toList();
   }
 
   Widget _buildNoClassTodayCard() {
@@ -472,43 +714,38 @@ class _MyTeamAttendanceTabState extends State<_MyTeamAttendanceTab> {
     final color = avgPercentage >= 75 ? Colors.green : Colors.red;
 
     return PremiumCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(Icons.group, color: color, size: 32),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Team Average',
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-                child: Icon(Icons.group, color: color, size: 32),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Team Average',
-                      style: GoogleFonts.poppins(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      '${avgPercentage.toStringAsFixed(1)}%',
-                      style: GoogleFonts.inter(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: color,
-                      ),
-                    ),
-                  ],
+                Text(
+                  '${avgPercentage.toStringAsFixed(1)}%',
+                  style: GoogleFonts.inter(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -938,16 +1175,13 @@ class _OverallAttendanceTab extends StatefulWidget {
 
 class _OverallAttendanceTabState extends State<_OverallAttendanceTab> {
   late AttendanceService _attendanceService;
-  late AttendanceScheduleService _scheduleService;
   List<AttendanceSummary> _allStudents = [];
-  List<ScheduledDate> _scheduledDates = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
     _attendanceService = AttendanceService();
-    _scheduleService = AttendanceScheduleService();
     _loadData();
   }
 
@@ -955,12 +1189,10 @@ class _OverallAttendanceTabState extends State<_OverallAttendanceTab> {
     setState(() => _isLoading = true);
     try {
       final students = await _attendanceService.getAllStudentsAttendanceSummary();
-      final scheduled = await _scheduleService.getUpcomingScheduledDates();
 
       if (mounted) {
         setState(() {
           _allStudents = students;
-          _scheduledDates = scheduled;
           _isLoading = false;
         });
       }
@@ -985,8 +1217,6 @@ class _OverallAttendanceTabState extends State<_OverallAttendanceTab> {
       child: ListView(
         padding: const EdgeInsets.all(AppSpacing.screenPadding),
         children: [
-          _buildScheduledDatesCard(),
-          const SizedBox(height: AppSpacing.lg),
           _buildMarkAttendanceCard(),
           const SizedBox(height: AppSpacing.lg),
           _buildOverallStatsCard(),
@@ -1097,90 +1327,88 @@ class _OverallAttendanceTabState extends State<_OverallAttendanceTab> {
     );
   }
 
-  Widget _buildScheduledDatesCard() {
-    return PremiumCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Scheduled Classes',
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              TextButton.icon(
-                onPressed: () => _showScheduleDatePicker(),
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Add Date'),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          if (_scheduledDates.isEmpty)
-            const Text('No upcoming scheduled classes')
-          else
-            ..._scheduledDates.map((scheduled) {
-              final dateStr = DateFormat('MMM dd, yyyy').format(scheduled.date);
-              return ListTile(
-                leading: const Icon(Icons.event, color: Colors.blue),
-                title: Text(dateStr),
-                subtitle: Text(scheduled.notes ?? 'No notes'),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.edit, size: 18),
-                      onPressed: () => _editScheduledDate(scheduled),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete, size: 18),
-                      onPressed: () => _deleteScheduledDate(scheduled.id),
-                    ),
-                  ],
-                ),
-              );
-            }),
-        ],
-      ),
-    );
-  }
-
   Widget _buildOverallStatsCard() {
     final avgPercentage = _allStudents.fold<double>(
           0,
           (sum, student) => sum + student.attendancePercentage,
         ) /
         (_allStudents.isEmpty ? 1 : _allStudents.length);
+    
+    final totalPresent = _allStudents.fold<int>(
+      0,
+      (sum, student) => sum + student.presentCount,
+    );
+    
+    final totalAbsent = _allStudents.fold<int>(
+      0,
+      (sum, student) => sum + student.absentCount,
+    );
 
     return PremiumCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Overall Statistics',
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.analytics_outlined, color: Colors.blue, size: 24),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Overall Statistics',
+                style: GoogleFonts.poppins(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Row(
+            children: [
+              Expanded(
+                child: _buildModernStatCard(
+                  'Total Students',
+                  _allStudents.length.toString(),
+                  Icons.people,
+                  Colors.blue,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: _buildModernStatCard(
+                  'Average %',
+                  '${avgPercentage.toStringAsFixed(1)}%',
+                  Icons.percent,
+                  avgPercentage >= 75 ? Colors.green : Colors.orange,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: AppSpacing.md),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildStatColumn('Students', _allStudents.length, Colors.blue),
-              _buildStatColumn(
-                'Avg %',
-                avgPercentage.round(),
-                avgPercentage >= 75 ? Colors.green : Colors.red,
+              Expanded(
+                child: _buildModernStatCard(
+                  'Total Present',
+                  totalPresent.toString(),
+                  Icons.check_circle,
+                  Colors.green,
+                ),
               ),
-              _buildStatColumn(
-                'Scheduled',
-                _scheduledDates.length,
-                Colors.purple,
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: _buildModernStatCard(
+                  'Total Absent',
+                  totalAbsent.toString(),
+                  Icons.cancel,
+                  Colors.red,
+                ),
               ),
             ],
           ),
@@ -1188,209 +1416,170 @@ class _OverallAttendanceTabState extends State<_OverallAttendanceTab> {
       ),
     );
   }
-
-  Widget _buildStatColumn(String label, int value, Color color) {
-    return Column(
-      children: [
-        Text(
-          value.toString(),
-          style: GoogleFonts.inter(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: color,
+  
+  Widget _buildModernStatCard(String label, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 28),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: GoogleFonts.inter(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
           ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 12,
-            color: Colors.grey[600],
+          const SizedBox(height: 4),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
   Widget _buildStudentsList() {
+    // Sort students by attendance percentage (lowest first)
+    final sortedStudents = List<AttendanceSummary>.from(_allStudents)
+      ..sort((a, b) => a.attendancePercentage.compareTo(b.attendancePercentage));
+
     return PremiumCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'All Students',
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          ..._allStudents.map((student) {
-            final percentage = student.attendancePercentage;
-            final color = percentage >= 75 ? Colors.green : Colors.red;
-
-            return ListTile(
-              leading: CircleAvatar(
-                backgroundColor: color.withValues(alpha: 0.1),
-                child: Text(
-                  student.name[0].toUpperCase(),
-                  style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.bold,
-                  ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.purple.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.group, color: Colors.purple, size: 24),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'All Students',
+                      style: GoogleFonts.poppins(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      '${_allStudents.length} students enrolled',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              title: Text(student.name),
-              subtitle: Text('${student.regNo} - ${student.teamId ?? "No Team"}'),
-              trailing: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    '${percentage.toStringAsFixed(1)}%',
-                    style: GoogleFonts.inter(
-                      fontWeight: FontWeight.bold,
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          const Divider(height: 1),
+          ...sortedStudents.map((student) {
+            final percentage = student.attendancePercentage;
+            final color = percentage >= 75 
+                ? Colors.green 
+                : percentage >= 50 
+                    ? Colors.orange 
+                    : Colors.red;
+
+            return Container(
+              margin: const EdgeInsets.only(top: AppSpacing.sm),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: color.withValues(alpha: 0.2)),
+              ),
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.xs,
+                ),
+                leading: CircleAvatar(
+                  backgroundColor: color.withValues(alpha: 0.2),
+                  child: Text(
+                    student.name.split(' ').map((n) => n[0]).take(2).join().toUpperCase(),
+                    style: TextStyle(
                       color: color,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
                     ),
                   ),
-                  Text(
-                    '${student.presentCount}/${student.totalWorkingDays}',
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      color: Colors.grey[600],
-                    ),
+                ),
+                title: Text(
+                  student.name,
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
                   ),
-                ],
+                ),
+                subtitle: Text(
+                  '${student.regNo} • ${student.teamId ?? "No Team"}',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                trailing: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '${percentage.toStringAsFixed(1)}%',
+                        style: GoogleFonts.inter(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          color: color,
+                        ),
+                      ),
+                      Text(
+                        '${student.presentCount}/${student.totalWorkingDays}',
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             );
           }),
         ],
       ),
     );
-  }
-
-  Future<void> _showScheduleDatePicker() async {
-    await showDialog(
-      context: context,
-      builder: (context) => _MultiDatePickerDialog(
-        onDatesSelected: (dates, notes) async {
-          final scaffoldMessenger = ScaffoldMessenger.of(context);
-          try {
-            final userProvider = Provider.of<UserProvider>(context, listen: false);
-            
-            // Add all selected dates
-            for (final date in dates) {
-              await _scheduleService.addScheduledDate(
-                date: date,
-                scheduledBy: userProvider.currentUser!.uid,
-                notes: notes,
-              );
-            }
-            
-            _loadData();
-            if (mounted) {
-              scaffoldMessenger.showSnackBar(
-                SnackBar(content: Text('${dates.length} date(s) scheduled successfully')),
-              );
-            }
-          } catch (e) {
-            if (mounted) {
-              scaffoldMessenger.showSnackBar(
-                SnackBar(content: Text('Error: $e')),
-              );
-            }
-          }
-        },
-      ),
-    );
-  }
-
-  Future<void> _editScheduledDate(ScheduledDate scheduled) async {
-    final controller = TextEditingController(text: scheduled.notes);
-    final notes = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Edit Notes'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            hintText: 'Notes',
-            border: OutlineInputBorder(),
-          ),
-          maxLines: 3,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-
-    if (notes != null) {
-      try {
-        await _scheduleService.updateScheduledDate(
-          id: scheduled.id,
-          notes: notes,
-        );
-        _loadData();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Updated successfully')),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $e')),
-          );
-        }
-      }
-    }
-  }
-
-  Future<void> _deleteScheduledDate(String id) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirm Delete'),
-        content: const Text('Are you sure you want to delete this scheduled date?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      try {
-        await _scheduleService.deleteScheduledDate(id);
-        _loadData();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Deleted successfully')),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $e')),
-          );
-        }
-      }
-    }
   }
 }
 

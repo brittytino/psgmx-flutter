@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS task_completions (
     task_date DATE NOT NULL,
     completed BOOLEAN NOT NULL DEFAULT FALSE,
     completed_at TIMESTAMPTZ,
+    verified_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    verified_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE(user_id, task_date)
@@ -95,10 +97,81 @@ USING (
     )
 );
 
+-- Team Leaders can insert/update task completions for their team members (for verification)
+CREATE POLICY "Team leaders can insert team completions"
+ON task_completions FOR INSERT
+WITH CHECK (
+    EXISTS (
+        SELECT 1 FROM users u1
+        JOIN users u2 ON u1.team_id = u2.team_id
+        WHERE u1.id = auth.uid()
+        AND u2.id = task_completions.user_id
+        AND (u1.roles->>'isTeamLeader')::boolean = true
+    )
+);
+
+CREATE POLICY "Team leaders can update team completions"
+ON task_completions FOR UPDATE
+USING (
+    EXISTS (
+        SELECT 1 FROM users u1
+        JOIN users u2 ON u1.team_id = u2.team_id
+        WHERE u1.id = auth.uid()
+        AND u2.id = task_completions.user_id
+        AND (u1.roles->>'isTeamLeader')::boolean = true
+    )
+)
+WITH CHECK (
+    EXISTS (
+        SELECT 1 FROM users u1
+        JOIN users u2 ON u1.team_id = u2.team_id
+        WHERE u1.id = auth.uid()
+        AND u2.id = task_completions.user_id
+        AND (u1.roles->>'isTeamLeader')::boolean = true
+    )
+);
+
 -- Placement Reps and Coordinators can view all
 CREATE POLICY "Admins can view all task completions"
 ON task_completions FOR SELECT
 USING (
+    EXISTS (
+        SELECT 1 FROM users
+        WHERE id = auth.uid()
+        AND (
+            (roles->>'isPlacementRep')::boolean = true
+            OR (roles->>'isCoordinator')::boolean = true
+        )
+    )
+);
+
+-- Placement Reps and Coordinators can insert/update all
+CREATE POLICY "Admins can insert all task completions"
+ON task_completions FOR INSERT
+WITH CHECK (
+    EXISTS (
+        SELECT 1 FROM users
+        WHERE id = auth.uid()
+        AND (
+            (roles->>'isPlacementRep')::boolean = true
+            OR (roles->>'isCoordinator')::boolean = true
+        )
+    )
+);
+
+CREATE POLICY "Admins can update all task completions"
+ON task_completions FOR UPDATE
+USING (
+    EXISTS (
+        SELECT 1 FROM users
+        WHERE id = auth.uid()
+        AND (
+            (roles->>'isPlacementRep')::boolean = true
+            OR (roles->>'isCoordinator')::boolean = true
+        )
+    )
+)
+WITH CHECK (
     EXISTS (
         SELECT 1 FROM users
         WHERE id = auth.uid()

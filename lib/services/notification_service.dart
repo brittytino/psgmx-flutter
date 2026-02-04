@@ -43,8 +43,6 @@ class NotificationService {
       importance: Importance.high,
       playSound: true,
       enableVibration: true,
-      enableLights: true,
-      ledColor: Color(0xFFFF6600),
     );
 
     const AndroidNotificationChannel leetcodeChannel =
@@ -159,8 +157,6 @@ class NotificationService {
       color: const Color(0xFFFF6600),
       playSound: true,
       enableVibration: true,
-      enableLights: true,
-      ledColor: const Color(0xFFFF6600),
       styleInformation: BigTextStyleInformation(
         notification.message,
         htmlFormatBigText: true,
@@ -395,38 +391,86 @@ class NotificationService {
   Future<void> checkAndSendBirthdayNotifications() async {
     try {
       final now = DateTime.now();
+      final todayStr = '${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      
+      debugPrint('[Notification] 🎂 Checking birthdays for today: $todayStr (${now.year}-${now.month}-${now.day})');
 
-      // Get all users with birthday today
-      final response = await _supabase
+      // Check BOTH whitelist AND users tables for birthdays
+      final whitelistResponse = await _supabase
           .from('whitelist')
           .select('email, name, dob')
           .not('dob', 'is', null);
 
-      for (var user in response as List) {
-        final dob = DateTime.tryParse(user['dob'] ?? '');
-        if (dob != null && dob.month == now.month && dob.day == now.day) {
-          final name = user['name'] as String? ?? 'Student';
+      final usersResponse = await _supabase
+          .from('users')
+          .select('id, email, name, dob')
+          .not('dob', 'is', null);
 
-          // Check if birthday notification already sent today
+      // Combine both lists (prefer users table data if exists)
+      final Map<String, Map<String, dynamic>> allUsersMap = {};
+      
+      // Add whitelist entries first
+      for (var user in whitelistResponse as List) {
+        final email = user['email'] as String?;
+        if (email != null) {
+          allUsersMap[email] = user;
+        }
+      }
+      
+      // Override with users table data (more up-to-date)
+      for (var user in usersResponse as List) {
+        final email = user['email'] as String?;
+        if (email != null) {
+          allUsersMap[email] = user;
+        }
+      }
+
+      debugPrint('[Notification] Found ${allUsersMap.length} users to check for birthdays');
+
+      int birthdaysFound = 0;
+      for (var user in allUsersMap.values) {
+        final dobStr = user['dob'] as String?;
+        final dob = DateTime.tryParse(dobStr ?? '');
+        
+        debugPrint('[Notification] Checking user: ${user['name']} - DOB: $dobStr - Parsed: ${dob?.toString() ?? "null"}');
+        
+        if (dob != null && dob.month == now.month && dob.day == now.day) {
+          birthdaysFound++;
+          final name = user['name'] as String? ?? 'Student';
+          final firstName = name.split(' ').first;
+
+          // Check if birthday notification already sent today (using better logic)
+          final todayStart = DateTime(now.year, now.month, now.day).toIso8601String();
+          final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59).toIso8601String();
+          
           final existingNotif = await _supabase
               .from('notifications')
               .select('id')
-              .ilike('title', '%Happy Birthday%$name%')
-              .gte('generated_at',
-                  DateTime(now.year, now.month, now.day).toIso8601String())
+              .eq('notification_type', 'announcement')
+              .ilike('title', '%Happy Birthday%$firstName%')
+              .gte('generated_at', todayStart)
+              .lte('generated_at', todayEnd)
               .maybeSingle();
 
           if (existingNotif == null) {
             await sendBirthdayNotification(
               birthdayPersonName: name,
-              birthdayPersonId: user['email'] ?? '',
+              birthdayPersonId: user['email'] ?? user['id'] ?? '',
             );
-            debugPrint('[Notification] Birthday notification sent for $name');
+            debugPrint('[Notification] ✅ Birthday notification sent for $name');
+          } else {
+            debugPrint('[Notification] ⏭️  Birthday notification already sent for $name today');
           }
         }
       }
+      
+      if (birthdaysFound == 0) {
+        debugPrint('[Notification] No birthdays found for today');
+      } else {
+        debugPrint('[Notification] Found $birthdaysFound birthday(s) today');
+      }
     } catch (e) {
-      debugPrint('[Notification] Error checking birthdays: $e');
+      debugPrint('[Notification] ❌ Error checking birthdays: $e');
     }
   }
 

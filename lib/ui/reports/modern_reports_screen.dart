@@ -10,6 +10,11 @@ import '../../services/defaulter_service.dart';
 import '../../models/task_completion.dart';
 import '../../core/theme/app_dimens.dart';
 import '../widgets/premium_card.dart';
+import 'long_absentees_screen.dart';
+import 'team_analysis_screen.dart';
+import 'all_students_screen.dart';
+import 'scheduled_classes_screen.dart';
+import 'task_completion_details_screen.dart';
 
 class ModernReportsScreen extends StatefulWidget {
   const ModernReportsScreen({super.key});
@@ -253,7 +258,11 @@ class _ModernReportsScreenState extends State<ModernReportsScreen> {
                 'Find students with consecutive absences',
                 Icons.warning_amber_rounded,
                 Colors.orange,
-                () => _showLongAbsenteesDialog(),
+                () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const LongAbsenteesScreen(),
+                  ),
+                ),
               ),
               const Divider(height: 1),
               _buildActionTile(
@@ -261,7 +270,11 @@ class _ModernReportsScreenState extends State<ModernReportsScreen> {
                 'Team-wise attendance analysis',
                 Icons.groups_rounded,
                 Colors.green,
-                () => _showTeamAnalysis(),
+                () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const TeamAnalysisScreen(),
+                  ),
+                ),
               ),
               const Divider(height: 1),
               _buildActionTile(
@@ -269,7 +282,11 @@ class _ModernReportsScreenState extends State<ModernReportsScreen> {
                 'See complete attendance records',
                 Icons.people_alt_rounded,
                 Colors.blue,
-                () => _showAllStudents(),
+                () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const AllStudentsScreen(),
+                  ),
+                ),
               ),
               const Divider(height: 1),
               _buildActionTile(
@@ -277,7 +294,11 @@ class _ModernReportsScreenState extends State<ModernReportsScreen> {
                 'View all scheduled dates',
                 Icons.event_note_rounded,
                 Colors.purple,
-                () => _showScheduledClasses(),
+                () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const ScheduledClassesScreen(),
+                  ),
+                ),
               ),
             ],
           ),
@@ -360,7 +381,11 @@ class _ModernReportsScreenState extends State<ModernReportsScreen> {
                   ),
                   const SizedBox(height: AppSpacing.md),
                   OutlinedButton.icon(
-                    onPressed: () => _showTaskCompletionDetails(),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const TaskCompletionDetailsScreen(),
+                      ),
+                    ),
                     icon: const Icon(Icons.visibility, size: 18),
                     label: const Text('View Details'),
                   ),
@@ -370,13 +395,6 @@ class _ModernReportsScreenState extends State<ModernReportsScreen> {
           ],
         );
       },
-    );
-  }
-
-  Future<void> _showTaskCompletionDetails() async {
-    showDialog(
-      context: context,
-      builder: (ctx) => const _TaskCompletionDetailsDialog(),
     );
   }
 
@@ -659,157 +677,6 @@ class _ModernReportsScreenState extends State<ModernReportsScreen> {
 
   // ========================================
   // LONG ABSENTEES DIALOG
-  // ========================================
-  Future<void> _showLongAbsenteesDialog() async {
-    showDialog(
-      context: context,
-      builder: (ctx) => const _LongAbsenteesDialog(),
-    );
-  }
-
-  // ========================================
-  // TEAM ANALYSIS DIALOG
-  // ========================================
-  Future<void> _showTeamAnalysis() async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()),
-    );
-
-    try {
-      // Query team data from student_attendance_summary grouped by team
-      final response = await _supabase
-          .from('student_attendance_summary')
-          .select(
-              'team_id, batch, attendance_percentage, present_count, absent_count')
-          .not('team_id', 'is', null);
-
-      if (!mounted) return;
-      Navigator.pop(context);
-
-      final students = response as List<dynamic>;
-
-      // Group by team
-      final Map<String, Map<String, dynamic>> teamData = {};
-      for (final student in students) {
-        final teamId = student['team_id'] as String?;
-        if (teamId == null) continue;
-
-        if (!teamData.containsKey(teamId)) {
-          teamData[teamId] = {
-            'team_id': teamId,
-            'batch': student['batch'] ?? 'Unknown',
-            'students': <Map<String, dynamic>>[],
-            'total_percentage': 0.0,
-          };
-        }
-
-        teamData[teamId]!['students'].add(student);
-        teamData[teamId]!['total_percentage'] +=
-            (student['attendance_percentage'] ?? 0.0).toDouble();
-      }
-
-      // Calculate averages
-      final teams = teamData.values.map((team) {
-        final studentCount = (team['students'] as List).length;
-        return {
-          'team_id': team['team_id'],
-          'batch': team['batch'],
-          'team_size': studentCount,
-          'team_attendance_percentage':
-              studentCount > 0 ? team['total_percentage'] / studentCount : 0.0,
-        };
-      }).toList();
-
-      // Sort by team_id
-      teams.sort(
-          (a, b) => (a['team_id'] as String).compareTo(b['team_id'] as String));
-
-      if (!mounted) return;
-
-      showDialog(
-        context: context,
-        builder: (context) => _TeamAnalysisDialog(teams: teams),
-      );
-    } catch (e) {
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error loading team data: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  // ========================================
-  // ALL STUDENTS DIALOG
-  // ========================================
-  Future<void> _showAllStudents() async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()),
-    );
-
-    try {
-      final summaries =
-          await _attendanceService.getAllStudentsAttendanceSummary();
-      if (!mounted) return;
-      Navigator.pop(context);
-
-      showDialog(
-        context: context,
-        builder: (context) => _AllStudentsDialog(summaries: summaries),
-      );
-    } catch (e) {
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  // ========================================
-  // SCHEDULED CLASSES DIALOG
-  // ========================================
-  Future<void> _showScheduledClasses() async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()),
-    );
-
-    try {
-      final scheduled = await _scheduleService.getScheduledDates();
-      if (!mounted) return;
-      Navigator.pop(context);
-
-      showDialog(
-        context: context,
-        builder: (context) => _ScheduledClassesDialog(scheduled: scheduled),
-      );
-    } catch (e) {
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
   // ========================================
   // EXPORT FUNCTIONS
   // ========================================
@@ -2127,6 +1994,8 @@ class _TaskCompletionDetailsDialogState
         return _allStudents.where((s) => s.completed).toList();
       case 'pending':
         return _allStudents.where((s) => !s.completed).toList();
+      case 'verified':
+        return _allStudents.where((s) => s.verifiedByName != null).toList();
       default:
         return _allStudents;
     }
@@ -2136,6 +2005,7 @@ class _TaskCompletionDetailsDialogState
   Widget build(BuildContext context) {
     final completed = _allStudents.where((s) => s.completed).length;
     final pending = _allStudents.where((s) => !s.completed).length;
+    final verified = _allStudents.where((s) => s.verifiedByName != null).length;
 
     return Dialog(
       child: Container(
@@ -2161,7 +2031,7 @@ class _TaskCompletionDetailsDialogState
                         ),
                       ),
                       Text(
-                        '$completed completed • $pending pending',
+                        '$completed completed • $verified verified • $pending pending',
                         style: GoogleFonts.inter(
                           fontSize: 13,
                           color: Colors.grey[600],
@@ -2179,28 +2049,38 @@ class _TaskCompletionDetailsDialogState
             const SizedBox(height: 16),
 
             // Filter Chips
-            Row(
-              children: [
-                FilterChip(
-                  label: Text('All (${_allStudents.length})'),
-                  selected: _filter == 'all',
-                  onSelected: (_) => setState(() => _filter = 'all'),
-                ),
-                const SizedBox(width: 8),
-                FilterChip(
-                  label: Text('Completed ($completed)'),
-                  selected: _filter == 'completed',
-                  onSelected: (_) => setState(() => _filter = 'completed'),
-                  selectedColor: Colors.green.withValues(alpha: 0.2),
-                ),
-                const SizedBox(width: 8),
-                FilterChip(
-                  label: Text('Pending ($pending)'),
-                  selected: _filter == 'pending',
-                  onSelected: (_) => setState(() => _filter = 'pending'),
-                  selectedColor: Colors.red.withValues(alpha: 0.2),
-                ),
-              ],
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  FilterChip(
+                    label: Text('All (${_allStudents.length})'),
+                    selected: _filter == 'all',
+                    onSelected: (_) => setState(() => _filter = 'all'),
+                  ),
+                  const SizedBox(width: 8),
+                  FilterChip(
+                    label: Text('Completed ($completed)'),
+                    selected: _filter == 'completed',
+                    onSelected: (_) => setState(() => _filter = 'completed'),
+                    selectedColor: Colors.green.withValues(alpha: 0.2),
+                  ),
+                  const SizedBox(width: 8),
+                  FilterChip(
+                    label: Text('Verified ($verified)'),
+                    selected: _filter == 'verified',
+                    onSelected: (_) => setState(() => _filter = 'verified'),
+                    selectedColor: Colors.blue.withValues(alpha: 0.2),
+                  ),
+                  const SizedBox(width: 8),
+                  FilterChip(
+                    label: Text('Pending ($pending)'),
+                    selected: _filter == 'pending',
+                    onSelected: (_) => setState(() => _filter = 'pending'),
+                    selectedColor: Colors.red.withValues(alpha: 0.2),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 16),
 
@@ -2240,45 +2120,92 @@ class _TaskCompletionDetailsDialogState
                                 style: GoogleFonts.inter(
                                     fontWeight: FontWeight.w600),
                               ),
-                              subtitle: Text(
-                                '${student.regNo} • Team ${student.teamId ?? "N/A"}',
-                                style: GoogleFonts.inter(fontSize: 12),
-                              ),
-                              trailing: student.completed
-                                  ? Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color:
-                                            Colors.green.withValues(alpha: 0.1),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Text(
-                                        '✓ Done',
-                                        style: GoogleFonts.inter(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.green,
-                                        ),
-                                      ),
-                                    )
-                                  : Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color:
-                                            Colors.red.withValues(alpha: 0.1),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Text(
-                                        'Pending',
-                                        style: GoogleFonts.inter(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.red,
-                                        ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${student.regNo} • Team ${student.teamId ?? "N/A"}',
+                                    style: GoogleFonts.inter(fontSize: 12),
+                                  ),
+                                  if (student.verifiedByName != null) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Verified by ${student.verifiedByName}',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 11,
+                                        color: Colors.blue,
+                                        fontStyle: FontStyle.italic,
                                       ),
                                     ),
+                                  ],
+                                ],
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (student.verifiedByName != null)
+                                    Container(
+                                      margin: const EdgeInsets.only(right: 8),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.blue.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.verified,
+                                              size: 14, color: Colors.blue),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            'Verified',
+                                            style: GoogleFonts.inter(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.blue,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  student.completed
+                                      ? Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color:
+                                                Colors.green.withValues(alpha: 0.1),
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: Text(
+                                            '✓ Done',
+                                            style: GoogleFonts.inter(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.green,
+                                            ),
+                                          ),
+                                        )
+                                      : Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color:
+                                                Colors.red.withValues(alpha: 0.1),
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: Text(
+                                            'Pending',
+                                            style: GoogleFonts.inter(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.red,
+                                            ),
+                                          ),
+                                        ),
+                                ],
+                              ),
                             );
                           },
                         ),

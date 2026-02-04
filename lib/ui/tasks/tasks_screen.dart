@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../providers/user_provider.dart';
 import '../../services/supabase_db_service.dart';
 import '../../services/task_upload_service.dart';
@@ -23,14 +24,24 @@ class TasksScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context);
-    // Determine if user has publish rights
+    
+    // Determine view based on role
     final canPublish = userProvider.isCoordinator ||
         (userProvider.isActualPlacementRep && !userProvider.isSimulating);
+    
+    final isTeamLeader = userProvider.isTeamLeader && !canPublish;
 
-    // Reps see the management interface, Students see the task list
+    // Reps/Coordinators see management interface
     if (canPublish) {
       return const _RepTasksView();
     }
+    
+    // Team Leaders see verification interface
+    if (isTeamLeader) {
+      return const _TeamLeaderTasksView();
+    }
+    
+    // Students see task list
     return const _StudentTasksView();
   }
 }
@@ -1514,6 +1525,389 @@ class _FormSectionHeader extends StatelessWidget {
                 color: Theme.of(context).colorScheme.primary,
                 letterSpacing: 1.0,
               )),
+    );
+  }
+}
+
+// ==========================================
+// TEAM LEADER VIEW - Task Verification
+// ==========================================
+
+class _TeamLeaderTasksView extends StatefulWidget {
+  const _TeamLeaderTasksView();
+
+  @override
+  State<_TeamLeaderTasksView> createState() => _TeamLeaderTasksViewState();
+}
+
+class _TeamLeaderTasksViewState extends State<_TeamLeaderTasksView> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  DateTime _selectedDate = DateTime.now();
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+          SliverAppBar(
+            pinned: true,
+            floating: true,
+            title: const Text("Tasks"),
+            centerTitle: false,
+            forceElevated: innerBoxIsScrolled,
+            bottom: TabBar(
+              controller: _tabController,
+              tabs: const [
+                Tab(text: 'My Tasks'),
+                Tab(text: 'Team Verification'),
+              ],
+            ),
+          ),
+        ],
+        body: TabBarView(
+          controller: _tabController,
+          children: [
+            _StudentTasksView(),
+            _TeamVerificationView(date: _selectedDate),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TeamVerificationView extends StatefulWidget {
+  final DateTime date;
+  const _TeamVerificationView({required this.date});
+
+  @override
+  State<_TeamVerificationView> createState() => _TeamVerificationViewState();
+}
+
+class _TeamVerificationViewState extends State<_TeamVerificationView> {
+  DateTime _selectedDate = DateTime.now();
+  List<Map<String, dynamic>> _teamMembers = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDate = widget.date;
+    _loadTeamData();
+  }
+
+  Future<void> _loadTeamData() async {
+    setState(() => _isLoading = true);
+    try {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final teamId = userProvider.currentUser?.teamId;
+      
+      if (teamId == null) {
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
+      final supabase = Supabase.instance.client;
+
+      // Get team members with their task completion status
+      final response = await supabase
+          .from('users')
+          .select('id, email, name, reg_no')
+          .eq('team_id', teamId)
+          .order('name');
+
+      final members = response as List;
+      
+      // Get task completions for this date
+      final completionsResponse = await supabase
+          .from('task_completions')
+          .select('user_id, completed, verified_by, verified_at')
+          .eq('task_date', dateStr)
+          .inFilter('user_id', members.map((m) => m['id']).toList());
+
+      final completions = completionsResponse as List;
+      final completionMap = {for (var c in completions) c['user_id']: c};
+
+      // Combine data
+      final teamData = members.map((member) {
+        final completion = completionMap[member['id']];
+        return {
+          'id': member['id'],
+          'email': member['email'],
+          'name': member['name'],
+          'reg_no': member['reg_no'],
+          'is_completed': completion?['completed'] ?? false,
+          'verified_by': completion?['verified_by'],
+          'verified_at': completion?['verified_at'],
+        };
+      }).toList();
+
+      if (mounted) {
+        setState(() {
+          _teamMembers = teamData;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('[TeamVerification] Error loading team data: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading team data: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _verifyTask(String studentId, bool isCompleted) async {
+    try {
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final verifierId = userProvider.currentUser?.uid;
+      final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
+
+      final supabase = Supabase.instance.client;
+
+      // Upsert task completion with verification
+      await supabase.from('task_completions').upsert({
+        'user_id': studentId,
+        'task_date': dateStr,
+        'completed': isCompleted,
+        'completed_at': isCompleted ? DateTime.now().toIso8601String() : null,
+        'verified_by': verifierId,
+        'verified_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'user_id,task_date');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isCompleted
+                ? 'Task verified as completed'
+                : 'Task marked as incomplete'),
+            backgroundColor: isCompleted ? Colors.green : Colors.orange,
+          ),
+        );
+        await _loadTeamData();
+      }
+    } catch (e) {
+      debugPrint('[TeamVerification] Error verifying task: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isToday = DateUtils.isSameDay(_selectedDate, DateTime.now());
+
+    return Column(
+      children: [
+        // Date Navigator
+        Container(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          color: Theme.of(context).colorScheme.surfaceContainer,
+          child: _DateNavigator(
+            date: _selectedDate,
+            onNext: () => setState(() {
+              _selectedDate = _selectedDate.add(const Duration(days: 1));
+              _loadTeamData();
+            }),
+            onPrev: () => setState(() {
+              _selectedDate = _selectedDate.subtract(const Duration(days: 1));
+              _loadTeamData();
+            }),
+            onTitleTap: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: _selectedDate,
+                firstDate: DateTime(2024),
+                lastDate: DateTime.now().add(const Duration(days: 365)),
+              );
+              if (picked != null && mounted) {
+                setState(() {
+                  _selectedDate = picked;
+                  _loadTeamData();
+                });
+              }
+            },
+          ),
+        ),
+
+        // Team Members List
+        Expanded(
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _teamMembers.isEmpty
+                  ? const Center(child: Text('No team members found'))
+                  : RefreshIndicator(
+                      onRefresh: _loadTeamData,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.all(AppSpacing.screenPadding),
+                        itemCount: _teamMembers.length,
+                        itemBuilder: (context, index) {
+                          final member = _teamMembers[index];
+                          final isCompleted = member['is_completed'] as bool;
+                          final isVerified = member['verified_by'] != null;
+
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                            child: PremiumCard(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      CircleAvatar(
+                                        backgroundColor: isCompleted
+                                            ? Colors.green.withValues(alpha: 0.1)
+                                            : Colors.grey.withValues(alpha: 0.1),
+                                        child: Text(
+                                          (member['name'] as String)[0].toUpperCase(),
+                                          style: TextStyle(
+                                            color: isCompleted ? Colors.green : Colors.grey,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: AppSpacing.md),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              member['name'],
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 16,
+                                              ),
+                                            ),
+                                            Text(
+                                              member['reg_no'],
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .onSurfaceVariant,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      if (isVerified)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: AppSpacing.sm,
+                                            vertical: AppSpacing.xs,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.blue.withValues(alpha: 0.1),
+                                            borderRadius:
+                                                BorderRadius.circular(AppRadius.sm),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.verified,
+                                                size: 14,
+                                                color: Colors.blue,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                'Verified',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: Colors.blue,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: AppSpacing.md),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: OutlinedButton.icon(
+                                          onPressed: isToday
+                                              ? () => _verifyTask(member['id'], true)
+                                              : null,
+                                          icon: Icon(
+                                            isCompleted
+                                                ? Icons.check_circle
+                                                : Icons.check_circle_outline,
+                                            size: 18,
+                                          ),
+                                          label: const Text('Completed'),
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor: Colors.green,
+                                            side: BorderSide(
+                                              color: isCompleted
+                                                  ? Colors.green
+                                                  : Colors.grey.shade300,
+                                              width: isCompleted ? 2 : 1,
+                                            ),
+                                            backgroundColor: isCompleted
+                                                ? Colors.green.withValues(alpha: 0.1)
+                                                : null,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: AppSpacing.sm),
+                                      Expanded(
+                                        child: OutlinedButton.icon(
+                                          onPressed: isToday
+                                              ? () => _verifyTask(member['id'], false)
+                                              : null,
+                                          icon: Icon(
+                                            !isCompleted
+                                                ? Icons.cancel
+                                                : Icons.cancel_outlined,
+                                            size: 18,
+                                          ),
+                                          label: const Text('Incomplete'),
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor: Colors.orange,
+                                            side: BorderSide(
+                                              color: !isCompleted
+                                                  ? Colors.orange
+                                                  : Colors.grey.shade300,
+                                              width: !isCompleted ? 2 : 1,
+                                            ),
+                                            backgroundColor: !isCompleted
+                                                ? Colors.orange.withValues(alpha: 0.1)
+                                                : null,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+        ),
+      ],
     );
   }
 }

@@ -56,56 +56,37 @@ class ProfileScreen extends StatelessWidget {
                children: [
                  const SizedBox(height: AppSpacing.lg),
                  // Profile Header
-                 Stack(
-                   alignment: Alignment.center,
-                   children: [
-                     Container(
-                       height: 120, width: 120,
-                       decoration: BoxDecoration(
-                         shape: BoxShape.circle,
-                         gradient: LinearGradient(
-                           colors: [
-                              Theme.of(context).colorScheme.primary,
-                              Theme.of(context).colorScheme.secondary,
-                           ],
-                           begin: Alignment.topLeft,
-                           end: Alignment.bottomRight,
-                         ),
-                         boxShadow: [
-                           BoxShadow(
-                             color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
-                             blurRadius: 15,
-                             offset: const Offset(0, 8)
-                           )
-                         ]
-                       ),
-                       child: Center(
-                         child: Text(
-                            user.name.isNotEmpty ? user.name[0] : '?',
-                            style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.white),
-                         ),
+                 Container(
+                   height: 120,
+                   width: 120,
+                   decoration: BoxDecoration(
+                     shape: BoxShape.circle,
+                     gradient: LinearGradient(
+                       colors: [
+                         Theme.of(context).colorScheme.primary,
+                         Theme.of(context).colorScheme.secondary,
+                       ],
+                       begin: Alignment.topLeft,
+                       end: Alignment.bottomRight,
+                     ),
+                     boxShadow: [
+                       BoxShadow(
+                         color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                         blurRadius: 15,
+                         offset: const Offset(0, 8),
+                       )
+                     ],
+                   ),
+                   child: Center(
+                     child: Text(
+                       user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
+                       style: const TextStyle(
+                         fontSize: 52,
+                         fontWeight: FontWeight.bold,
+                         color: Colors.white,
                        ),
                      ),
-                     Positioned(
-                       bottom: 0,
-                       right: 0,
-                       child: Container(
-                         padding: const EdgeInsets.all(6),
-                         decoration: BoxDecoration(
-                           color: Theme.of(context).scaffoldBackgroundColor,
-                           shape: BoxShape.circle,
-                         ),
-                         child: Container(
-                           padding: const EdgeInsets.all(6),
-                           decoration: BoxDecoration(
-                             color: Theme.of(context).colorScheme.primary,
-                             shape: BoxShape.circle,
-                           ),
-                           child: const Icon(Icons.edit, size: 14, color: Colors.white),
-                         ),
-                       ),
-                     )
-                   ],
+                   ),
                  ),
                  
                  const SizedBox(height: AppSpacing.md),
@@ -256,16 +237,34 @@ class ProfileScreen extends StatelessWidget {
                 
                 const SizedBox(height: AppSpacing.xl),
                 
-                // Danger Zone
-                PremiumCard(
-                  onTap: () => _confirmSignOut(context, provider),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                       Icon(Icons.logout, color: Theme.of(context).colorScheme.error),
-                       const SizedBox(width: AppSpacing.md),
-                       Text("Sign Out", style: TextStyle(color: Theme.of(context).colorScheme.error, fontWeight: FontWeight.bold)),
-                    ],
+                // Sign Out Button
+                Center(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _confirmSignOut(context, provider),
+                    icon: Icon(
+                      Icons.logout,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    label: Text(
+                      "Sign Out",
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(
+                        color: Theme.of(context).colorScheme.error.withValues(alpha: 0.5),
+                        width: 1.5,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.xl,
+                        vertical: AppSpacing.md,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.lg),
+                      ),
+                    ),
                   ),
                 ),
                 

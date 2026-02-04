@@ -53,9 +53,9 @@ class AttendanceStreakService {
           .eq('user_id', studentId)
           .order('date', ascending: false);
 
-      // Get attendance days info
+      // Get scheduled attendance dates info
       final daysResponse = await _supabase
-          .from('attendance_days')
+          .from('scheduled_attendance_dates')
           .select('date, is_working_day');
 
       // Build a map of dates to working day status
@@ -145,9 +145,9 @@ class AttendanceStreakService {
           .select('date, status')
           .eq('user_id', studentId);
 
-      // Get attendance days info (all dates marked)
+      // Get scheduled attendance dates info (all dates marked)
       final daysResponse = await _supabase
-          .from('attendance_days')
+          .from('scheduled_attendance_dates')
           .select('date, is_working_day');
 
       // Build working day map
@@ -164,7 +164,7 @@ class AttendanceStreakService {
       DateTime? startDate;
       DateTime? endDate;
 
-      // Get unique dates from attendance_days
+      // Get unique dates from scheduled_attendance_dates
       for (var entry in workingDayMap.entries) {
         final date = DateTime.parse(entry.key);
         if (entry.value) {

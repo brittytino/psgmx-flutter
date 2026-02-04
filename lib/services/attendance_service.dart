@@ -93,7 +93,7 @@ class AttendanceService {
     try {
       final dateString = date.toIso8601String().split('T')[0];
       
-      await _supabase.from('attendance_days').upsert({
+      await _supabase.from('scheduled_attendance_dates').upsert({
         'date': dateString,
         'is_working_day': isWorkingDay,
         'decided_by': decidedBy,
@@ -133,7 +133,7 @@ class AttendanceService {
         };
       }).toList();
 
-      await _supabase.from('attendance_days').upsert(records);
+      await _supabase.from('scheduled_attendance_dates').upsert(records);
     } catch (e) {
       throw Exception('Failed to set bulk working days: ${e.toString()}');
     }
@@ -298,6 +298,55 @@ class AttendanceService {
           .toList();
     } catch (e) {
       throw Exception('Failed to get team summary: ${e.toString()}');
+    }
+  }
+
+  /// Get all teams attendance summary with ranking
+  Future<List<Map<String, dynamic>>> getAllTeamsAttendanceSummary() async {
+    try {
+      final response = await _supabase
+          .from('student_attendance_summary')
+          .select();
+
+      final data = response as List;
+      
+      // Group by team_id
+      final Map<String, List<AttendanceSummary>> teamGroups = {};
+      for (var item in data) {
+        final teamId = item['team_id'] as String?;
+        if (teamId != null) {
+          teamGroups.putIfAbsent(teamId, () => []);
+          teamGroups[teamId]!.add(AttendanceSummary.fromMap(item));
+        }
+      }
+
+      // Calculate team averages
+      final List<Map<String, dynamic>> teamSummaries = [];
+      for (var entry in teamGroups.entries) {
+        final members = entry.value;
+        final avgPercentage = members.fold<double>(
+              0,
+              (sum, member) => sum + member.attendancePercentage,
+            ) /
+            members.length;
+
+        teamSummaries.add({
+          'team_id': entry.key,
+          'team_name': 'Team ${entry.key}',
+          'average_percentage': avgPercentage,
+          'member_count': members.length,
+          'members': members,
+        });
+      }
+
+      // Sort by average percentage (highest first)
+      teamSummaries.sort((a, b) => 
+        (b['average_percentage'] as double).compareTo(a['average_percentage'] as double)
+      );
+
+      return teamSummaries;
+    } catch (e) {
+      throw Exception('Failed to get all teams summary: ${e.toString()}');
     }
   }
 

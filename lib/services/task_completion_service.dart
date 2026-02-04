@@ -134,7 +134,14 @@ class TaskCompletionService {
             name,
             reg_no,
             team_id,
-            task_completions!left(completed, completed_at)
+            task_completions!task_completions_user_id_fkey!left(
+              id,
+              completed, 
+              completed_at, 
+              task_date, 
+              verified_by, 
+              verified_at
+            )
           ''').eq('team_id', teamId).order('reg_no');
 
       final results = <UserTaskStatus>[];
@@ -146,6 +153,21 @@ class TaskCompletionService {
           orElse: () => null,
         );
 
+        // Get verified by name if exists
+        String? verifiedByName;
+        if (todayCompletion?['verified_by'] != null) {
+          try {
+            final verifierResponse = await _supabase
+                .from('users')
+                .select('name')
+                .eq('id', todayCompletion['verified_by'])
+                .single();
+            verifiedByName = verifierResponse['name'];
+          } catch (e) {
+            debugPrint('[TaskCompletionService] Error getting verifier name: $e');
+          }
+        }
+
         results.add(UserTaskStatus(
           odId: row['id'] ?? '',
           name: row['name'] ?? '',
@@ -154,6 +176,10 @@ class TaskCompletionService {
           completed: todayCompletion?['completed'] ?? false,
           completedAt: todayCompletion?['completed_at'] != null
               ? DateTime.parse(todayCompletion['completed_at'])
+              : null,
+          verifiedByName: verifiedByName,
+          verifiedAt: todayCompletion?['verified_at'] != null
+              ? DateTime.parse(todayCompletion['verified_at'])
               : null,
         ));
       }
@@ -208,6 +234,7 @@ class TaskCompletionService {
     try {
       final dateString = date.toIso8601String().split('T')[0];
 
+      // Get all students with their task completions for today
       final response = await _supabase
           .from('users')
           .select('''
@@ -215,7 +242,14 @@ class TaskCompletionService {
             name,
             reg_no,
             team_id,
-            task_completions!left(completed, completed_at, task_date)
+            task_completions!task_completions_user_id_fkey!left(
+              id,
+              completed, 
+              completed_at, 
+              task_date, 
+              verified_by, 
+              verified_at
+            )
           ''')
           .contains('roles', {'isStudent': true})
           .order('team_id')
@@ -229,6 +263,21 @@ class TaskCompletionService {
           orElse: () => null,
         );
 
+        // Get verified by name if exists
+        String? verifiedByName;
+        if (todayCompletion?['verified_by'] != null) {
+          try {
+            final verifierResponse = await _supabase
+                .from('users')
+                .select('name')
+                .eq('id', todayCompletion['verified_by'])
+                .single();
+            verifiedByName = verifierResponse['name'];
+          } catch (e) {
+            debugPrint('[TaskCompletionService] Error getting verifier name: $e');
+          }
+        }
+
         results.add(UserTaskStatus(
           odId: row['id'] ?? '',
           name: row['name'] ?? '',
@@ -237,6 +286,10 @@ class TaskCompletionService {
           completed: todayCompletion?['completed'] ?? false,
           completedAt: todayCompletion?['completed_at'] != null
               ? DateTime.parse(todayCompletion['completed_at'])
+              : null,
+          verifiedByName: verifiedByName,
+          verifiedAt: todayCompletion?['verified_at'] != null
+              ? DateTime.parse(todayCompletion['verified_at'])
               : null,
         ));
       }
