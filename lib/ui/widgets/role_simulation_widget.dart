@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/enhanced_auth_service.dart';
 import '../../models/app_user.dart';
 
@@ -19,6 +20,48 @@ class RoleSimulationWidget extends StatefulWidget {
 class _RoleSimulationWidgetState extends State<RoleSimulationWidget> {
   String? _selectedTeamId;
   SimulationMode _mode = SimulationMode.none;
+  List<String> _teamIds = [];
+  bool _isLoadingTeams = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTeams();
+  }
+
+  Future<void> _loadTeams() async {
+    try {
+      // Fetch distinct team IDs from the users table
+      final response = await Supabase.instance.client
+          .from('users')
+          .select('team_id')
+          .not('team_id', 'is', null);
+
+      final teams = <String>{};
+      for (var row in response as List) {
+        final teamId = row['team_id'] as String?;
+        if (teamId != null && teamId.isNotEmpty) {
+          teams.add(teamId);
+        }
+      }
+
+      // Sort teams naturally (T01, T02, ..., T21)
+      final sortedTeams = teams.toList()
+        ..sort((a, b) => a.compareTo(b));
+
+      if (mounted) {
+        setState(() {
+          _teamIds = sortedTeams;
+          _isLoadingTeams = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('[RoleSimulation] Error loading teams: $e');
+      if (mounted) {
+        setState(() => _isLoadingTeams = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -145,32 +188,48 @@ class _RoleSimulationWidgetState extends State<RoleSimulationWidget> {
   }
 
   Widget _buildTeamSelector() {
-    return DropdownButtonFormField<String>(
+    if (_isLoadingTeams) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(16.0),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_teamIds.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(16.0),
+        child: Text('No teams found'),
+      );
+    }
+
+    return InputDecorator(
       decoration: const InputDecoration(
         labelText: 'Select Team',
         border: OutlineInputBorder(),
         isDense: true,
       ),
-      initialValue: _selectedTeamId,
-      items: _getTeamOptions(),
-      onChanged: (value) {
-        setState(() {
-          _selectedTeamId = value;
-        });
-        _applySimulation();
-      },
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          isExpanded: true,
+          value: _selectedTeamId,
+          hint: const Text('Select a team'),
+          items: _teamIds.map((teamId) {
+            return DropdownMenuItem(
+              value: teamId,
+              child: Text(teamId),
+            );
+          }).toList(),
+          onChanged: (value) {
+            setState(() {
+              _selectedTeamId = value;
+            });
+            _applySimulation();
+          },
+        ),
+      ),
     );
-  }
-
-  List<DropdownMenuItem<String>> _getTeamOptions() {
-    // Generate team options (Team1 to Team10)
-    return List.generate(10, (index) {
-      final teamId = 'Team${index + 1}';
-      return DropdownMenuItem(
-        value: teamId,
-        child: Text(teamId),
-      );
-    });
   }
 
   void _selectMode(SimulationMode mode, bool needsTeam) {

@@ -1,7 +1,7 @@
 name: psgmx_placement_prep
 description: Placement Preparation Program App for PSG Technology - MCA.
 publish_to: 'none'
-version: 1.1.8
+version: 1.2.0
 
 environment:
   sdk: '>=3.2.0 <4.0.0'

@@ -77,7 +77,7 @@ class AuditLog {
       id: '',
       actorId: actorId,
       action: 'working_day_change',
-      entityType: 'attendance_days',
+      entityType: 'scheduled_attendance_dates',
       metadata: {
         'date': date.toIso8601String(),
         'is_working_day': isWorkingDay,

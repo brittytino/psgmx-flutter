@@ -93,10 +93,13 @@ class _UpdateGateState extends State<UpdateGate> with WidgetsBindingObserver {
     if (updateService.shouldShowOptionalUpdate) {
       _hasShownOptionalUpdate = true;
       
-      // Delay slightly to ensure smooth UI
+      // Delay slightly to ensure smooth UI and Navigator is ready
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted && updateService.shouldShowOptionalUpdate) {
-          OptionalUpdateSheet.show(context);
+          // Check if Navigator is available before showing
+          if (Navigator.maybeOf(context) != null) {
+            OptionalUpdateSheet.show(context);
+          }
         }
       });
     }

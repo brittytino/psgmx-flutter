@@ -436,6 +436,8 @@ class _DailyAttendanceSheetState extends State<DailyAttendanceSheet> {
     final absentCount = _statusMap.values.where((s) => s == 'ABSENT').length;
     final total = provider.teamMembers.length;
 
+    if (!context.mounted) return;
+
     // Show confirmation
     final confirm = await showDialog<bool>(
       context: context, 

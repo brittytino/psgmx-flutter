@@ -26,7 +26,7 @@ class LeaderboardScreen extends StatelessWidget {
           if (snapshot.hasError) {
             final isOffline = !ConnectivityService().hasConnection;
             if (isOffline) {
-              return OfflineErrorView(
+              return const OfflineErrorView(
                 title: 'Unable to Load Leaderboard',
                 message: 'Connect to the internet to view rankings',
               );

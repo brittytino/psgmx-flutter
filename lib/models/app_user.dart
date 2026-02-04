@@ -1,9 +1,4 @@
-enum UserRole {
-  student,
-  teamLeader,
-  coordinator,
-  placementRep
-}
+enum UserRole { student, teamLeader, coordinator, placementRep }
 
 class UserRoles {
   final bool isStudent;
@@ -65,12 +60,17 @@ class AppUser {
   final UserRoles roles;
   final DateTime createdAt;
   final DateTime updatedAt;
-  
+
   // New Fields
   final String? leetcodeUsername;
   final DateTime? dob;
   final bool birthdayNotificationsEnabled;
   final bool leetcodeNotificationsEnabled;
+
+  // A2: Additional notification preferences (persisted to DB)
+  final bool taskRemindersEnabled;
+  final bool attendanceAlertsEnabled;
+  final bool announcementsEnabled;
 
   AppUser({
     required this.uid,
@@ -86,6 +86,9 @@ class AppUser {
     this.dob,
     this.birthdayNotificationsEnabled = true,
     this.leetcodeNotificationsEnabled = true,
+    this.taskRemindersEnabled = true,
+    this.attendanceAlertsEnabled = true,
+    this.announcementsEnabled = true,
   })  : createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now();
 
@@ -99,7 +102,7 @@ class AppUser {
   factory AppUser.fromMap(Map<String, dynamic> data) {
     var rolesData = data['roles'];
     rolesData ??= const UserRoles().toJson();
-    
+
     final roles = rolesData is Map<String, dynamic>
         ? UserRoles.fromJson(rolesData)
         : const UserRoles();
@@ -112,15 +115,26 @@ class AppUser {
       teamId: data['team_id'],
       batch: data['batch'] ?? 'G1',
       roles: roles,
-      createdAt: data['created_at'] != null ? DateTime.parse(data['created_at']) : null,
-      updatedAt: data['updated_at'] != null ? DateTime.parse(data['updated_at']) : null,
+      createdAt: data['created_at'] != null
+          ? DateTime.parse(data['created_at'])
+          : null,
+      updatedAt: data['updated_at'] != null
+          ? DateTime.parse(data['updated_at'])
+          : null,
       leetcodeUsername: data['leetcode_username'],
-      dob: data['dob'] != null ? DateTime.tryParse(data['dob'].toString()) : null,
-      birthdayNotificationsEnabled: data['birthday_notifications_enabled'] ?? true,
-      leetcodeNotificationsEnabled: data['leetcode_notifications_enabled'] ?? true,
+      dob: data['dob'] != null
+          ? DateTime.tryParse(data['dob'].toString())
+          : null,
+      birthdayNotificationsEnabled:
+          data['birthday_notifications_enabled'] ?? true,
+      leetcodeNotificationsEnabled:
+          data['leetcode_notifications_enabled'] ?? true,
+      taskRemindersEnabled: data['task_reminders_enabled'] ?? true,
+      attendanceAlertsEnabled: data['attendance_alerts_enabled'] ?? true,
+      announcementsEnabled: data['announcements_enabled'] ?? true,
     );
   }
-  
+
   // Alias for fromMap
   factory AppUser.fromJson(Map<String, dynamic> data) => AppUser.fromMap(data);
 
@@ -139,6 +153,9 @@ class AppUser {
       'dob': dob?.toIso8601String().split('T')[0],
       'birthday_notifications_enabled': birthdayNotificationsEnabled,
       'leetcode_notifications_enabled': leetcodeNotificationsEnabled,
+      'task_reminders_enabled': taskRemindersEnabled,
+      'attendance_alerts_enabled': attendanceAlertsEnabled,
+      'announcements_enabled': announcementsEnabled,
     };
   }
 
@@ -149,6 +166,9 @@ class AppUser {
     DateTime? dob,
     bool? birthdayNotificationsEnabled,
     bool? leetcodeNotificationsEnabled,
+    bool? taskRemindersEnabled,
+    bool? attendanceAlertsEnabled,
+    bool? announcementsEnabled,
     String? teamId,
   }) {
     return AppUser(
@@ -163,8 +183,14 @@ class AppUser {
       updatedAt: DateTime.now(),
       leetcodeUsername: leetcodeUsername ?? this.leetcodeUsername,
       dob: dob ?? this.dob,
-      birthdayNotificationsEnabled: birthdayNotificationsEnabled ?? this.birthdayNotificationsEnabled,
-      leetcodeNotificationsEnabled: leetcodeNotificationsEnabled ?? this.leetcodeNotificationsEnabled,
+      birthdayNotificationsEnabled:
+          birthdayNotificationsEnabled ?? this.birthdayNotificationsEnabled,
+      leetcodeNotificationsEnabled:
+          leetcodeNotificationsEnabled ?? this.leetcodeNotificationsEnabled,
+      taskRemindersEnabled: taskRemindersEnabled ?? this.taskRemindersEnabled,
+      attendanceAlertsEnabled:
+          attendanceAlertsEnabled ?? this.attendanceAlertsEnabled,
+      announcementsEnabled: announcementsEnabled ?? this.announcementsEnabled,
     );
   }
 }

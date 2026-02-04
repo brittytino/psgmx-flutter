@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_dimens.dart';
+import '../../providers/user_provider.dart';
+import '../../providers/theme_provider.dart';
 import '../../services/notification_service.dart';
 import '../widgets/premium_card.dart';
 import '../widgets/notification_bell_icon.dart';
@@ -14,14 +17,36 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  bool _notificationsEnabled = true;
-  bool _taskReminders = true;
-  bool _attendanceAlerts = true;
-  bool _reportUpdates = false;
-  bool _darkMode = false;
+  bool _isSaving = false;
+  bool _isLoggingOut = false;
+  String _appVersion = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAppVersion();
+  }
+
+  Future<void> _loadAppVersion() async {
+    final packageInfo = await PackageInfo.fromPlatform();
+    if (mounted) {
+      setState(() {
+        _appVersion = packageInfo.version;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final userProvider = Provider.of<UserProvider>(context);
+    final user = userProvider.currentUser;
+
+    // A2: Read preferences from DB-backed user model
+    final taskReminders = user?.taskRemindersEnabled ?? true;
+    final attendanceAlerts = user?.attendanceAlertsEnabled ?? true;
+    final announcements = user?.announcementsEnabled ?? true;
+    final leetcodeNotifications = user?.leetcodeNotificationsEnabled ?? true;
+
     return Scaffold(
       body: CustomScrollView(
         slivers: [
@@ -37,10 +62,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             centerTitle: true,
             actions: [
               Consumer<NotificationService>(
-                builder: (context, notifService, _) => FutureBuilder<List<dynamic>>(
+                builder: (context, notifService, _) =>
+                    FutureBuilder<List<dynamic>>(
                   future: notifService.getNotifications(),
                   builder: (context, snapshot) {
-                    final unreadCount = snapshot.data?.where((n) => n.isRead != true).length ?? 0;
+                    final unreadCount =
+                        snapshot.data?.where((n) => n.isRead != true).length ??
+                            0;
                     return NotificationBellIcon(unreadCount: unreadCount);
                   },
                 ),
@@ -52,27 +80,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 // Notifications Section
-                _buildSectionHeader(context, 'Notifications', Icons.notifications_active),
+                _buildSectionHeader(
+                    context, 'Notifications', Icons.notifications_active),
                 const SizedBox(height: AppSpacing.sm),
                 PremiumCard(
                   child: Column(
                     children: [
                       _buildModernToggle(
                         context,
-                        title: 'Push Notifications',
-                        subtitle: 'Enable notifications for all updates',
-                        icon: Icons.notifications_outlined,
-                        value: _notificationsEnabled,
-                        onChanged: (val) => setState(() => _notificationsEnabled = val),
-                      ),
-                      const Divider(height: 1),
-                      _buildModernToggle(
-                        context,
                         title: 'Task Reminders',
-                        subtitle: 'Daily coding problem reminders',
+                        subtitle: 'Daily coding problem reminders at 9 PM',
                         icon: Icons.task_alt,
-                        value: _taskReminders,
-                        onChanged: (val) => setState(() => _taskReminders = val),
+                        value: taskReminders,
+                        isLoading: _isSaving,
+                        onChanged: (val) => _updatePreference(
+                          () => userProvider.updateTaskRemindersEnabled(val),
+                        ),
                       ),
                       const Divider(height: 1),
                       _buildModernToggle(
@@ -80,17 +103,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         title: 'Attendance Alerts',
                         subtitle: 'Get notified about attendance updates',
                         icon: Icons.calendar_today,
-                        value: _attendanceAlerts,
-                        onChanged: (val) => setState(() => _attendanceAlerts = val),
+                        value: attendanceAlerts,
+                        isLoading: _isSaving,
+                        onChanged: (val) => _updatePreference(
+                          () => userProvider.updateAttendanceAlertsEnabled(val),
+                        ),
                       ),
                       const Divider(height: 1),
                       _buildModernToggle(
                         context,
-                        title: 'Report Updates',
-                        subtitle: 'Weekly analytics and reports',
-                        icon: Icons.bar_chart,
-                        value: _reportUpdates,
-                        onChanged: (val) => setState(() => _reportUpdates = val),
+                        title: 'Announcements',
+                        subtitle: 'Important updates from placement team',
+                        icon: Icons.campaign_outlined,
+                        value: announcements,
+                        isLoading: _isSaving,
+                        onChanged: (val) => _updatePreference(
+                          () => userProvider.updateAnnouncementsEnabled(val),
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      _buildModernToggle(
+                        context,
+                        title: 'LeetCode Reminders',
+                        subtitle: 'Daily problem & weekly leaderboard updates',
+                        icon: Icons.code,
+                        value: leetcodeNotifications,
+                        isLoading: _isSaving,
+                        onChanged: (val) => _updatePreference(
+                          () => userProvider.updateLeetCodeNotification(val),
+                        ),
                       ),
                     ],
                   ),
@@ -101,66 +142,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 // Appearance Section
                 _buildSectionHeader(context, 'Appearance', Icons.palette),
                 const SizedBox(height: AppSpacing.sm),
-                PremiumCard(
-                  child: Column(
-                    children: [
-                      _buildModernToggle(
-                        context,
-                        title: 'Dark Mode',
-                        subtitle: 'Toggle dark theme',
-                        icon: Icons.dark_mode,
-                        value: _darkMode,
-                        onChanged: (val) => setState(() => _darkMode = val),
+                Consumer<ThemeProvider>(
+                  builder: (context, themeProvider, child) {
+                    return PremiumCard(
+                      child: Column(
+                        children: [
+                          _buildThemeSelector(context, themeProvider),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: AppSpacing.lg),
-
-                // Account Section
-                _buildSectionHeader(context, 'Account', Icons.person),
-                const SizedBox(height: AppSpacing.sm),
-                PremiumCard(
-                  child: Column(
-                    children: [
-                      _buildActionTile(
-                        context,
-                        title: 'Edit Profile',
-                        subtitle: 'Update your profile information',
-                        icon: Icons.edit,
-                        onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Profile edit coming soon!')),
-                          );
-                        },
-                      ),
-                      const Divider(height: 1),
-                      _buildActionTile(
-                        context,
-                        title: 'Change Password',
-                        subtitle: 'Update your security credentials',
-                        icon: Icons.lock,
-                        onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Password change coming soon!')),
-                          );
-                        },
-                      ),
-                      const Divider(height: 1),
-                      _buildActionTile(
-                        context,
-                        title: 'Privacy Policy',
-                        subtitle: 'View our privacy policy',
-                        icon: Icons.privacy_tip,
-                        onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Privacy policy coming soon!')),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
+                    );
+                  },
                 ),
 
                 const SizedBox(height: AppSpacing.lg),
@@ -173,39 +164,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     children: [
                       _buildActionTile(
                         context,
-                        title: 'Help Center',
-                        subtitle: 'Get help and support',
-                        icon: Icons.help_outline,
-                        onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Help center coming soon!')),
-                          );
-                        },
-                      ),
-                      const Divider(height: 1),
-                      _buildActionTile(
-                        context,
-                        title: 'Contact Us',
-                        subtitle: 'Reach out to our team',
-                        icon: Icons.email,
-                        onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Contact form coming soon!')),
-                          );
-                        },
-                      ),
-                      const Divider(height: 1),
-                      _buildActionTile(
-                        context,
                         title: 'About',
-                        subtitle: 'Version 1.0.0',
+                        subtitle: 'Version $_appVersion',
                         icon: Icons.info,
                         onTap: () {
                           showAboutDialog(
                             context: context,
                             applicationName: 'PSGMX Flutter',
-                            applicationVersion: '1.0.0',
-                            applicationLegalese: '© 2024 PSGMX. All rights reserved.',
+                            applicationVersion: _appVersion,
+                            applicationLegalese:
+                                '© ${DateTime.now().year} PSGMX. All rights reserved.',
                           );
                         },
                       ),
@@ -213,52 +181,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
 
-                const SizedBox(height: AppSpacing.xl),
-
-                // Logout Button
-                Center(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      showDialog(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: const Text('Logout'),
-                          content: const Text('Are you sure you want to logout?'),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx),
-                              child: const Text('Cancel'),
-                            ),
-                            FilledButton(
-                              onPressed: () {
-                                Navigator.pop(ctx);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Logout coming soon!')),
-                                );
-                              },
-                              child: const Text('Logout'),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.logout),
-                    label: Text(
-                      'Logout',
-                      style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Theme.of(context).colorScheme.errorContainer,
-                      foregroundColor: Theme.of(context).colorScheme.onErrorContainer,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.xl,
-                        vertical: AppSpacing.md,
-                      ),
-                    ),
-                  ),
-                ),
                 const SizedBox(height: AppSpacing.xl),
               ]),
             ),
@@ -268,7 +190,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildSectionHeader(BuildContext context, String title, IconData icon) {
+  Widget _buildSectionHeader(
+      BuildContext context, String title, IconData icon) {
     return Row(
       children: [
         Icon(
@@ -289,6 +212,67 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  // A2: Helper to update preferences with loading state
+  Future<void> _updatePreference(Future<void> Function() update) async {
+    setState(() => _isSaving = true);
+    try {
+      await update();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Preference saved'),
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving preference: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  Future<void> _confirmSignOut(BuildContext context, UserProvider provider) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sign Out'),
+        content: const Text('Are you sure you want to sign out?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Sign Out'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      setState(() => _isLoggingOut = true);
+      try {
+        await provider.signOut();
+        // Navigation will be handled by the auth state listener
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isLoggingOut = false);
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error signing out: $e')),
+            );
+          }
+        }
+      }
+    }
+  }
+
   Widget _buildModernToggle(
     BuildContext context, {
     required String title,
@@ -296,6 +280,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required IconData icon,
     required bool value,
     required ValueChanged<bool> onChanged,
+    bool isLoading = false,
   }) {
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(
@@ -328,16 +313,202 @@ class _SettingsScreenState extends State<SettingsScreen> {
           color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
       ),
-      trailing: Switch(
-        value: value,
-        onChanged: onChanged,
-        thumbIcon: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.selected)) {
-            return const Icon(Icons.check, color: Colors.white, size: 16);
-          }
-          return const Icon(Icons.close, color: Colors.white, size: 16);
-        }),
+      trailing: isLoading
+          ? const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Switch(
+              value: value,
+              onChanged: onChanged,
+              thumbIcon: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.selected)) {
+                  return const Icon(Icons.check, color: Colors.white, size: 16);
+                }
+                return const Icon(Icons.close, color: Colors.white, size: 16);
+              }),
+            ),
+    );
+  }
+
+  Widget _buildThemeSelector(BuildContext context, ThemeProvider themeProvider) {
+    final isDark = themeProvider.themeMode == ThemeMode.dark;
+    final isSystem = themeProvider.themeMode == ThemeMode.system;
+    
+    return Padding(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Row(
+        children: [
+          // Sun Icon (Light Mode)
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            decoration: BoxDecoration(
+              color: !isDark && !isSystem
+                  ? Theme.of(context).colorScheme.primaryContainer
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+            child: Icon(
+              Icons.light_mode,
+              color: !isDark && !isSystem
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
+              size: 20,
+            ),
+          ),
+          
+          const SizedBox(width: AppSpacing.md),
+          
+          // Toggle Switch
+          Expanded(
+            child: Center(
+              child: Container(
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainer,
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // System Option
+                    _buildThemeToggleOption(
+                      context,
+                      label: 'System',
+                      isSelected: isSystem,
+                      onTap: () => themeProvider.setThemeMode(ThemeMode.system),
+                    ),
+                    // Light Option
+                    _buildThemeToggleOption(
+                      context,
+                      label: 'Light',
+                      isSelected: !isDark && !isSystem,
+                      onTap: () => themeProvider.setThemeMode(ThemeMode.light),
+                    ),
+                    // Dark Option
+                    _buildThemeToggleOption(
+                      context,
+                      label: 'Dark',
+                      isSelected: isDark && !isSystem,
+                      onTap: () => themeProvider.setThemeMode(ThemeMode.dark),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          
+          const SizedBox(width: AppSpacing.md),
+          
+          // Moon Icon (Dark Mode)
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            decoration: BoxDecoration(
+              color: isDark && !isSystem
+                  ? Theme.of(context).colorScheme.primaryContainer
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+            child: Icon(
+              Icons.dark_mode,
+              color: isDark && !isSystem
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
+              size: 20,
+            ),
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildThemeToggleOption(
+    BuildContext context, {
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.xs,
+        ),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? Theme.of(context).colorScheme.primary
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected
+                ? Theme.of(context).colorScheme.onPrimary
+                : Theme.of(context).colorScheme.onSurfaceVariant,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+            fontSize: 13,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildThemeOption_OLD(
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.xs,
+      ),
+      leading: Container(
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        decoration: BoxDecoration(
+          color: isSelected 
+              ? Theme.of(context).colorScheme.primaryContainer
+              : Theme.of(context).colorScheme.surfaceContainer,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+        child: Icon(
+          icon,
+          color: isSelected 
+              ? Theme.of(context).colorScheme.primary
+              : Theme.of(context).colorScheme.onSurfaceVariant,
+          size: 20,
+        ),
+      ),
+      title: Text(
+        title,
+        style: GoogleFonts.inter(
+          fontWeight: FontWeight.w600,
+          fontSize: 14,
+          color: isSelected ? Theme.of(context).colorScheme.primary : null,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: GoogleFonts.inter(
+          fontSize: 12,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      ),
+      trailing: isSelected
+          ? Icon(
+              Icons.check_circle,
+              color: Theme.of(context).colorScheme.primary,
+            )
+          : null,
+      onTap: onTap,
     );
   }
 
@@ -387,5 +558,3 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 }
-
-

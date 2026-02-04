@@ -222,4 +222,112 @@ class UserProvider with ChangeNotifier {
       debugPrint('[UserProvider] Error scheduling birthday notification: $e');
     }
   }
+
+  // ========================================
+  // A2: NOTIFICATION PREFERENCES PERSISTENCE
+  // ========================================
+
+  /// Update task reminders preference (persisted to DB)
+  Future<void> updateTaskRemindersEnabled(bool enabled) async {
+    if (_currentUser == null) return;
+    try {
+      await Supabase.instance.client.from('users').update(
+          {'task_reminders_enabled': enabled}).eq('id', _currentUser!.uid);
+
+      _currentUser = _currentUser!.copyWith(taskRemindersEnabled: enabled);
+      notifyListeners();
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Update attendance alerts preference (persisted to DB)
+  Future<void> updateAttendanceAlertsEnabled(bool enabled) async {
+    if (_currentUser == null) return;
+    try {
+      await Supabase.instance.client.from('users').update(
+          {'attendance_alerts_enabled': enabled}).eq('id', _currentUser!.uid);
+
+      _currentUser = _currentUser!.copyWith(attendanceAlertsEnabled: enabled);
+      notifyListeners();
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Update announcements preference (persisted to DB)
+  Future<void> updateAnnouncementsEnabled(bool enabled) async {
+    if (_currentUser == null) return;
+    try {
+      await Supabase.instance.client.from('users').update(
+          {'announcements_enabled': enabled}).eq('id', _currentUser!.uid);
+
+      _currentUser = _currentUser!.copyWith(announcementsEnabled: enabled);
+      notifyListeners();
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Update all notification preferences at once
+  Future<void> updateAllNotificationPreferences({
+    bool? taskReminders,
+    bool? attendanceAlerts,
+    bool? announcements,
+    bool? leetcodeNotifications,
+    bool? birthdayNotifications,
+  }) async {
+    if (_currentUser == null) return;
+    try {
+      final updates = <String, dynamic>{};
+
+      if (taskReminders != null) {
+        updates['task_reminders_enabled'] = taskReminders;
+      }
+      if (attendanceAlerts != null) {
+        updates['attendance_alerts_enabled'] = attendanceAlerts;
+      }
+      if (announcements != null) {
+        updates['announcements_enabled'] = announcements;
+      }
+      if (leetcodeNotifications != null) {
+        updates['leetcode_notifications_enabled'] = leetcodeNotifications;
+      }
+      if (birthdayNotifications != null) {
+        updates['birthday_notifications_enabled'] = birthdayNotifications;
+      }
+
+      if (updates.isEmpty) return;
+
+      await Supabase.instance.client
+          .from('users')
+          .update(updates)
+          .eq('id', _currentUser!.uid);
+
+      _currentUser = _currentUser!.copyWith(
+        taskRemindersEnabled:
+            taskReminders ?? _currentUser!.taskRemindersEnabled,
+        attendanceAlertsEnabled:
+            attendanceAlerts ?? _currentUser!.attendanceAlertsEnabled,
+        announcementsEnabled:
+            announcements ?? _currentUser!.announcementsEnabled,
+        leetcodeNotificationsEnabled:
+            leetcodeNotifications ?? _currentUser!.leetcodeNotificationsEnabled,
+        birthdayNotificationsEnabled:
+            birthdayNotifications ?? _currentUser!.birthdayNotificationsEnabled,
+      );
+      notifyListeners();
+
+      // Handle notification service updates
+      if (leetcodeNotifications != null) {
+        if (leetcodeNotifications) {
+          await NotificationService().scheduleLeetCodeReminders();
+        } else {
+          await NotificationService().cancelLeetCodeReminders();
+        }
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
 }

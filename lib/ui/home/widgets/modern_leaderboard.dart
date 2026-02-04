@@ -74,7 +74,7 @@ class _ModernLeaderboardState extends State<ModernLeaderboard> {
             if (snapshot.hasError) {
               final isOffline = !ConnectivityService().hasConnection;
               if (isOffline) {
-                return CompactOfflineView();
+                return const CompactOfflineView();
               }
               return Center(child: Text("Error: ${snapshot.error}"));
             }

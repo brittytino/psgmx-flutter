@@ -46,11 +46,16 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
   }
 
   Future<void> _refreshLeaderboard() async {
-    final user = context.read<SupabaseService>().client.auth.currentUser;
+    // Capture all context-dependent values BEFORE any await
+    final supabaseService = context.read<SupabaseService>();
+    final user = supabaseService.client.auth.currentUser;
     if (user == null) return;
 
-    final userData = await context
-        .read<SupabaseService>()
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final leetCodeProvider = context.read<LeetCodeProvider>();
+
+    final userData = await supabaseService
         .client
         .from('users')
         .select('roles')
@@ -62,7 +67,7 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
 
     if (!isPlacementRep) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        scaffoldMessenger.showSnackBar(
           SnackBar(
             content: const Text(
                 '⚠️ Only Placement Representatives can refresh data'),
@@ -80,18 +85,28 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
     _refreshAnimationController.repeat();
 
     try {
-      final isDark = Theme.of(context).brightness == Brightness.dark;
+      if (!mounted) return;
       final shouldRefresh = await showDialog<bool>(
         context: context,
+        barrierDismissible: false,
         builder: (context) => _buildRefreshDialog(isDark),
       );
 
-      if (shouldRefresh == true) {
-        final leetCodeProvider = context.read<LeetCodeProvider>();
-        await leetCodeProvider.refreshAllUsersFromAPI();
+      if (shouldRefresh == true && mounted) {
+        // Show progress modal
+        await showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogContext) => _RefreshProgressModal(
+            leetCodeProvider: leetCodeProvider,
+            onComplete: () {
+              Navigator.of(dialogContext).pop();
+            },
+          ),
+        );
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          scaffoldMessenger.showSnackBar(
             SnackBar(
               content: const Text('✅ Refresh complete! All stats updated.'),
               backgroundColor: Colors.green.shade700,
@@ -680,7 +695,7 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
   }
 
   Widget _buildToggleButton(String label, bool isSelected, bool isDark) {
-    final selectedBg = const Color(0xFFFF6600);
+    const selectedBg = Color(0xFFFF6600);
     final unselectedText = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
 
     return GestureDetector(
@@ -816,7 +831,7 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
     final textSecondary = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
 
     final isTopPerformer = rank <= 10;
-    final accentColor = const Color(0xFFFF6600);
+    const accentColor = Color(0xFFFF6600);
 
     return Container(
       decoration: BoxDecoration(
@@ -1047,7 +1062,7 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
     final borderColor = isDark ? const Color(0xFF2D2D2D) : Colors.grey.shade200;
     final textPrimary = isDark ? Colors.white : Colors.grey.shade900;
     final textSecondary = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
-    final accentColor = const Color(0xFFFF6600);
+    const accentColor = Color(0xFFFF6600);
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -1248,6 +1263,259 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
           Icons.person_rounded,
           size: 26,
           color: color,
+        ),
+      ),
+    );
+  }
+}
+
+/// Modal dialog that shows real-time progress while refreshing LeetCode stats
+class _RefreshProgressModal extends StatefulWidget {
+  final LeetCodeProvider leetCodeProvider;
+  final VoidCallback onComplete;
+
+  const _RefreshProgressModal({
+    required this.leetCodeProvider,
+    required this.onComplete,
+  });
+
+  @override
+  State<_RefreshProgressModal> createState() => _RefreshProgressModalState();
+}
+
+class _RefreshProgressModalState extends State<_RefreshProgressModal>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _pulseController;
+  bool _isComplete = false;
+  String _statusMessage = 'Starting refresh...';
+  int _currentUser = 0;
+  int _totalUsers = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    )..repeat(reverse: true);
+    _startRefresh();
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _startRefresh() async {
+    try {
+      // Listen to provider updates
+      widget.leetCodeProvider.addListener(_onProviderUpdate);
+      
+      await widget.leetCodeProvider.refreshAllUsersFromAPI();
+      
+      if (mounted) {
+        setState(() {
+          _isComplete = true;
+          _statusMessage = 'Refresh complete!';
+        });
+        
+        // Wait a moment to show completion, then close
+        await Future.delayed(const Duration(seconds: 2));
+        widget.onComplete();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isComplete = true;
+          _statusMessage = 'Error: $e';
+        });
+        await Future.delayed(const Duration(seconds: 3));
+        widget.onComplete();
+      }
+    } finally {
+      widget.leetCodeProvider.removeListener(_onProviderUpdate);
+    }
+  }
+
+  void _onProviderUpdate() {
+    if (!mounted) return;
+    final message = widget.leetCodeProvider.loadingMessage;
+    
+    // Parse progress from message like "Fetching 45/123 users..."
+    final match = RegExp(r'(\d+)/(\d+)').firstMatch(message);
+    if (match != null) {
+      setState(() {
+        _currentUser = int.tryParse(match.group(1) ?? '0') ?? 0;
+        _totalUsers = int.tryParse(match.group(2) ?? '0') ?? 0;
+        _statusMessage = message;
+      });
+    } else {
+      setState(() => _statusMessage = message);
+    }
+  }
+
+  double get _progress {
+    if (_totalUsers == 0) return 0.0;
+    return _currentUser / _totalUsers;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final textPrimary = isDark ? Colors.white : Colors.grey.shade900;
+    final textSecondary = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+
+    return PopScope(
+      canPop: _isComplete,
+      child: Dialog(
+        backgroundColor: cardBg,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Animated Icon
+              AnimatedBuilder(
+                animation: _pulseController,
+                builder: (context, child) {
+                  return Transform.scale(
+                    scale: 1.0 + (_pulseController.value * 0.1),
+                    child: Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: _isComplete
+                            ? Colors.green.withValues(alpha: 0.15)
+                            : const Color(0xFFFF6600).withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        _isComplete ? Icons.check_circle : Icons.sync,
+                        color: _isComplete ? Colors.green : const Color(0xFFFF6600),
+                        size: 40,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 24),
+              
+              // Title
+              Text(
+                _isComplete ? 'All Done!' : 'Refreshing LeetCode Data',
+                style: GoogleFonts.poppins(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              
+              // Status Message
+              Text(
+                _statusMessage,
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  color: textSecondary,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              
+              // Progress Bar
+              if (!_isComplete && _totalUsers > 0) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    value: _progress,
+                    minHeight: 12,
+                    backgroundColor: isDark
+                        ? Colors.grey.shade800
+                        : Colors.grey.shade200,
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      Color(0xFFFF6600),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  '$_currentUser / $_totalUsers users',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFFFF6600),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+              
+              // Loading indicator when no progress yet
+              if (!_isComplete && _totalUsers == 0) ...[
+                const SizedBox(height: 8),
+                const CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF6600)),
+                ),
+                const SizedBox(height: 16),
+              ],
+              
+              // Warning message
+              if (!_isComplete)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline, color: Colors.amber, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Please wait until the process completes. Do not close this dialog.',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: Colors.amber.shade700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              
+              // Success summary
+              if (_isComplete) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.check_circle, color: Colors.green, size: 24),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Leaderboard updated successfully!',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.green.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );

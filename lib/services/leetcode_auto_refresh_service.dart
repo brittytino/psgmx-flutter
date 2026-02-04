@@ -3,12 +3,17 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/leetcode_provider.dart';
 import '../services/supabase_service.dart';
+import '../services/performance_service.dart';
 
 /// Daily Auto-Refresh Service for LeetCode Stats
 /// This runs in the background and automatically refreshes stats once per day
+/// Also handles:
+/// - C1: Weekly Top Performer Announcement
+/// - C2: LeetCode Milestones
 class LeetCodeAutoRefreshService {
   final LeetCodeProvider _leetCodeProvider;
   final SupabaseService _supabaseService;
+  final PerformanceService _performanceService = PerformanceService();
   Timer? _dailyTimer;
 
   static const String _lastRefreshKey = 'leetcode_last_refresh_timestamp';
@@ -78,8 +83,38 @@ class LeetCodeAutoRefreshService {
       await _saveLastRefreshTimestamp(DateTime.now());
 
       debugPrint('[AutoRefresh] ✅ Auto-refresh completed successfully');
+
+      // C1: Check and announce weekly top performer (only on Mondays)
+      await _checkWeeklyTopPerformer();
+
+      // C2: Check for milestone achievements
+      await _checkMilestones();
     } catch (e) {
       debugPrint('[AutoRefresh] Error during auto-refresh: $e');
+    }
+  }
+
+  /// C1: Check if we should announce weekly top performer
+  Future<void> _checkWeeklyTopPerformer() async {
+    try {
+      final shouldAnnounce =
+          await _performanceService.shouldAnnounceWeeklyTopPerformer();
+      if (shouldAnnounce) {
+        debugPrint('[AutoRefresh] Announcing weekly top performer...');
+        await _performanceService.announceWeeklyTopPerformer();
+      }
+    } catch (e) {
+      debugPrint('[AutoRefresh] Error checking weekly top performer: $e');
+    }
+  }
+
+  /// C2: Check for milestone achievements
+  Future<void> _checkMilestones() async {
+    try {
+      debugPrint('[AutoRefresh] Checking for milestone achievements...');
+      await _performanceService.checkAndAnnounceMilestone();
+    } catch (e) {
+      debugPrint('[AutoRefresh] Error checking milestones: $e');
     }
   }
 

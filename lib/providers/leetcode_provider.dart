@@ -3,11 +3,9 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import '../models/leetcode_stats.dart';
 import '../services/supabase_service.dart';
-import '../services/data_seed_service.dart';
 
 class LeetCodeProvider extends ChangeNotifier {
   final SupabaseService _supabaseService;
-  late final DataSeedService _dataSeedService;
   
   bool _isLoading = false;
   bool get isLoading => _isLoading;
@@ -25,9 +23,7 @@ class LeetCodeProvider extends ChangeNotifier {
   
   DateTime? _lastBatchUpdate;
   
-  LeetCodeProvider(this._supabaseService) {
-    _dataSeedService = DataSeedService(_supabaseService);
-  }
+  LeetCodeProvider(this._supabaseService);
   
   // Check if we need to refresh (every 12 hours)
   bool get needsRefresh {
@@ -246,11 +242,6 @@ class LeetCodeProvider extends ChangeNotifier {
     notifyListeners();
     
     try {
-      // 0. ENSURE WHITELIST IS SEEDED (Auto-Populate if Empty)
-      _loadingMessage = 'Checking whitelist...';
-      notifyListeners();
-      await _dataSeedService.ensureWhitelistSeeded();
-      
       // 1. Get all leetcode usernames from WHITELIST (Source of Truth)
       // This checks EVERY student, not just those who signed up
       _loadingMessage = 'Loading user list...';

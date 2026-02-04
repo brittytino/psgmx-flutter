@@ -255,7 +255,7 @@ class _ModernBulkUploadDialogState extends State<ModernBulkUploadDialog> {
                     value: _selectedFile!.name,
                   ),
                   const SizedBox(height: 8),
-                  _InfoRow(
+                  const _InfoRow(
                     icon: Icons.info_outline,
                     label: 'Note:',
                     value: 'Existing tasks for the same date will be updated',
@@ -434,7 +434,7 @@ class _FormatInfoCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          _FormatRow(
+          const _FormatRow(
             columns: ['Date', 'Leetcode Topic', 'Leetcode URL', 'Core CS Topic', 'Description'],
           ),
           const SizedBox(height: 8),

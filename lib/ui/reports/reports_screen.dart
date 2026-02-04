@@ -533,7 +533,7 @@ class _LongAbsenteesDialogState extends State<_LongAbsenteesDialog> {
       List<Map<String, dynamic>> longAbsentees = [];
 
       // Get attendance records for the last 30 days
-      final thirtyDaysAgo = DateTime.now().subtract(Duration(days: 30));
+      final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
       final attendanceRecords = await supabase
           .from('attendance_records')
           .select('user_id, date, status')

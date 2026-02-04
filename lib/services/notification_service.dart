@@ -18,12 +18,13 @@ class NotificationService {
   factory NotificationService() => _instance;
   NotificationService._internal();
 
-  final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _notifications =
+      FlutterLocalNotificationsPlugin();
   bool _isInitialized = false;
-  
+
   // Real-time subscription
   RealtimeChannel? _notificationChannel;
-  
+
   // Cached notifications from database
   List<AppNotification> _cachedNotifications = [];
 
@@ -33,7 +34,7 @@ class NotificationService {
     if (_isInitialized) return;
 
     tz.initializeTimeZones();
-    
+
     // Create notification channels for Android
     const AndroidNotificationChannel mainChannel = AndroidNotificationChannel(
       'psgmx_channel_main',
@@ -42,19 +43,19 @@ class NotificationService {
       importance: Importance.high,
       playSound: true,
       enableVibration: true,
-      enableLights: true,
-      ledColor: Color(0xFFFF6600),
     );
-    
-    const AndroidNotificationChannel leetcodeChannel = AndroidNotificationChannel(
+
+    const AndroidNotificationChannel leetcodeChannel =
+        AndroidNotificationChannel(
       'psgmx_leetcode',
       'LeetCode Reminders',
       description: 'Daily LeetCode problem reminders',
       importance: Importance.defaultImportance,
       playSound: true,
     );
-    
-    const AndroidNotificationChannel birthdayChannel = AndroidNotificationChannel(
+
+    const AndroidNotificationChannel birthdayChannel =
+        AndroidNotificationChannel(
       'psgmx_birthday',
       'Birthday Notifications',
       description: 'Birthday wishes and celebrations',
@@ -62,8 +63,9 @@ class NotificationService {
       playSound: true,
       enableVibration: true,
     );
-    
-    const AndroidNotificationChannel attendanceChannel = AndroidNotificationChannel(
+
+    const AndroidNotificationChannel attendanceChannel =
+        AndroidNotificationChannel(
       'psgmx_attendance',
       'Attendance Reminders',
       description: 'Daily attendance marking reminders for team leaders',
@@ -71,33 +73,36 @@ class NotificationService {
       playSound: true,
       enableVibration: true,
     );
-    
+
     // Register channels
-    final androidPlugin = _notifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
     await androidPlugin?.createNotificationChannel(mainChannel);
     await androidPlugin?.createNotificationChannel(leetcodeChannel);
     await androidPlugin?.createNotificationChannel(birthdayChannel);
     await androidPlugin?.createNotificationChannel(attendanceChannel);
-    
+
     // Initialize settings
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosSettings = DarwinInitializationSettings(
-      requestAlertPermission: false, 
+      requestAlertPermission: false,
       requestBadgePermission: false,
       requestSoundPermission: false,
     );
-    
-    const settings = InitializationSettings(android: androidSettings, iOS: iosSettings);
-    
+
+    const settings =
+        InitializationSettings(android: androidSettings, iOS: iosSettings);
+
     await _notifications.initialize(
       settings,
       onDidReceiveNotificationResponse: (details) {
         debugPrint('[Notification] Tapped: ${details.payload}');
       },
     );
-    
+
     _isInitialized = true;
-    
+
     // Setup real-time subscription after user is authenticated
     _setupRealtimeSubscription();
   }
@@ -106,9 +111,9 @@ class NotificationService {
   void _setupRealtimeSubscription() {
     final user = _supabase.auth.currentUser;
     if (user == null) return;
-    
+
     _notificationChannel?.unsubscribe();
-    
+
     _notificationChannel = _supabase
         .channel('notifications_channel')
         .onPostgresChanges(
@@ -116,12 +121,13 @@ class NotificationService {
           schema: 'public',
           table: 'notifications',
           callback: (payload) {
-            debugPrint('[Notification] New notification received: ${payload.newRecord}');
+            debugPrint(
+                '[Notification] New notification received: ${payload.newRecord}');
             _handleNewNotification(payload.newRecord);
           },
         )
         .subscribe();
-    
+
     debugPrint('[Notification] Real-time subscription active');
   }
 
@@ -129,10 +135,10 @@ class NotificationService {
   void _handleNewNotification(Map<String, dynamic> data) async {
     try {
       final notification = AppNotification.fromMap(data);
-      
+
       // Add to cache
       _cachedNotifications.insert(0, notification);
-      
+
       // Show push notification
       await _showPushNotification(notification);
     } catch (e) {
@@ -151,8 +157,6 @@ class NotificationService {
       color: const Color(0xFFFF6600),
       playSound: true,
       enableVibration: true,
-      enableLights: true,
-      ledColor: const Color(0xFFFF6600),
       styleInformation: BigTextStyleInformation(
         notification.message,
         htmlFormatBigText: true,
@@ -162,16 +166,17 @@ class NotificationService {
       ),
       icon: '@mipmap/ic_launcher',
     );
-    
+
     const iosDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
       badgeNumber: 1,
     );
-    
-    final details = NotificationDetails(android: androidDetails, iOS: iosDetails);
-    
+
+    final details =
+        NotificationDetails(android: androidDetails, iOS: iosDetails);
+
     await _notifications.show(
       notification.id.hashCode,
       notification.title,
@@ -186,7 +191,7 @@ class NotificationService {
     try {
       final user = _supabase.auth.currentUser;
       if (user == null) return [];
-      
+
       // Fetch notifications from database
       final response = await _supabase
           .from('notifications')
@@ -197,29 +202,37 @@ class NotificationService {
           .eq('is_active', true)
           .order('generated_at', ascending: false)
           .limit(50);
-      
+
       final notifications = <AppNotification>[];
-      
+
       for (var data in response as List) {
         final reads = data['notification_reads'] as List?;
         final hasRead = reads?.isNotEmpty == true;
-        
+
         notifications.add(AppNotification(
           id: data['id'] ?? '',
           title: data['title'] ?? '',
           message: data['message'] ?? '',
-          notificationType: NotificationType.fromString(data['notification_type'] ?? 'announcement'),
-          tone: data['tone'] != null ? NotificationTone.fromString(data['tone']) : null,
+          notificationType: NotificationType.fromString(
+              data['notification_type'] ?? 'announcement'),
+          tone: data['tone'] != null
+              ? NotificationTone.fromString(data['tone'])
+              : null,
           targetAudience: data['target_audience'] ?? 'all',
-          generatedAt: DateTime.tryParse(data['generated_at'] ?? '') ?? DateTime.now(),
-          validUntil: data['valid_until'] != null ? DateTime.tryParse(data['valid_until']) : null,
+          generatedAt:
+              DateTime.tryParse(data['generated_at'] ?? '') ?? DateTime.now(),
+          validUntil: data['valid_until'] != null
+              ? DateTime.tryParse(data['valid_until'])
+              : null,
           createdBy: data['created_by'],
           isActive: data['is_active'] ?? true,
           isRead: hasRead,
-          readAt: hasRead && reads!.isNotEmpty ? DateTime.tryParse(reads.first['read_at'] ?? '') : null,
+          readAt: hasRead && reads!.isNotEmpty
+              ? DateTime.tryParse(reads.first['read_at'] ?? '')
+              : null,
         ));
       }
-      
+
       _cachedNotifications = notifications;
       return notifications;
     } catch (e) {
@@ -233,15 +246,16 @@ class NotificationService {
     try {
       final user = _supabase.auth.currentUser;
       if (user == null) return;
-      
+
       await _supabase.from('notification_reads').upsert({
         'notification_id': notificationId,
         'user_id': user.id,
         'read_at': DateTime.now().toIso8601String(),
       });
-      
+
       // Update cache
-      final index = _cachedNotifications.indexWhere((n) => n.id == notificationId);
+      final index =
+          _cachedNotifications.indexWhere((n) => n.id == notificationId);
       if (index != -1) {
         _cachedNotifications[index] = _cachedNotifications[index].copyWith(
           isRead: true,
@@ -258,12 +272,12 @@ class NotificationService {
     try {
       final user = _supabase.auth.currentUser;
       if (user == null) return;
-      
+
       final unreadIds = _cachedNotifications
           .where((n) => n.isRead != true)
           .map((n) => n.id)
           .toList();
-      
+
       for (var id in unreadIds) {
         await _supabase.from('notification_reads').upsert({
           'notification_id': id,
@@ -271,7 +285,7 @@ class NotificationService {
           'read_at': DateTime.now().toIso8601String(),
         });
       }
-      
+
       // Update cache
       for (int i = 0; i < _cachedNotifications.length; i++) {
         _cachedNotifications[i] = _cachedNotifications[i].copyWith(
@@ -289,13 +303,13 @@ class NotificationService {
     try {
       final user = _supabase.auth.currentUser;
       if (user == null) return;
-      
+
       await _supabase.from('notification_reads').upsert({
         'notification_id': notificationId,
         'user_id': user.id,
         'dismissed_at': DateTime.now().toIso8601String(),
       });
-      
+
       _cachedNotifications.removeWhere((n) => n.id == notificationId);
     } catch (e) {
       debugPrint('[Notification] Error deleting notification: $e');
@@ -312,7 +326,7 @@ class NotificationService {
     try {
       final user = _supabase.auth.currentUser;
       if (user == null) return false;
-      
+
       // Insert into database (triggers real-time for other users)
       await _supabase.from('notifications').insert({
         'title': title,
@@ -323,7 +337,7 @@ class NotificationService {
         'created_by': user.id,
         'is_active': true,
       });
-      
+
       // Show push notification locally as well
       await showNotification(
         id: DateTime.now().millisecondsSinceEpoch % 100000,
@@ -331,7 +345,7 @@ class NotificationService {
         body: message,
         type: NotificationType.announcement,
       );
-      
+
       return true;
     } catch (e) {
       debugPrint('[Notification] Error sending announcement: $e');
@@ -346,7 +360,7 @@ class NotificationService {
   }) async {
     try {
       final firstName = birthdayPersonName.split(' ').first;
-      
+
       // Insert birthday notification into database
       await _supabase.from('notifications').insert({
         'title': '🎂 Happy Birthday, $firstName!',
@@ -356,7 +370,7 @@ class NotificationService {
         'target_audience': 'all',
         'is_active': true,
       });
-      
+
       // Also show local push notification
       await showNotification(
         id: 200 + birthdayPersonId.hashCode % 1000,
@@ -365,7 +379,7 @@ class NotificationService {
         type: NotificationType.announcement,
         channel: 'psgmx_birthday',
       );
-      
+
       return true;
     } catch (e) {
       debugPrint('[Notification] Error sending birthday notification: $e');
@@ -377,37 +391,86 @@ class NotificationService {
   Future<void> checkAndSendBirthdayNotifications() async {
     try {
       final now = DateTime.now();
+      final todayStr = '${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
       
-      // Get all users with birthday today
-      final response = await _supabase
+      debugPrint('[Notification] 🎂 Checking birthdays for today: $todayStr (${now.year}-${now.month}-${now.day})');
+
+      // Check BOTH whitelist AND users tables for birthdays
+      final whitelistResponse = await _supabase
           .from('whitelist')
           .select('email, name, dob')
           .not('dob', 'is', null);
+
+      final usersResponse = await _supabase
+          .from('users')
+          .select('id, email, name, dob')
+          .not('dob', 'is', null);
+
+      // Combine both lists (prefer users table data if exists)
+      final Map<String, Map<String, dynamic>> allUsersMap = {};
       
-      for (var user in response as List) {
-        final dob = DateTime.tryParse(user['dob'] ?? '');
+      // Add whitelist entries first
+      for (var user in whitelistResponse as List) {
+        final email = user['email'] as String?;
+        if (email != null) {
+          allUsersMap[email] = user;
+        }
+      }
+      
+      // Override with users table data (more up-to-date)
+      for (var user in usersResponse as List) {
+        final email = user['email'] as String?;
+        if (email != null) {
+          allUsersMap[email] = user;
+        }
+      }
+
+      debugPrint('[Notification] Found ${allUsersMap.length} users to check for birthdays');
+
+      int birthdaysFound = 0;
+      for (var user in allUsersMap.values) {
+        final dobStr = user['dob'] as String?;
+        final dob = DateTime.tryParse(dobStr ?? '');
+        
+        debugPrint('[Notification] Checking user: ${user['name']} - DOB: $dobStr - Parsed: ${dob?.toString() ?? "null"}');
+        
         if (dob != null && dob.month == now.month && dob.day == now.day) {
+          birthdaysFound++;
           final name = user['name'] as String? ?? 'Student';
+          final firstName = name.split(' ').first;
+
+          // Check if birthday notification already sent today (using better logic)
+          final todayStart = DateTime(now.year, now.month, now.day).toIso8601String();
+          final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59).toIso8601String();
           
-          // Check if birthday notification already sent today
           final existingNotif = await _supabase
               .from('notifications')
               .select('id')
-              .ilike('title', '%Happy Birthday%$name%')
-              .gte('generated_at', DateTime(now.year, now.month, now.day).toIso8601String())
+              .eq('notification_type', 'announcement')
+              .ilike('title', '%Happy Birthday%$firstName%')
+              .gte('generated_at', todayStart)
+              .lte('generated_at', todayEnd)
               .maybeSingle();
-          
+
           if (existingNotif == null) {
             await sendBirthdayNotification(
               birthdayPersonName: name,
-              birthdayPersonId: user['email'] ?? '',
+              birthdayPersonId: user['email'] ?? user['id'] ?? '',
             );
-            debugPrint('[Notification] Birthday notification sent for $name');
+            debugPrint('[Notification] ✅ Birthday notification sent for $name');
+          } else {
+            debugPrint('[Notification] ⏭️  Birthday notification already sent for $name today');
           }
         }
       }
+      
+      if (birthdaysFound == 0) {
+        debugPrint('[Notification] No birthdays found for today');
+      } else {
+        debugPrint('[Notification] Found $birthdaysFound birthday(s) today');
+      }
     } catch (e) {
-      debugPrint('[Notification] Error checking birthdays: $e');
+      debugPrint('[Notification] ❌ Error checking birthdays: $e');
     }
   }
 
@@ -417,18 +480,20 @@ class NotificationService {
     required String teamId,
   }) async {
     if (!isTeamLeader) return;
-    
+
     // Schedule daily reminder at 4:45 PM
     await _scheduleDaily(
       id: 300 + teamId.hashCode % 100,
       title: '📋 Mark Today\'s Attendance',
-      body: 'Hey Team Leader! Don\'t forget to mark attendance for your team today.',
+      body:
+          'Hey Team Leader! Don\'t forget to mark attendance for your team today.',
       hour: 16,
       minute: 45,
       channel: 'psgmx_attendance',
     );
-    
-    debugPrint('[Notification] Attendance reminder scheduled for team: $teamId');
+
+    debugPrint(
+        '[Notification] Attendance reminder scheduled for team: $teamId');
   }
 
   /// Cancel attendance reminders
@@ -477,11 +542,13 @@ class NotificationService {
 
     final now = tz.TZDateTime.now(tz.local);
     final firstName = userName.split(' ').first;
-    
-    var birthdayDate = tz.TZDateTime(tz.local, now.year, dob.month, dob.day, 0, 0);
-    
+
+    var birthdayDate =
+        tz.TZDateTime(tz.local, now.year, dob.month, dob.day, 0, 0);
+
     if (birthdayDate.isBefore(now)) {
-      birthdayDate = tz.TZDateTime(tz.local, now.year + 1, dob.month, dob.day, 0, 0);
+      birthdayDate =
+          tz.TZDateTime(tz.local, now.year + 1, dob.month, dob.day, 0, 0);
     }
 
     try {
@@ -528,7 +595,8 @@ class NotificationService {
     String channel = 'psgmx_leetcode',
   }) async {
     final now = tz.TZDateTime.now(tz.local);
-    var scheduledDate = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
+    var scheduledDate =
+        tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
     if (scheduledDate.isBefore(now)) {
       scheduledDate = scheduledDate.add(const Duration(days: 1));
     }
@@ -541,7 +609,9 @@ class NotificationService {
       NotificationDetails(
         android: AndroidNotificationDetails(
           channel,
-          channel == 'psgmx_attendance' ? 'Attendance Reminders' : 'LeetCode Reminders',
+          channel == 'psgmx_attendance'
+              ? 'Attendance Reminders'
+              : 'LeetCode Reminders',
           importance: Importance.high,
           priority: Priority.high,
         ),
@@ -564,8 +634,9 @@ class NotificationService {
     while (date.weekday != day) {
       date = date.add(const Duration(days: 1));
     }
-    date = tz.TZDateTime(tz.local, date.year, date.month, date.day, hour, minute);
-    
+    date =
+        tz.TZDateTime(tz.local, date.year, date.month, date.day, hour, minute);
+
     if (date.isBefore(tz.TZDateTime.now(tz.local))) {
       date = date.add(const Duration(days: 7));
     }
@@ -590,10 +661,11 @@ class NotificationService {
 
   Future<bool> requestPermissions() async {
     if (await Permission.notification.isGranted) return true;
-    
+
     final status = await Permission.notification.request();
-    
-    final iosImpl = _notifications.resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
+
+    final iosImpl = _notifications.resolvePlatformSpecificImplementation<
+        IOSFlutterLocalNotificationsPlugin>();
     if (iosImpl != null) {
       final bool? result = await iosImpl.requestPermissions(
         alert: true,
@@ -602,7 +674,7 @@ class NotificationService {
       );
       return result ?? false;
     }
-    
+
     return status.isGranted;
   }
 
@@ -634,15 +706,16 @@ class NotificationService {
       ),
       icon: '@mipmap/ic_launcher',
     );
-    
+
     const iosDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
       badgeNumber: 1,
     );
-    
-    final details = NotificationDetails(android: androidDetails, iOS: iosDetails);
+
+    final details =
+        NotificationDetails(android: androidDetails, iOS: iosDetails);
     await _notifications.show(id, title, body, details, payload: payload);
   }
 
@@ -668,13 +741,147 @@ class NotificationService {
     await showNotification(
       id: DateTime.now().millisecondsSinceEpoch % 100000,
       title: '🎉 Welcome to PSGMX Notifications!',
-      body: 'Stay updated with announcements, reminders, and important updates!',
+      body:
+          'Stay updated with announcements, reminders, and important updates!',
       type: NotificationType.announcement,
     );
   }
 
   int getUnreadCount(List<AppNotification> notifications) {
     return notifications.where((n) => n.isRead != true).length;
+  }
+
+  // ========================================
+  // A2: RESPECT NOTIFICATION PREFERENCES
+  // ========================================
+
+  /// Check if a notification type should be sent based on user preferences
+  Future<bool> shouldSendNotification(String notificationType) async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return false;
+
+      final response = await _supabase.from('users').select('''
+            task_reminders_enabled,
+            attendance_alerts_enabled,
+            announcements_enabled,
+            leetcode_notifications_enabled,
+            birthday_notifications_enabled
+          ''').eq('id', user.id).maybeSingle();
+
+      if (response == null) return true; // Default to enabled
+
+      switch (notificationType) {
+        case 'task_reminder':
+          return response['task_reminders_enabled'] ?? true;
+        case 'attendance':
+          return response['attendance_alerts_enabled'] ?? true;
+        case 'announcement':
+          return response['announcements_enabled'] ?? true;
+        case 'leetcode':
+          return response['leetcode_notifications_enabled'] ?? true;
+        case 'birthday':
+          return response['birthday_notifications_enabled'] ?? true;
+        default:
+          return true;
+      }
+    } catch (e) {
+      debugPrint('[Notification] Error checking preferences: $e');
+      return true; // Default to enabled on error
+    }
+  }
+
+  // ========================================
+  // B2: TASK DEADLINE REMINDERS
+  // ========================================
+
+  /// Schedule task deadline reminder at 9 PM
+  Future<void> scheduleTaskDeadlineReminder() async {
+    try {
+      // Check if user has task reminders enabled
+      final shouldSend = await shouldSendNotification('task_reminder');
+      if (!shouldSend) {
+        debugPrint('[Notification] Task reminders disabled, skipping schedule');
+        return;
+      }
+
+      await _scheduleDaily(
+        id: 400, // Unique ID for task deadline
+        title: '📝 Daily Task Reminder',
+        body:
+            'Have you completed today\'s task? Don\'t forget to mark it as done!',
+        hour: 21, // 9 PM
+        minute: 0,
+        channel: 'psgmx_channel_main',
+      );
+
+      debugPrint('[Notification] Task deadline reminder scheduled for 9 PM');
+    } catch (e) {
+      debugPrint('[Notification] Error scheduling task reminder: $e');
+    }
+  }
+
+  /// Cancel task deadline reminder
+  Future<void> cancelTaskDeadlineReminder() async {
+    await _notifications.cancel(400);
+  }
+
+  /// Send immediate task reminder (called if task not completed)
+  Future<void> sendTaskIncompleteReminder() async {
+    try {
+      final shouldSend = await shouldSendNotification('task_reminder');
+      if (!shouldSend) return;
+
+      await showNotification(
+        id: 401,
+        title: '⏰ Task Still Pending',
+        body:
+            'You haven\'t marked today\'s task as completed yet. Take a moment to finish it!',
+        type: NotificationType.reminder,
+      );
+    } catch (e) {
+      debugPrint('[Notification] Error sending task reminder: $e');
+    }
+  }
+
+  /// Send announcement respecting user preference
+  Future<bool> sendAnnouncementWithPreference({
+    required String title,
+    required String message,
+    String targetAudience = 'all',
+    NotificationTone? tone,
+  }) async {
+    try {
+      final shouldSend = await shouldSendNotification('announcement');
+      if (!shouldSend) {
+        debugPrint('[Notification] User has announcements disabled');
+        // Still insert to database for in-app viewing
+        final user = _supabase.auth.currentUser;
+        if (user != null) {
+          await _supabase.from('notifications').insert({
+            'title': title,
+            'message': message,
+            'notification_type': 'announcement',
+            'tone': tone?.name ?? 'friendly',
+            'target_audience': targetAudience,
+            'created_by': user.id,
+            'is_active': true,
+          });
+        }
+        return true; // DB insertion succeeded
+      }
+
+      // Full send with push notification
+      return await sendAnnouncement(
+        title: title,
+        message: message,
+        targetAudience: targetAudience,
+        tone: tone,
+      );
+    } catch (e) {
+      debugPrint('[Notification] Error sending announcement: $e');
+      return false;
+    }
   }
 
   /// Cleanup subscriptions

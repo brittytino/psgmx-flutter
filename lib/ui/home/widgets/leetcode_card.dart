@@ -230,11 +230,11 @@ class _LeetCodeCardState extends State<LeetCodeCard>
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Row(
+                  content: const Row(
                     children: [
-                      const Icon(Icons.person, color: Colors.white),
-                      const SizedBox(width: 8),
-                      const Text('Go to Profile to add LeetCode username'),
+                      Icon(Icons.person, color: Colors.white),
+                      SizedBox(width: 8),
+                      Text('Go to Profile to add LeetCode username'),
                     ],
                   ),
                   backgroundColor: colorScheme.primary,
@@ -389,10 +389,10 @@ class _LeetCodeCardState extends State<LeetCodeCard>
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.leaderboard_rounded,
                           size: 14,
-                          color: const Color(0xFFFFA116),
+                          color: Color(0xFFFFA116),
                         ),
                         const SizedBox(width: 4),
                         Text(
