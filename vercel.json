@@ -1,6 +1,4 @@
 {
-  "buildCommand": "bash build.sh",
-  "outputDirectory": "build/web",
   "rewrites": [
     {
       "source": "/(.*)",
@@ -36,7 +34,7 @@
       ]
     },
     {
-      "source": "/(.*)",
+      "source": "/",
       "headers": [
         {
           "key": "Cache-Control",
