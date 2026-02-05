@@ -37,6 +37,9 @@ android/local.properties
 android/key.properties
 android/*.jks
 android/*.keystore
+android/keystore.base64.txt
+android/app/*.jks
+android/app/*.keystore
 
 
 # iOS
