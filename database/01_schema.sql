@@ -104,6 +104,7 @@ CREATE INDEX IF NOT EXISTS idx_daily_tasks_topic_type ON daily_tasks(topic_type)
 CREATE TABLE IF NOT EXISTS scheduled_attendance_dates (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     date DATE NOT NULL UNIQUE,
+    is_working_day BOOLEAN NOT NULL DEFAULT TRUE,
     scheduled_by UUID REFERENCES users(id),
     notes TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

@@ -26,7 +26,7 @@ class AnnouncementProvider extends ChangeNotifier {
     }
 
     _isLoading = true;
-    notifyListeners();
+    _safeNotifyListeners();
 
     try {
       final response = await _supabaseService.client
@@ -46,7 +46,7 @@ class AnnouncementProvider extends ChangeNotifier {
       debugPrint('Error fetching announcements: $e');
     } finally {
       _isLoading = false;
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
 
@@ -119,5 +119,14 @@ class AnnouncementProvider extends ChangeNotifier {
     } catch (e) {
       return false;
     }
+  }
+
+  /// Safely notify listeners (prevents setState during build)
+  void _safeNotifyListeners() {
+    // Use addPostFrameCallback to ensure we're not in the build phase
+    WidgetsFlutterBinding.ensureInitialized();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      notifyListeners();
+    });
   }
 }

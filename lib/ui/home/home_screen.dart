@@ -35,9 +35,9 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _refreshAll();
-
+    
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshAll();
       NotificationService().init(); // Ensure notification init
       NotificationService().requestPermissions();
       _checkAttendancePopup();

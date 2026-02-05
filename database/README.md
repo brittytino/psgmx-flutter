@@ -1,217 +1,155 @@
-# 📚 PSG MX Placement App - Database Setup
+# 🗄️ Database Setup Guide
 
-This folder contains all SQL scripts needed to set up the database in **Supabase**.
+Complete PostgreSQL/Supabase database schema for PSGMX Placement Prep App.
 
-## 🚀 Quick Start
+## 📋 Quick Start
 
-Run these scripts **in order** in the Supabase SQL Editor:
+Run these SQL files in order in your Supabase SQL Editor:
 
-| # | File | Description | Time |
-|---|------|-------------|------|
-| 1 | `01_schema.sql` | Creates all tables and indexes | ~5s |
-| 2 | `02_data.sql` | Inserts all 123 students | ~10s |
-| 3 | `03_functions.sql` | Creates helper functions & views | ~3s |
-| 4 | `04_rls_policies.sql` | Sets up access control (RLS) | ~5s |
-| 5 | `05_sample_data.sql` | *(Optional)* Sample attendance data | ~5s |
+1. **01_schema.sql** - Creates all tables, indexes, and extensions
+2. **02_data.sql** - Inserts 123 students into whitelist
+3. **03_functions.sql** - Creates database functions and triggers
+4. **04_rls_policies.sql** - Sets up Row Level Security
+5. **05_sample_data.sql** - (Optional) Adds sample announcements and attendance
+6. **09_app_config.sql** - App version control configuration
+7. **migrations/** - Run any migration scripts if updating existing database
 
-**Total setup time: ~30 seconds**
+## 📁 File Structure
 
----
+```
+database/
+├── README.md                    # This file
+├── 01_schema.sql               # Database tables and structure
+├── 02_data.sql                 # Student data (123 students)
+├── 03_functions.sql            # Database functions and triggers
+├── 04_rls_policies.sql         # Security policies
+├── 05_sample_data.sql          # Sample data for testing
+├── 09_app_config.sql           # App update configuration
+└── migrations/                 # Database migrations
+    └── add_is_working_day.sql  # Adds is_working_day column
+```
 
-## 📋 What Each Script Does
+## 🔧 Setup Instructions
 
-### 01_schema.sql
-Creates all database tables:
-- `users` - All user accounts (students, team leaders, coordinators, placement rep)
-- `whitelist` - Master list of 123 allowed students
-- `leetcode_stats` - LeetCode leaderboard data
-- `daily_tasks` - Daily LeetCode and Core subject tasks
-- `scheduled_attendance_dates` - Dates when classes are scheduled
-- `attendance_records` - Individual attendance records
-- `audit_logs` - Tracks important actions
-- `notifications` - App notifications
-- `notification_reads` - Track read notifications
+### 1. Create a Supabase Project
+- Go to [supabase.com](https://supabase.com)
+- Create a new project
+- Note down your project URL and anon key
 
-### 02_data.sql
-Inserts student data:
-- 123 students into whitelist table
-- Syncs data to users table
-- Populates LeetCode usernames
-
-### 03_functions.sql
-Creates helper functions:
-- `has_role()` - Check if user has a role
-- `is_placement_rep()` - Check if user is placement rep
-- `is_team_leader()` - Check if user is team leader
-- `is_date_scheduled()` - Check if date is a class day
-- `get_team_attendance_for_date()` - Get attendance for a team
-
-Creates views:
-- `student_attendance_summary` - Attendance stats per student
-- `team_attendance_summary` - Attendance stats per team
-
-### 04_rls_policies.sql
-Sets up Row Level Security (access control):
-
-| Feature | Student | Team Leader | Placement Rep |
-|---------|:-------:|:-----------:|:-------------:|
-| View own attendance | ✅ | ✅ | ✅ |
-| View team attendance | ❌ | ✅ | ✅ |
-| View ALL attendance | ❌ | ❌ | ✅ |
-| Mark team attendance | ❌ | ✅ | ✅ |
-| Mark ANY attendance | ❌ | ❌ | ✅ |
-| Edit ANY attendance | ❌ | ❌ | ✅ |
-| Delete attendance | ❌ | ❌ | ✅ |
-
-### 05_sample_data.sql
-*(Optional)* Creates sample data:
-- Scheduled class dates
-- Marks all students PRESENT for today
-- Utility queries for common operations
-
----
-
-## 🔧 Common Operations
-
-### Mark Attendance for Today
+### 2. Run Database Scripts
 ```sql
-INSERT INTO attendance_records (user_id, date, team_id, status, marked_by)
-SELECT 
-    u.id, CURRENT_DATE, u.team_id, 'PRESENT',
-    (SELECT id FROM users WHERE roles->>'isPlacementRep' = 'true' LIMIT 1)
-FROM users u
-WHERE u.roles->>'isStudent' = 'true'
-ON CONFLICT (user_id, date) DO UPDATE SET status = 'PRESENT';
+-- In Supabase SQL Editor, run each file in order:
+-- 1. Copy contents of 01_schema.sql → Execute
+-- 2. Copy contents of 02_data.sql → Execute
+-- 3. Copy contents of 03_functions.sql → Execute
+-- 4. Copy contents of 04_rls_policies.sql → Execute
+-- 5. Copy contents of 05_sample_data.sql → Execute (optional)
+-- 6. Copy contents of 09_app_config.sql → Execute
 ```
 
-### Mark Specific Students Absent
-```sql
-UPDATE attendance_records ar
-SET status = 'ABSENT'
-FROM users u
-WHERE ar.user_id = u.id
-  AND ar.date = CURRENT_DATE
-  AND u.email IN (
-      '25mx101@psgtech.ac.in',
-      '25mx102@psgtech.ac.in'
-  );
-```
+### 3. Enable Email Auth
+- Go to Authentication → Providers
+- Enable Email provider
+- Configure email templates if needed
 
-### View Attendance Summary
-```sql
-SELECT name, reg_no, team_id, present_count, absent_count, attendance_percentage
-FROM student_attendance_summary
-ORDER BY attendance_percentage DESC;
-```
+### 4. Get API Keys
+- Go to Settings → API
+- Copy `Project URL` and `anon public` key
+- These will be used in your Flutter app
 
-### View Team Summary
-```sql
-SELECT team_id, total_members, avg_attendance_percentage
-FROM team_attendance_summary
-ORDER BY team_id;
-```
+## 🗂️ Database Tables
 
-### Find Long Absentees (3+ consecutive days)
-```sql
-SELECT u.name, u.reg_no, COUNT(*) as consecutive_absences
-FROM attendance_records ar
-JOIN users u ON ar.user_id = u.id
-WHERE ar.status = 'ABSENT'
-  AND ar.date >= CURRENT_DATE - INTERVAL '7 days'
-GROUP BY u.id, u.name, u.reg_no
-HAVING COUNT(*) >= 3
-ORDER BY consecutive_absences DESC;
-```
+### Core Tables
+- **users** - All user data (students, leaders, coordinators, reps)
+- **whitelist** - Approved email list (123 students)
+- **teams** - Team information (21 teams)
 
----
+### Attendance System
+- **scheduled_attendance_dates** - Class day schedules
+- **attendance_records** - Individual attendance records
 
-## 👥 User Roles
+### Communication
+- **announcements** - Placement announcements and updates
+- **notifications** - User notifications
 
-| Role | Description | Count |
-|------|-------------|-------|
-| `isStudent` | All students | 123 |
-| `isTeamLeader` | Team leaders (one per team) | 21 |
-| `isCoordinator` | Coordinators | 4 |
-| `isPlacementRep` | Placement Representative | 1 |
+### LeetCode Integration
+- **leetcode_stats** - Student LeetCode progress tracking
 
-**Placement Rep:** Tino Britty J (`25mx354@psgtech.ac.in`)
+### Audit
+- **audit_logs** - System activity tracking
 
----
+### Configuration
+- **app_config** - App version control and updates
 
-## 📊 Database Schema
+## 🔒 Security
 
-```
-┌─────────────────────┐     ┌─────────────────────┐
-│       users         │     │      whitelist      │
-├─────────────────────┤     ├─────────────────────┤
-│ id (PK, FK→auth)    │     │ email (PK)          │
-│ email               │←────│ name                │
-│ reg_no              │     │ reg_no              │
-│ name                │     │ batch               │
-│ team_id             │     │ team_id             │
-│ batch               │     │ roles               │
-│ roles (JSONB)       │     │ leetcode_username   │
-│ leetcode_username   │     └─────────────────────┘
-└─────────────────────┘
-         │
-         ▼
-┌─────────────────────┐     ┌─────────────────────┐
-│ attendance_records  │     │  leetcode_stats     │
-├─────────────────────┤     ├─────────────────────┤
-│ id (PK)             │     │ username (PK)       │
-│ user_id (FK→users)  │     │ total_solved        │
-│ date                │     │ easy_solved         │
-│ team_id             │     │ medium_solved       │
-│ status              │     │ hard_solved         │
-│ marked_by           │     │ ranking             │
-│ UNIQUE(user_id,date)│     └─────────────────────┘
-└─────────────────────┘
-```
+All tables have Row Level Security (RLS) enabled. Policies ensure:
+- Students can only see their own data
+- Team leaders can manage their team
+- Coordinators have broader access
+- Placement reps have full access
 
----
+## 🚀 Migrations
 
-## ❓ Troubleshooting
-
-### "Permission denied" error
-Make sure you ran `04_rls_policies.sql` and the user has the correct role.
-
-### "duplicate key" error
-The data already exists. Use `ON CONFLICT DO UPDATE` or delete existing data first.
-
-### Views not showing data
-Run `03_functions.sql` again to recreate the views after schema changes.
-
-### Attendance not saving
-Check that:
-1. `team_id` is included (NOT NULL constraint)
-2. `user_id` matches a user in the `users` table
-3. Date is valid
-
----
-
-## 🔄 Reset Database
-
-To completely reset and start fresh:
+When updating an existing database, run migration scripts:
 
 ```sql
--- Drop all tables (DANGEROUS!)
-DROP TABLE IF EXISTS notification_reads CASCADE;
-DROP TABLE IF EXISTS notifications CASCADE;
-DROP TABLE IF EXISTS audit_logs CASCADE;
-DROP TABLE IF EXISTS attendance_records CASCADE;
-DROP TABLE IF EXISTS scheduled_attendance_dates CASCADE;
-DROP TABLE IF EXISTS daily_tasks CASCADE;
-DROP TABLE IF EXISTS leetcode_stats CASCADE;
-DROP TABLE IF EXISTS whitelist CASCADE;
-DROP TABLE IF EXISTS users CASCADE;
-DROP TABLE IF EXISTS attendance_days CASCADE;
-DROP TABLE IF EXISTS attendance CASCADE;
-
--- Then run all scripts again in order
+-- Example: Adding new column
+-- Copy contents of migrations/add_is_working_day.sql → Execute
 ```
 
----
+## 📊 Sample Data
+
+File `05_sample_data.sql` includes:
+- Sample announcements
+- Sample attendance dates
+- Test data for development
+
+**Note**: Skip this file in production if you don't want sample data.
+
+## 🔍 Verification
+
+After setup, verify tables were created:
+
+```sql
+-- Check all tables exist
+SELECT table_name 
+FROM information_schema.tables 
+WHERE table_schema = 'public' 
+ORDER BY table_name;
+
+-- Check student count
+SELECT COUNT(*) FROM whitelist;  -- Should return 123
+
+-- Check RLS is enabled
+SELECT tablename, rowsecurity 
+FROM pg_tables 
+WHERE schemaname = 'public';
+```
+
+## 🆘 Troubleshooting
+
+### Issue: "relation does not exist"
+- Ensure you ran 01_schema.sql first
+- Check for any errors in the SQL execution
+
+### Issue: "permission denied"
+- Verify RLS policies in 04_rls_policies.sql were applied
+- Check user authentication is working
+
+### Issue: "column does not exist"
+- Run the migration scripts in migrations/ folder
+- Check schema is up to date
 
 ## 📞 Support
 
-For issues, contact the development team or check the Flutter app logs.
+For database issues:
+1. Check Supabase logs in Dashboard → Database → Logs
+2. Verify all SQL scripts executed without errors
+3. Review RLS policies if access issues occur
+
+## 🔄 Backup
+
+Always backup before making changes:
+- Supabase Dashboard → Database → Backups
+- Can restore to any point in time
