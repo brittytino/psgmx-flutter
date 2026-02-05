@@ -50,20 +50,25 @@ class AuthService {
         throw Exception('Email not authorized. Please contact administrator.');
       }
 
-      // 3. Send OTP Token (6-digit code for existing users)
-      // shouldCreateUser: false because all users pre-exist in auth.users
-      // This forces Supabase to send OTP token, not signup confirmation link
+      // 3. Send OTP Token
+      // Note: Users MUST exist in auth.users (created via SQL script with matching UUIDs)
       await _supabaseService.auth.signInWithOtp(
         email: email,
-        shouldCreateUser: false, // Users already exist - OTP only
+        shouldCreateUser: false, // Users pre-exist with matching UUIDs
       );
 
-      debugPrint('[AuthService] ✅ OTP (6-digit code) sent to $email');
-      debugPrint('[AuthService] User should receive OTP token in email');
+      debugPrint('[AuthService] ✅ OTP sent to $email');
       return true;
 
     } on AuthException catch (e) {
       debugPrint('[AuthService] Auth Error: ${e.message}');
+      
+      // If user doesn't exist, provide clear error
+      if (e.message.contains('Database error finding user') || 
+          e.message.contains('User not found')) {
+        throw 'User not found. Please contact administrator to add your account.';
+      }
+      
       if (e.message.contains('rate limit')) {
         throw 'Too many requests. Please wait a moment.';
       }
@@ -106,18 +111,10 @@ class AuthService {
 
       debugPrint('[AuthService] ✅ OTP verified successfully');
       debugPrint('[AuthService] User authenticated: ${user.email}');
+      debugPrint('[AuthService] User ID: ${user.id}');
 
-      // Ensure user profile exists (non-blocking)
-      // Database trigger should auto-create profile, this is just backup
-      try {
-        await _ensureUserProfile(user.id, email);
-        debugPrint('[AuthService] ✅ Profile verified/created');
-      } catch (e) {
-        // Silently handle - profile likely exists from trigger
-        debugPrint('[AuthService] Profile check completed: $e');
-        // Don't throw - auth is successful, profile exists
-      }
-
+      // Profile should already exist with matching UUID
+      // No need to create or check - UserProvider will fetch it
       debugPrint('[AuthService] ✅ Login complete for: $email');
 
     } on AuthException catch (e) {
@@ -152,7 +149,16 @@ class AuthService {
           .maybeSingle();
       
       if (existingProfileByEmail != null) {
-        debugPrint('[AuthService] ✅ Profile already exists (by email). Trigger created it.');
+        debugPrint('[AuthService] ✅ Profile already exists (by email). Updating id if needed.');
+
+        final existingId = existingProfileByEmail['id']?.toString();
+        if (existingId != null && existingId != userId) {
+          await _supabaseService.client
+              .from('users')
+              .update({'id': userId})
+              .eq('email', email);
+          debugPrint('[AuthService] ✅ Profile id updated to match auth user.');
+        }
         return;
       }
 

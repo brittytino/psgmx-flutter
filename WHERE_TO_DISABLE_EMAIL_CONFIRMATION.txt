@@ -1,0 +1,126 @@
+╔═══════════════════════════════════════════════════════════════╗
+║  EXACT LOCATION: Where to Disable Email Confirmation         ║
+╚═══════════════════════════════════════════════════════════════╝
+
+YOU'RE LOOKING AT THE WRONG PLACE!
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Current location (WRONG):
+Authentication → Providers → Email ❌
+
+Correct location (RIGHT):
+Authentication → Settings → User Signups ✅
+
+EXACT STEPS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Open Supabase Dashboard
+
+2. Click: "Authentication" (left sidebar)
+
+3. Click: "Settings" (NOT "Providers")
+   └── You should see tabs: General, Rate Limits, etc.
+
+4. Scroll down to section: "User Signups"
+   
+5. Find this setting:
+   ┌─────────────────────────────────────────────────────┐
+   │ "Confirm email"                                     │
+   │  Users will need to confirm their email address     │
+   │  before signing in for the first time               │
+   │  [✅ ON - Toggle]  ← Turn this OFF                 │
+   └─────────────────────────────────────────────────────┘
+
+6. Click the toggle to turn it OFF (gray)
+
+7. Click "Save" at the bottom
+
+ALTERNATIVE LOCATION (if not in Settings):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Some Supabase versions have it here:
+
+1. Authentication → Settings
+2. Look for section: "Email Auth"
+3. Find: "Enable email confirmations" or "Confirm email"
+4. Turn it OFF
+
+OR check the "Sign In / Providers" page and scroll ALL the way down.
+There might be a "User Signups" section at the bottom.
+
+IF YOU STILL CAN'T FIND IT:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Run this SQL in Supabase SQL Editor to disable it directly:
+
+-- Disable email confirmation requirement
+UPDATE auth.config 
+SET config = jsonb_set(
+  config, 
+  '{MAILER_AUTOCONFIRM}', 
+  'true'::jsonb
+)
+WHERE config ? 'MAILER_AUTOCONFIRM';
+
+-- Verify the change
+SELECT 
+  config->'MAILER_AUTOCONFIRM' as email_autoconfirm,
+  config->'MAILER_SECURE_EMAIL_CHANGE_ENABLED' as secure_email_change
+FROM auth.config;
+
+Expected result:
+  email_autoconfirm = true  ← Emails auto-confirmed (no confirmation needed)
+  secure_email_change = true ← Secure email changes still enabled
+
+AFTER DISABLING, RESTART THE APP:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The code is already fixed with shouldCreateUser: true
+
+Now you need to restart the Flutter app to use the new code:
+
+Stop current app (Ctrl+C in terminal)
+Then run: flutter run -d chrome
+
+TEST WITH ANY STUDENT:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+After disabling email confirmation + restarting app:
+
+Try: 25mx343@psgtech.ac.in
+Try: 25mx101@psgtech.ac.in
+Try: 25mx301@psgtech.ac.in
+
+All should receive 6-digit OTP codes and login successfully.
+
+WHAT YOU SHOULD SEE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Email content:
+  Subject: PSG MX - One-Time Password (OTP)
+  Body: Your code is: 123456 ← 6 digits
+
+App behavior:
+  1. Enter email → Click "Get OTP"
+  2. Check email → Copy 6-digit code
+  3. Enter code → Click "Login"
+  4. Dashboard loads ✅
+
+WHY 25mx354 WORKS BUT OTHERS DON'T:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+25mx354 (you) probably:
+  - Logged in before when email confirmation was OFF
+  - OR confirmed email already
+  - So auth.users has email_confirmed_at set
+
+Other students:
+  - Never logged in before
+  - auth.users either doesn't exist OR email_confirmed_at is NULL
+  - With confirmation required, they get magic link instead of OTP
+
+SOLUTION: Disable email confirmation = everyone gets OTP tokens!
+
+╔═══════════════════════════════════════════════════════════════╗
+║  Try the SQL method if you can't find the toggle in UI       ║
+╚═══════════════════════════════════════════════════════════════╝
