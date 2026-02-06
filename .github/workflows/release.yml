@@ -52,20 +52,21 @@ jobs:
           flutter precache --android
 
       - name: Setup Keystore
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 -d > android/app/upload-keystore.jks
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
+          chmod 600 android/app/upload-keystore.jks
 
           cat > android/key.properties <<EOF
-          storePassword=${KEYSTORE_PASSWORD}
-          keyPassword=${KEY_PASSWORD}
-          keyAlias=${KEY_ALIAS}
+          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
           storeFile=app/upload-keystore.jks
           EOF
+
+      - name: Verify keystore
+        run: |
+          keytool -list -keystore android/app/upload-keystore.jks \
+            -storepass ${{ secrets.KEYSTORE_PASSWORD }}
 
       - name: Build Signed APK
         timeout-minutes: 60
