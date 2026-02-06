@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -14,7 +15,7 @@ import '../models/notification.dart';
 /// - Birthday notifications for all users
 /// - Attendance reminders for team leaders
 /// - Daily LeetCode reminders
-class NotificationService {
+class NotificationService extends ChangeNotifier {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
   NotificationService._internal();
@@ -28,11 +29,25 @@ class NotificationService {
 
   // Cached notifications from database
   List<AppNotification> _cachedNotifications = [];
+  
+  // Stream for new notifications (for in-app toasts)
+  final _streamController = StreamController<AppNotification>.broadcast();
+  Stream<AppNotification> get notificationStream => _streamController.stream;
 
   SupabaseClient get _supabase => Supabase.instance.client;
 
   Future<void> init() async {
     if (_isInitialized) return;
+
+    // Listen to auth state changes to setup/teardown subscription
+    _supabase.auth.onAuthStateChange.listen((data) {
+      if (data.session != null) {
+        _setupRealtimeSubscription();
+      } else {
+        _notificationChannel?.unsubscribe();
+        _notificationChannel = null;
+      }
+    });
 
     // Skip native notification setup on web
     if (kIsWeb) {
@@ -147,6 +162,12 @@ class NotificationService {
 
       // Add to cache
       _cachedNotifications.insert(0, notification);
+      
+      // Notify listeners for UI updates
+      notifyListeners();
+      
+      // Add to stream for toasts
+      _streamController.add(notification);
 
       // Show push notification
       await _showPushNotification(notification);
@@ -276,6 +297,7 @@ class NotificationService {
           isRead: true,
           readAt: DateTime.now(),
         );
+        notifyListeners();
       }
     } catch (e) {
       debugPrint('[Notification] Error marking as read: $e');
@@ -308,6 +330,7 @@ class NotificationService {
           readAt: DateTime.now(),
         );
       }
+      notifyListeners();
     } catch (e) {
       debugPrint('[Notification] Error marking all as read: $e');
     }

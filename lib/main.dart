@@ -34,6 +34,7 @@ import 'services/update_service.dart';
 
 import 'ui/widgets/error_boundary.dart';
 import 'ui/widgets/modern_offline_banner.dart';
+import 'ui/widgets/notification_listener_wrapper.dart';
 import 'ui/update/update_gate.dart';
 import 'core/theme/app_theme.dart';
 
@@ -54,18 +55,13 @@ void main() async {
     );
     debugPrint('[APP] Supabase initialized successfully');
 
-    // Skip notification services on web
-    if (!kIsWeb) {
-      debugPrint('[APP] Initializing NotificationService...');
-      await NotificationService().init();
-      debugPrint('[APP] NotificationService initialized successfully');
+    debugPrint('[APP] Initializing NotificationService...');
+    await NotificationService().init();
+    debugPrint('[APP] NotificationService initialized successfully');
 
-      debugPrint('[APP] Initializing BirthdayNotificationService...');
-      await BirthdayNotificationService().init();
-      debugPrint('[APP] BirthdayNotificationService initialized successfully');
-    } else {
-      debugPrint('[APP] Web platform detected - skipping notification services');
-    }
+    debugPrint('[APP] Initializing BirthdayNotificationService...');
+    await BirthdayNotificationService().init();
+    debugPrint('[APP] BirthdayNotificationService initialized successfully');
 
     debugPrint('[APP] Initializing UpdateService...');
     await UpdateService().initialize();
@@ -95,7 +91,7 @@ class PsgMxApp extends StatelessWidget {
         Provider<SupabaseDbService>.value(value: supabaseDbService),
         Provider<AuthService>.value(value: authService),
         Provider<QuoteService>.value(value: quoteService),
-        Provider<NotificationService>.value(value: NotificationService()),
+        ChangeNotifierProvider<NotificationService>.value(value: NotificationService()),
         ChangeNotifierProvider<UpdateService>.value(value: UpdateService()),
         ChangeNotifierProvider(
           create: (_) => UserProvider(authService: authService),
@@ -174,9 +170,12 @@ class _PsgMxAppInnerState extends State<PsgMxAppInner> {
       routerConfig: _router,
       builder: (context, child) {
         // Wrap with UpdateGate to enforce version checks
+        // Then NotificationListenerWrapper for in-app notifications
         // Then ModernOfflineBanner for connectivity status
         return UpdateGate(
-          child: ModernOfflineBanner(child: child ?? const SizedBox()),
+          child: NotificationListenerWrapper(
+            child: ModernOfflineBanner(child: child ?? const SizedBox())
+          ),
         );
       },
     );

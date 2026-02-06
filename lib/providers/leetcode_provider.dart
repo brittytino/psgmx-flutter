@@ -291,6 +291,10 @@ class LeetCodeProvider extends ChangeNotifier {
     
     int successCount = 0;
     int failCount = 0;
+    int consecutiveFailures = 0;
+    
+    // Dynamic delay base
+    int currentDelayMs = kIsWeb ? 2500 : 2000; // Slower on web to avoid 429s
     
     for (var i = 0; i < usernames.length; i++) {
       final username = usernames[i];
@@ -299,20 +303,38 @@ class LeetCodeProvider extends ChangeNotifier {
         _loadingMessage = 'Fetching ${i + 1}/${usernames.length} users...';
         notifyListeners();
         
-        await Future.delayed(const Duration(milliseconds: 800)); // Rate limiting (slightly longer)
-        final stats = await _fetchFromLeetCodeApi(username); // This saves to DB internally
+        // Rate limiting with dynamic backoff
+        await Future.delayed(Duration(milliseconds: currentDelayMs));
+        
+        final stats = await _fetchFromLeetCodeApi(username); 
+        
         if (stats != null) {
           _statsCache[username] = stats;
           successCount++;
+          consecutiveFailures = 0;
           
-          // Notify UI every 10 users for progressive loading
-          if (successCount % 10 == 0) {
-            debugPrint('[LeetCode] 📊 Progress: $successCount/${usernames.length} users synced');
+          // Reset delay on success (gradually)
+          if (currentDelayMs > 2000) {
+            currentDelayMs -= 100;
+          }
+          
+          // Notify UI every 5 users for progressive loading
+          if (successCount % 5 == 0) {
+            debugPrint('[LeetCode] 📊 Progress: $successCount synced');
             await fetchAllUsers();
           }
         } else {
           failCount++;
+          consecutiveFailures++;
           debugPrint('[LeetCode] ⚠️  Failed to fetch: $username');
+          
+          // Exponential backoff if failing repeatedly (likely rate limit)
+          if (consecutiveFailures >= 3) {
+            currentDelayMs = (currentDelayMs * 1.5).toInt();
+            // Cap at 10 seconds
+            if (currentDelayMs > 10000) currentDelayMs = 10000;
+            debugPrint('[LeetCode] ⏳ Increasing delay to ${currentDelayMs}ms due to failures');
+          }
         }
       } catch (e) {
         debugPrint('[LeetCode] ❌ Error fetching $username: $e');
@@ -349,6 +371,11 @@ class LeetCodeProvider extends ChangeNotifier {
 
 
   Future<LeetCodeStats?> _fetchFromLeetCodeApi(String username) async {
+    // On Web, skip official API because of CORS
+    if (kIsWeb) {
+      return await _fetchFromAlphaApi(username);
+    }
+
     // Try official LeetCode GraphQL API first
     final stats = await _fetchFromOfficialApi(username);
     if (stats != null) return stats;
@@ -562,6 +589,11 @@ class LeetCodeProvider extends ChangeNotifier {
         // Save to database
         await _saveToDatabase(stats);
         return stats;
+      } else if (response.statusCode == 429) {
+        debugPrint('[LeetCode] ⏳ Alpha API Rate Limit 429 for $username');
+        // If specific 429, we should propagate this signal ideally, but returning null 
+        // with the error log allows the background loop to catch failures and backoff.
+        return null;
       } else {
         debugPrint('[LeetCode] ❌ Alpha API returned ${response.statusCode}');
         return null;

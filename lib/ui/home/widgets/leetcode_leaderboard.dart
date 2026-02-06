@@ -41,8 +41,11 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
   }
 
   Future<void> _initializeLeaderboard() async {
-    final provider = context.read<LeetCodeProvider>();
-    await provider.loadAllUsersFromDatabase();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final provider = context.read<LeetCodeProvider>();
+      await provider.loadAllUsersFromDatabase();
+    });
   }
 
   Future<void> _refreshLeaderboard() async {
