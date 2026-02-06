@@ -22,6 +22,7 @@ import 'providers/user_provider.dart';
 import 'providers/leetcode_provider.dart';
 import 'providers/announcement_provider.dart';
 import 'providers/attendance_provider.dart';
+import 'providers/navigation_provider.dart';
 import 'providers/theme_provider.dart';
 import 'services/auth_service.dart';
 import 'services/supabase_service.dart';
@@ -93,6 +94,7 @@ class PsgMxApp extends StatelessWidget {
         Provider<QuoteService>.value(value: quoteService),
         ChangeNotifierProvider<NotificationService>.value(value: NotificationService()),
         ChangeNotifierProvider<UpdateService>.value(value: UpdateService()),
+        ChangeNotifierProvider(create: (_) => NavigationProvider()),
         ChangeNotifierProvider(
           create: (_) => UserProvider(authService: authService),
         ),

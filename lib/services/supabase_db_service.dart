@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/app_user.dart';
 
@@ -225,20 +226,18 @@ class SupabaseDbService {
   Future<Map<String, dynamic>> getPlacementStats() async {
     try {
       // 1. Total Students from USERS table (all 123 students now in users)
-      final usersResponse = await _supabase
+      final totalStudents = await _supabase
           .from('users')
-          .select()
+          .count(CountOption.exact)
           .eq('roles->>isStudent', 'true');
-      final totalStudents = (usersResponse as List).length;
 
       // 2. Count today's attendance
       final today = DateTime.now().toIso8601String().split('T')[0];
-      final attendanceResponse = await _supabase
+      final todayPresent = await _supabase
           .from('attendance_records')
-          .select()
+          .count(CountOption.exact)
           .eq('date', today)
           .eq('status', 'PRESENT');
-      final todayPresent = (attendanceResponse as List).length;
 
       return {
         'total_students': totalStudents,

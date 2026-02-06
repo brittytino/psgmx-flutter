@@ -738,20 +738,34 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
   }
 
   Widget _buildUserGrid(List<LeetCodeStats> users, int startRank, bool isDark) {
-    return GridView.builder(
-      physics: const NeverScrollableScrollPhysics(),
-      shrinkWrap: true,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 0.78,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-      ),
-      itemCount: users.length,
-      itemBuilder: (ctx, idx) {
-        final user = users[idx];
-        final rank = startRank + idx;
-        return _buildModernUserCard(user, rank, isDark);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        int crossAxisCount = 2;
+        if (width > 900) {
+          crossAxisCount = 5;
+        } else if (width > 600) {
+          crossAxisCount = 4;
+        } else if (width > 400) {
+          crossAxisCount = 3;
+        }
+
+        return GridView.builder(
+          physics: const NeverScrollableScrollPhysics(),
+          shrinkWrap: true,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            childAspectRatio: 0.75,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+          ),
+          itemCount: users.length,
+          itemBuilder: (ctx, idx) {
+            final user = users[idx];
+            final rank = startRank + idx;
+            return _buildModernUserCard(user, rank, isDark);
+          },
+        );
       },
     );
   }

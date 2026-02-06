@@ -448,73 +448,41 @@ class HelpSupportScreen extends StatelessWidget {
   }
 
   Widget _buildContactSection(BuildContext context, bool isDark) {
-    return PremiumCard(
-      child: Column(
-        children: [
-          ListTile(
-            leading: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.blue.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _ContactCard(
+                icon: Icons.email_rounded,
+                color: Colors.blue,
+                title: 'Email',
+                subtitle: 'Official Support',
+                onTap: () => _launchEmail(context),
               ),
-              child: const Icon(Icons.email, color: Colors.blue),
             ),
-            title: Text(
-              'Email Support',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-            ),
-            subtitle: Text(
-              'placement.psgmx@gmail.com',
-              style: GoogleFonts.inter(fontSize: 12, color: Colors.grey[600]),
-            ),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-            onTap: () => _launchEmail(context),
-          ),
-          Divider(height: 1, color: isDark ? Colors.grey[800] : Colors.grey[200]),
-          ListTile(
-            leading: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.green.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _ContactCard(
+                icon: Icons.chat_bubble_rounded,
+                color: Colors.green,
+                title: 'WhatsApp',
+                subtitle: 'Class Group',
+                onTap: () => _showWhatsAppInfo(context),
               ),
-              child: const Icon(Icons.chat, color: Colors.green),
             ),
-            title: Text(
-              'WhatsApp Group',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-            ),
-            subtitle: Text(
-              'Join class group for quick help',
-              style: GoogleFonts.inter(fontSize: 12, color: Colors.grey[600]),
-            ),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-            onTap: () => _showWhatsAppInfo(context),
-          ),
-          Divider(height: 1, color: isDark ? Colors.grey[800] : Colors.grey[200]),
-          ListTile(
-            leading: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.purple.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.person, color: Colors.purple),
-            ),
-            title: Text(
-              'Contact Placement Rep',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-            ),
-            subtitle: Text(
-              'For urgent issues and queries',
-              style: GoogleFonts.inter(fontSize: 12, color: Colors.grey[600]),
-            ),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-            onTap: () => _showPlacementRepContact(context),
-          ),
-        ],
-      ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        _ContactCard(
+          icon: Icons.support_agent_rounded,
+          color: Colors.purple,
+          title: 'Contact Placement Rep',
+          subtitle: 'For urgent issues & corrections',
+          isFullWidth: true,
+          onTap: () => _showPlacementRepSheet(context),
+        ),
+      ],
     );
   }
 
@@ -603,6 +571,24 @@ class HelpSupportScreen extends StatelessWidget {
     );
   }
 
+  Future<void> _launchGitHubIssue(BuildContext context, {bool isBug = true}) async {
+    final String title = isBug ? 'Bug Report' : 'Feature Request';
+    final String label = isBug ? 'bug' : 'enhancement';
+    final Uri url = Uri.parse(
+      'https://github.com/brittytino/psgmx-flutter/issues/new?labels=$label&title=$title',
+    );
+
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } else {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open GitHub')),
+        );
+      }
+    }
+  }
+
   Future<void> _launchEmail(BuildContext context) async {
     final Uri emailUri = Uri(
       scheme: 'mailto',
@@ -666,9 +652,9 @@ class HelpSupportScreen extends StatelessWidget {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
-              _launchEmail(context);
+              _launchGitHubIssue(context, isBug: true);
             },
-            child: const Text('Send Report'),
+            child: const Text('Open GitHub Issue'),
           ),
         ],
       ),
@@ -696,7 +682,7 @@ class HelpSupportScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'We\'d love to hear your suggestions! Share your ideas with us via email.',
+              'We\'d love to hear your suggestions! Open a feature request on our GitHub repo.',
               style: GoogleFonts.inter(fontSize: 13, height: 1.5),
             ),
           ],
@@ -709,7 +695,7 @@ class HelpSupportScreen extends StatelessWidget {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
-              _launchEmail(context);
+              _launchGitHubIssue(context, isBug: false);
             },
             child: const Text('Share Idea'),
           ),
@@ -747,34 +733,7 @@ class HelpSupportScreen extends StatelessWidget {
     );
   }
 
-  void _showPlacementRepContact(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            const Icon(Icons.person, color: Colors.purple),
-            const SizedBox(width: 10),
-            Text('Placement Representative', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: Text(
-          'For urgent matters that need immediate attention:\n\n'
-          '• Attendance corrections\n'
-          '• Access issues\n'
-          '• Data discrepancies\n\n'
-          'Contact your Placement Representative directly through the class WhatsApp group or in person.',
-          style: GoogleFonts.inter(fontSize: 14, height: 1.5),
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Understood'),
-          ),
-        ],
-      ),
-    );
-  }
+
 
   void _showPrivacyPolicy(BuildContext context) {
     showDialog(
@@ -858,6 +817,217 @@ class HelpSupportScreen extends StatelessWidget {
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPlacementRepSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        builder: (_, controller) => Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: ListView(
+            controller: controller,
+            padding: const EdgeInsets.all(24),
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 24),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.purple.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.support_agent_rounded, size: 32, color: Colors.purple),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Placement Representative',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Contact for urgent matters only',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(color: Colors.grey),
+              ),
+              const SizedBox(height: 24),
+              const _RepActionItem(
+                icon: Icons.person_search_rounded,
+                text: 'Find Rep in Class',
+                description: 'Approach them directly during college hours',
+              ),
+              const SizedBox(height: 16),
+              const _RepActionItem(
+                icon: Icons.chat_outlined,
+                text: 'Message in Group',
+                description: 'Tag them in the official WhatsApp group for queries',
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.all(16),
+                    backgroundColor: Colors.purple,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Close'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ContactCard extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final bool isFullWidth;
+
+  const _ContactCard({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.isFullWidth = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return PremiumCard(
+      onTap: onTap,
+      padding: const EdgeInsets.all(16),
+      child: isFullWidth
+          ? Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: color, size: 24),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 15),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: GoogleFonts.inter(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+              ],
+            )
+          : Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: color, size: 24),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  title,
+                  style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 14),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(fontSize: 11, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+class _RepActionItem extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final String description;
+
+  const _RepActionItem({
+    required this.icon,
+    required this.text,
+    required this.description,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.purple, size: 24),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  text,
+                  style: GoogleFonts.poppins(fontWeight: FontWeight.w600, fontSize: 15),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  description,
+                  style: GoogleFonts.inter(fontSize: 12, color: Colors.grey[600]),
+                ),
+              ],
+            ),
           ),
         ],
       ),

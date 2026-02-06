@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/user_provider.dart';
+import '../providers/navigation_provider.dart';
 import '../core/utils/responsive_helper.dart';
 import 'home/home_screen.dart';
 import 'tasks/tasks_screen.dart';
@@ -16,11 +17,11 @@ class RootLayout extends StatefulWidget {
 }
 
 class _RootLayoutState extends State<RootLayout> {
-  int _currentIndex = 0;
 
   @override
   Widget build(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context);
+    final navProvider = Provider.of<NavigationProvider>(context);
     final user = userProvider.currentUser;
 
     if (user == null) {
@@ -71,8 +72,13 @@ class _RootLayoutState extends State<RootLayout> {
     ];
 
     // Safety check for index
-    if (_currentIndex >= screens.length) {
-      _currentIndex = 0;
+    var currentIndex = navProvider.currentIndex;
+    if (currentIndex >= screens.length) {
+      currentIndex = 0;
+      // Schedule a fix for the provider as well
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        navProvider.setIndex(0);
+      });
     }
 
     // Use NavigationRail for desktop/tablet web, BottomNavigationBar for mobile
@@ -84,8 +90,8 @@ class _RootLayoutState extends State<RootLayout> {
         body: Row(
           children: [
             NavigationRail(
-              selectedIndex: _currentIndex,
-              onDestinationSelected: (idx) => setState(() => _currentIndex = idx),
+              selectedIndex: currentIndex,
+              onDestinationSelected: (idx) => navProvider.setIndex(idx),
               labelType: NavigationRailLabelType.all,
               destinations: navItems.map((item) => NavigationRailDestination(
                 icon: item.icon,
@@ -94,7 +100,7 @@ class _RootLayoutState extends State<RootLayout> {
               )).toList(),
             ),
             const VerticalDivider(thickness: 1, width: 1),
-            Expanded(child: screens[_currentIndex]),
+            Expanded(child: screens[currentIndex]),
           ],
         ),
       );
@@ -102,10 +108,10 @@ class _RootLayoutState extends State<RootLayout> {
 
     // Mobile layout with bottom navigation
     return Scaffold(
-      body: screens[_currentIndex],
+      body: screens[currentIndex],
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (idx) => setState(() => _currentIndex = idx),
+        selectedIndex: currentIndex,
+        onDestinationSelected: (idx) => navProvider.setIndex(idx),
         destinations: navItems,
       ),
     );
