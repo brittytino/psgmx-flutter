@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/leetcode_provider.dart';
 import '../../providers/announcement_provider.dart';
+import '../../providers/navigation_provider.dart';
 import '../../services/supabase_db_service.dart';
 import '../../services/quote_service.dart';
 import '../../services/notification_service.dart';
@@ -666,7 +667,12 @@ class _StudentDashboardState extends State<_StudentDashboard> {
         const _TodayTaskStatus(),
         const SizedBox(height: AppSpacing.xl),
 
-        _SectionHeader(title: 'Your Progress', action: 'History', onTap: () {}),
+        _SectionHeader(
+            title: 'Your Progress',
+            action: 'History',
+            onTap: () {
+              context.read<NavigationProvider>().setIndex(2);
+            }),
         const SizedBox(height: AppSpacing.md),
 
         // A3 & A4: Real attendance stats
@@ -744,7 +750,7 @@ class _TodayTaskStatus extends StatelessWidget {
                 TextButton(
                   onPressed: () {
                     // Navigate to tasks screen
-                    Navigator.of(context).pushNamed('/tasks');
+                    context.read<NavigationProvider>().setIndex(1);
                   },
                   child: const Text('Go to Task'),
                 ),

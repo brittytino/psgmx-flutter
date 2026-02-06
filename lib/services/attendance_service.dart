@@ -252,7 +252,7 @@ class AttendanceService {
   // ATTENDANCE ANALYTICS
   // ========================================
 
-  Future<AttendanceSummary> getStudentAttendanceSummary({
+  Future<AttendanceSummary?> getStudentAttendanceSummary({
     required String studentId,
   }) async {
     try {
@@ -260,7 +260,11 @@ class AttendanceService {
           .from('student_attendance_summary')
           .select()
           .eq('student_id', studentId)
-          .single();
+          .maybeSingle();
+
+      if (response == null) {
+        return null;
+      }
 
       return AttendanceSummary.fromMap(response);
     } catch (e) {
