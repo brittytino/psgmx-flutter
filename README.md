@@ -1,14 +1,28 @@
 # 🎓 PSGMX - Placement Excellence Program
 
-> A comprehensive placement preparation platform for PSG Technology - MCA Batch (2025-2027)
+<div align="center">
 
-[![Flutter](https://img.shields.io/badge/Flutter-3.27+-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
-[![Supabase](https://img.shields.io/badge/Supabase-Production-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com)
-[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+  ![PSGMX Logo](assets/images/psgmx_logo.png)
+
+  > A comprehensive placement preparation platform for PSG Technology - MCA Batch (2025-2027)
+
+  [![Version](https://img.shields.io/badge/version-2.2.4-blue.svg)](pubspec.yaml)
+  [![Downloads](https://img.shields.io/github/downloads/brittytino/psgmx-flutter/total.svg)](https://github.com/brittytino/psgmx-flutter/releases)
+  [![Flutter](https://img.shields.io/badge/Flutter-3.27+-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
+  [![Supabase](https://img.shields.io/badge/Supabase-Production-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com)
+  [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+
+</div>
 
 ---
 
-## ✨ Features
+## 📖 About
+
+**PSGMX** is a closed-community platform designed to streamline the placement preparation process for MCA students at PSG College of Technology. It bridges the gap between students, team leaders, and placement coordinators by providing tools for attendance tracking, task monitoring, and real-time communication.
+
+---
+
+## ✨ Key Features
 
 ### 👨‍🎓 For Students
 - **📊 LeetCode Integration** - Track daily problem-solving progress
@@ -22,33 +36,37 @@
 - **✓ Task Verification** - Track team's LeetCode completion
 - **📊 Team Analytics** - View team performance metrics
 
-### 🎯 For Coordinators & Placement Reps
-- **📣 Broadcast System** - Send announcements to all students
-- **📈 Batch Statistics** - Complete batch performance overview
-- **🔐 Admin Controls** - Manage users and system configuration
+### 🎯 For Coordinators & Admins
+- **📣 Broadcast System** - Send broadcast announcements to the entire batch.
+- **🛡️ Audit Logging** - Track important actions and changes within the system for security.
+- **🔄 Version Control** - Force update mechanism to ensure everyone uses the latest critical version.
+- **📂 Data Management** - Support for bulk data handling (CSV/Excel) for managing student records.
+- **📈 Batch Statistics** - Comprehensive overview of the entire batch's progress.
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Getting Started
 
 ### Prerequisites
-- Flutter SDK 3.27 or higher
-- Dart 3.0 or higher
-- Supabase account
-- Git
+*   [Flutter SDK](https://flutter.dev/docs/get-started/install) (3.27+)
+*   [Dart SDK](https://dart.dev/get-dart) (3.0+)
+*   Supabase Account
+*   Git
 
-### 1. Clone Repository
+### Installation
+
+1.  **Clone the repository**
 ```bash
 git clone https://github.com/brittytino/psgmx-flutter.git
 cd psgmx-flutter
 ```
 
-### 2. Install Dependencies
+2.  **Install Dependencies**
 ```bash
 flutter pub get
 ```
 
-### 3. Setup Supabase Database
+3.  **Setup Supabase Database**
 1. Create a Supabase project at [supabase.com](https://supabase.com)
 2. Run database scripts in order (see [database/README.md](database/README.md)):
    - `01_schema.sql`
@@ -58,14 +76,14 @@ flutter pub get
    - `05_sample_data.sql`
    - `09_app_config.sql`
 
-### 4. Configure Environment
+4.  **Configure Environment**
 Create `.env` file in project root:
 ```env
 SUPABASE_URL=your_supabase_project_url
 SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
-### 5. Run the App
+5.  **Run the App**
 ```bash
 # Web
 flutter run -d chrome
@@ -166,11 +184,12 @@ lib/
 ├── providers/         # State management (Provider pattern)
 ├── services/          # API services (Supabase, LeetCode, etc.)
 └── ui/                # Screens and widgets
+    ├── admin/         # Admin controls & Batch management
     ├── auth/          # Authentication screens
     ├── home/          # Dashboard and home screen
+    ├── tasks/         # LeetCode & Daily tasks
     ├── attendance/    # Attendance tracking
     ├── leaderboard/   # LeetCode leaderboard
-    ├── profile/       # User profile
     └── widgets/       # Reusable widgets
 
 database/
@@ -185,11 +204,12 @@ database/
 
 ---
 
-## 🛠️ Tech Stack
+## 🛠️ Tech Stack & Architecture
 
 - **Frontend**: Flutter 3.27+ (Web, Android, iOS)
 - **Backend**: Supabase (PostgreSQL, Auth, Realtime)
 - **State Management**: Provider
+- **Routing**: GoRouter
 - **Architecture**: Feature-first with service layer
 - **Deployment**: Vercel (Web), GitHub Releases (APK)
 
