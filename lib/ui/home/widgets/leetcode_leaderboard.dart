@@ -744,36 +744,53 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
       builder: (context, constraints) {
         final width = constraints.maxWidth;
         int crossAxisCount = 2;
-        double childAspectRatio = 0.85; // Default for mobile
+        double childAspectRatio = 0.70; // Better default for mobile
+        double cardPadding = 12.0;
+        double cardSpacing = 12.0;
 
         if (width > 1200) {
+          // Large desktop
           crossAxisCount = 5;
-          childAspectRatio = 0.95;
-        } else if (width > 900) {
-          crossAxisCount = 4;
-          childAspectRatio = 0.9;
-        } else if (width > 600) {
-          crossAxisCount = 3;
-          childAspectRatio = 0.88;
-        } else if (width < 380) {
-          // Extra small phones
           childAspectRatio = 0.75;
+          cardSpacing = 16.0;
+        } else if (width > 900) {
+          // Desktop/Tablet landscape
+          crossAxisCount = 4;
+          childAspectRatio = 0.72;
+          cardSpacing = 14.0;
+        } else if (width > 600) {
+          // Tablet portrait
+          crossAxisCount = 3;
+          childAspectRatio = 0.72;
+          cardSpacing = 12.0;
+        } else if (width > 400) {
+          // Standard mobile
+          crossAxisCount = 2;
+          childAspectRatio = 0.70;
+          cardSpacing = 10.0;
+        } else {
+          // Small mobile
+          crossAxisCount = 2;
+          childAspectRatio = 0.68;
+          cardSpacing = 8.0;
+          cardPadding = 10.0;
         }
 
         return GridView.builder(
           physics: const NeverScrollableScrollPhysics(),
           shrinkWrap: true,
+          padding: EdgeInsets.all(cardPadding),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
             childAspectRatio: childAspectRatio,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
+            crossAxisSpacing: cardSpacing,
+            mainAxisSpacing: cardSpacing,
           ),
           itemCount: users.length,
           itemBuilder: (ctx, idx) {
             final user = users[idx];
             final rank = startRank + idx;
-            return _buildModernUserCard(user, rank, isDark);
+            return _buildModernUserCard(user, rank, isDark, width);
           },
         );
       },
@@ -851,7 +868,7 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
     );
   }
 
-  Widget _buildModernUserCard(LeetCodeStats user, int rank, bool isDark) {
+  Widget _buildModernUserCard(LeetCodeStats user, int rank, bool isDark, double screenWidth) {
     final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final borderColor = isDark ? const Color(0xFF2D2D2D) : Colors.grey.shade200;
     final textPrimary = isDark ? Colors.white : Colors.grey.shade900;
@@ -860,10 +877,34 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
     final isTopPerformer = rank <= 10;
     const accentColor = Color(0xFFFF6600);
 
+    // Responsive sizing based on screen width
+    double avatarSize = 56;
+    double nameFontSize = 13;
+    double usernameFontSize = 10;
+    double scoreFontSize = 18;
+    double rankFontSize = 12;
+    double cardPadding = 12;
+
+    if (screenWidth < 400) {
+      avatarSize = 50;
+      nameFontSize = 12;
+      usernameFontSize = 9;
+      scoreFontSize = 16;
+      rankFontSize = 11;
+      cardPadding = 10;
+    } else if (screenWidth > 900) {
+      avatarSize = 64;
+      nameFontSize = 14;
+      usernameFontSize = 11;
+      scoreFontSize = 20;
+      rankFontSize = 13;
+      cardPadding = 14;
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: cardBg,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color:
               isTopPerformer ? accentColor.withValues(alpha: 0.4) : borderColor,
@@ -878,7 +919,7 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(8),
+        padding: EdgeInsets.all(cardPadding),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -886,53 +927,57 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    gradient: isTopPerformer
-                        ? const LinearGradient(
-                            colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
-                          )
-                        : LinearGradient(
-                            colors: isDark
-                                ? [Colors.grey.shade700, Colors.grey.shade800]
-                                : [Colors.grey.shade300, Colors.grey.shade400],
-                          ),
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: isTopPerformer
-                        ? [
-                            BoxShadow(
-                              color: const Color(0xFFFFD700)
-                                  .withValues(alpha: 0.4),
-                              blurRadius: 6,
+                Flexible(
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      gradient: isTopPerformer
+                          ? const LinearGradient(
+                              colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
+                            )
+                          : LinearGradient(
+                              colors: isDark
+                                  ? [Colors.grey.shade700, Colors.grey.shade800]
+                                  : [Colors.grey.shade300, Colors.grey.shade400],
                             ),
-                          ]
-                        : null,
-                  ),
-                  child: Text(
-                    "#$rank",
-                    style: GoogleFonts.poppins(
-                      fontWeight: FontWeight.bold,
-                      color: isTopPerformer
-                          ? Colors.white
-                          : (isDark
-                              ? Colors.grey.shade300
-                              : Colors.grey.shade700),
-                      fontSize: 12,
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: isTopPerformer
+                          ? [
+                              BoxShadow(
+                                color: const Color(0xFFFFD700)
+                                    .withValues(alpha: 0.4),
+                                blurRadius: 6,
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: Text(
+                      "#$rank",
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.bold,
+                        color: isTopPerformer
+                            ? Colors.white
+                            : (isDark
+                                ? Colors.grey.shade300
+                                : Colors.grey.shade700),
+                        fontSize: rankFontSize,
+                      ),
                     ),
                   ),
                 ),
                 if (isTopPerformer)
-                  const Icon(Icons.star_rounded,
-                      color: Color(0xFFFFD700), size: 20),
+                  Icon(Icons.star_rounded,
+                      color: const Color(0xFFFFD700), size: rankFontSize + 8),
               ],
             ),
 
+            const SizedBox(height: 4),
+
             // Avatar
             Container(
-              width: 56,
-              height: 56,
+              width: avatarSize,
+              height: avatarSize,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
@@ -965,47 +1010,49 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
               ),
             ),
 
-            const SizedBox(height: 10),
+            const SizedBox(height: 6),
 
             // Name & Username
-            Column(
-              children: [
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
+            Flexible(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
                     user.name ?? user.username,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
                     style: GoogleFonts.poppins(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      fontSize: nameFontSize,
                       color: textPrimary,
+                      height: 1.2,
                     ),
                   ),
-                ),
-                if (user.name != null)
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      user.username,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(
-                        fontSize: 10,
-                        color: textSecondary,
+                  if (user.name != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        user.username,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.inter(
+                          fontSize: usernameFontSize,
+                          color: textSecondary,
+                          height: 1.2,
+                        ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
 
-            const SizedBox(height: 10),
+            const SizedBox(height: 6),
 
             // Score
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: accentColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
@@ -1015,45 +1062,43 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
                 ),
               ),
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      "${_isWeekly ? user.weeklyScore : user.totalSolved}",
-                      style: GoogleFonts.poppins(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                        color: accentColor,
-                        height: 1.0,
-                      ),
+                  Text(
+                    "${_isWeekly ? user.weeklyScore : user.totalSolved}",
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.bold,
+                      fontSize: scoreFontSize,
+                      color: accentColor,
+                      height: 1.0,
                     ),
                   ),
-                  const SizedBox(height: 1),
                   Text(
                     _isWeekly ? "Weekly" : "Total",
                     style: GoogleFonts.inter(
-                      fontSize: 9,
+                      fontSize: usernameFontSize - 1,
                       fontWeight: FontWeight.w600,
                       color: textSecondary,
+                      height: 1.0,
                     ),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 10),
+            const SizedBox(height: 6),
 
             // Difficulty Stats
             Row(
               children: [
                 _buildDifficultyChip(
-                    "E", user.easySolved, const Color(0xFF4CAF50), isDark),
-                const SizedBox(width: 6),
+                    "E", user.easySolved, const Color(0xFF4CAF50), isDark, screenWidth),
+                const SizedBox(width: 4),
                 _buildDifficultyChip(
-                    "M", user.mediumSolved, const Color(0xFFFF9800), isDark),
-                const SizedBox(width: 6),
+                    "M", user.mediumSolved, const Color(0xFFFF9800), isDark, screenWidth),
+                const SizedBox(width: 4),
                 _buildDifficultyChip(
-                    "H", user.hardSolved, const Color(0xFFF44336), isDark),
+                    "H", user.hardSolved, const Color(0xFFF44336), isDark, screenWidth),
               ],
             ),
           ],
@@ -1063,14 +1108,30 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
   }
 
   Widget _buildDifficultyChip(
-      String label, int value, Color color, bool isDark) {
+      String label, int value, Color color, bool isDark, double screenWidth) {
+    
+    // Responsive font sizes
+    double labelFontSize = 9;
+    double valueFontSize = 11;
+    double verticalPadding = 6;
+    
+    if (screenWidth < 400) {
+      labelFontSize = 8;
+      valueFontSize = 10;
+      verticalPadding = 5;
+    } else if (screenWidth > 900) {
+      labelFontSize = 10;
+      valueFontSize = 13;
+      verticalPadding = 7;
+    }
+    
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+        padding: EdgeInsets.symmetric(vertical: verticalPadding, horizontal: 4),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
+          color: color.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withValues(alpha: 0.4), width: 1),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1078,22 +1139,20 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
             Text(
               label,
               style: GoogleFonts.inter(
-                fontSize: 9,
+                fontSize: labelFontSize,
                 color: color,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w600,
+                height: 1.0,
               ),
             ),
             const SizedBox(height: 2),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                "$value",
-                style: GoogleFonts.poppins(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                  height: 1.0,
-                ),
+            Text(
+              "$value",
+              style: GoogleFonts.poppins(
+                fontSize: valueFontSize,
+                fontWeight: FontWeight.bold,
+                color: color,
+                height: 1.0,
               ),
             ),
           ],

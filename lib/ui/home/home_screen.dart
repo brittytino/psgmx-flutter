@@ -11,6 +11,7 @@ import '../../services/attendance_service.dart';
 import '../../services/task_completion_service.dart';
 import '../../services/attendance_streak_service.dart';
 import '../../services/performance_service.dart';
+import '../../services/github_service.dart';
 import '../../models/attendance_streak.dart';
 import '../../core/theme/app_dimens.dart';
 import '../widgets/premium_card.dart';
@@ -629,49 +630,73 @@ class _HomeScreenState extends State<HomeScreen> with UpdateCheckMixin {
   Widget _buildGitHubStarButton(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
-    return InkWell(
-      onTap: () => _launchGitHubRepo(context),
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: isDark 
-              ? [const Color(0xFF24292E), const Color(0xFF1E2226)]
-              : [const Color(0xFFEFF3F6), const Color(0xFFE6EBF1)],
-          ),
+    return FutureBuilder<GitHubRepoStats>(
+      future: GitHubService.fetchRepoStats(),
+      builder: (context, snapshot) {
+        final stats = snapshot.data;
+        
+        return InkWell(
+          onTap: () => _launchGitHubRepo(context),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.1),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.star_rounded, 
-              size: 16, 
-              color: isDark ? const Color(0xFFFFD700) : const Color(0xFFE3B341)
-            ),
-            const SizedBox(width: 4),
-            Text(
-              'Star on GitHub',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : Colors.black87,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: isDark 
+                  ? [const Color(0xFF24292E), const Color(0xFF1E2226)]
+                  : [const Color(0xFFEFF3F6), const Color(0xFFE6EBF1)],
               ),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.1),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Star icon and count
+                Icon(
+                  Icons.star_rounded, 
+                  size: 14, 
+                  color: isDark ? const Color(0xFFFFD700) : const Color(0xFFE3B341)
+                ),
+                const SizedBox(width: 3),
+                Text(
+                  stats?.formattedStars ?? '...',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Fork icon and count
+                Icon(
+                  Icons.call_split_rounded,
+                  size: 14,
+                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade700,
+                ),
+                const SizedBox(width: 3),
+                Text(
+                  stats?.formattedForks ?? '...',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -730,20 +755,55 @@ class _HomeScreenState extends State<HomeScreen> with UpdateCheckMixin {
   }
 }
 
-class _NotificationBell extends StatelessWidget {
+class _NotificationBell extends StatefulWidget {
   const _NotificationBell();
 
   @override
+  State<_NotificationBell> createState() => _NotificationBellState();
+}
+
+class _NotificationBellState extends State<_NotificationBell> {
+  int _unreadCount = 0;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotifications();
+  }
+
+  Future<void> _loadNotifications() async {
+    if (_isLoading) return;
+    
+    setState(() => _isLoading = true);
+    
+    try {
+      final notifService = context.read<NotificationService>();
+      final notifications = await notifService.getNotifications();
+      
+      if (mounted) {
+        setState(() {
+          _unreadCount = notifications.where((n) => n.isRead != true).length;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Consumer<NotificationService>(
-      builder: (context, notifService, _) => FutureBuilder<List<dynamic>>(
-        future: notifService.getNotifications(),
-        builder: (context, snapshot) {
-          final unreadCount =
-              snapshot.data?.where((n) => n.isRead != true).length ?? 0;
-          return NotificationBellIcon(unreadCount: unreadCount);
-        },
-      ),
+    return NotificationBellIcon(
+      unreadCount: _unreadCount,
+      onTap: () async {
+        Navigator.pushNamed(context, '/notifications');
+        // Refresh count after returning from notifications
+        await Future.delayed(const Duration(milliseconds: 500));
+        _loadNotifications();
+      },
     );
   }
 }
