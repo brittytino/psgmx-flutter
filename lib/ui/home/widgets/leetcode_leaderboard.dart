@@ -744,12 +744,20 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
       builder: (context, constraints) {
         final width = constraints.maxWidth;
         int crossAxisCount = 2;
+        double childAspectRatio = 0.85; // Default for mobile
+
         if (width > 1200) {
           crossAxisCount = 5;
+          childAspectRatio = 0.95;
         } else if (width > 900) {
           crossAxisCount = 4;
+          childAspectRatio = 0.9;
         } else if (width > 600) {
           crossAxisCount = 3;
+          childAspectRatio = 0.88;
+        } else if (width < 380) {
+          // Extra small phones
+          childAspectRatio = 0.75;
         }
 
         return GridView.builder(
@@ -757,9 +765,9 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
           shrinkWrap: true,
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
-            childAspectRatio: 0.82,
-            crossAxisSpacing: 14,
-            mainAxisSpacing: 14,
+            childAspectRatio: childAspectRatio,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
           ),
           itemCount: users.length,
           itemBuilder: (ctx, idx) {
@@ -962,26 +970,32 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
             // Name & Username
             Column(
               children: [
-                Text(
-                  user.name ?? user.username,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.poppins(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13.5,
-                    color: textPrimary,
-                  ),
-                ),
-                if (user.name != null)
-                  Text(
-                    user.username,
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    user.name ?? user.username,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
-                    style: GoogleFonts.inter(
-                      fontSize: 10.5,
-                      color: textSecondary,
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: textPrimary,
+                    ),
+                  ),
+                ),
+                if (user.name != null)
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      user.username,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        color: textSecondary,
+                      ),
                     ),
                   ),
               ],
@@ -991,31 +1005,34 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
 
             // Score
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: accentColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: accentColor.withValues(alpha: 0.3),
-                  width: 1.5,
+                  color: accentColor.withValues(alpha: 0.2),
+                  width: 1,
                 ),
               ),
               child: Column(
                 children: [
-                  Text(
-                    "${_isWeekly ? user.weeklyScore : user.totalSolved}",
-                    style: GoogleFonts.poppins(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 22,
-                      color: accentColor,
-                      height: 1.0,
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      "${_isWeekly ? user.weeklyScore : user.totalSolved}",
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                        color: accentColor,
+                        height: 1.0,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 1),
                   Text(
                     _isWeekly ? "Weekly" : "Total",
                     style: GoogleFonts.inter(
-                      fontSize: 10,
+                      fontSize: 9,
                       fontWeight: FontWeight.w600,
                       color: textSecondary,
                     ),
@@ -1049,11 +1066,11 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
       String label, int value, Color color, bool isDark) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withValues(alpha: 0.4), width: 1.5),
+          border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1061,19 +1078,22 @@ class _LeetCodeLeaderboardState extends State<LeetCodeLeaderboard>
             Text(
               label,
               style: GoogleFonts.inter(
-                fontSize: 10,
+                fontSize: 9,
                 color: color,
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 2),
-            Text(
-              "$value",
-              style: GoogleFonts.poppins(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: color,
-                height: 1.0,
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                "$value",
+                style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                  height: 1.0,
+                ),
               ),
             ),
           ],

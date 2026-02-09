@@ -3,9 +3,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_dimens.dart';
+import '../../core/utils/version_comparator.dart';
 import '../../providers/user_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../services/notification_service.dart';
+import '../../services/update_service.dart';
 import '../widgets/premium_card.dart';
 import '../widgets/notification_bell_icon.dart';
 
@@ -161,6 +163,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 PremiumCard(
                   child: Column(
                     children: [
+                      _buildActionTile(
+                        context,
+                        title: 'Check for Updates',
+                        subtitle: 'Manually check for new app updates',
+                        icon: Icons.system_update_alt,
+                        onTap: () => _showUpdateCheckModal(context),
+                      ),
+                      const Divider(height: 1),
                       _buildActionTile(
                         context,
                         title: 'About',
@@ -463,6 +473,353 @@ class _SettingsScreenState extends State<SettingsScreen> {
         color: Theme.of(context).colorScheme.outline,
       ),
       onTap: onTap,
+    );
+  }
+
+  // Check for Updates Modal
+  Future<void> _showUpdateCheckModal(BuildContext context) async {
+    showModalBottomSheet(
+      context: context,
+      isDismissible: false,
+      enableDrag: false,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const _UpdateCheckModal(),
+    );
+  }
+}
+
+// Modern Update Check Modal Widget
+class _UpdateCheckModal extends StatefulWidget {
+  const _UpdateCheckModal();
+
+  @override
+  State<_UpdateCheckModal> createState() => _UpdateCheckModalState();
+}
+
+class _UpdateCheckModalState extends State<_UpdateCheckModal> {
+  bool _isChecking = true;
+  UpdateStatus? _updateStatus;
+  String? _latestVersion;
+  String? _currentVersion;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkForUpdates();
+  }
+
+  Future<void> _checkForUpdates() async {
+    try {
+      final updateService = UpdateService();
+      
+      // Get current version
+      final packageInfo = await PackageInfo.fromPlatform();
+      _currentVersion = packageInfo.version;
+
+      // Force check for updates
+      final status = await updateService.checkForUpdates(forceCheck: true);
+      
+      if (mounted) {
+        setState(() {
+          _updateStatus = status;
+          _latestVersion = updateService.config?.latestVersion;
+          _isChecking = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isChecking = false;
+          _errorMessage = 'Failed to check for updates. Please try again.';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.xl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Icon
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              decoration: BoxDecoration(
+                gradient: _isChecking
+                    ? LinearGradient(
+                        colors: [
+                          Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
+                          Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                        ],
+                      )
+                    : (_updateStatus == UpdateStatus.optionalUpdateAvailable ||
+                            _updateStatus == UpdateStatus.forceUpdateRequired)
+                        ? const LinearGradient(
+                            colors: [Color(0xFF4CAF50), Color(0xFF81C784)],
+                          )
+                        : LinearGradient(
+                            colors: [
+                              Theme.of(context).colorScheme.primary,
+                              Theme.of(context).colorScheme.primary.withValues(alpha: 0.7),
+                            ],
+                          ),
+                shape: BoxShape.circle,
+              ),
+              child: _buildIcon(),
+            ),
+
+            const SizedBox(height: AppSpacing.lg),
+
+            // Title
+            Text(
+              _getTitle(),
+              style: GoogleFonts.poppins(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+              textAlign: TextAlign.center,
+            ),
+
+            const SizedBox(height: AppSpacing.sm),
+
+            // Description
+            Text(
+              _getDescription(),
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                height: 1.5,
+              ),
+              textAlign: TextAlign.center,
+            ),
+
+            const SizedBox(height: AppSpacing.xl),
+
+            // Action Buttons
+            _buildActionButtons(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIcon() {
+    if (_isChecking) {
+      return SizedBox(
+        width: 48,
+        height: 48,
+        child: CircularProgressIndicator(
+          strokeWidth: 3,
+          valueColor: AlwaysStoppedAnimation<Color>(
+            Theme.of(context).colorScheme.primary,
+          ),
+        ),
+      );
+    }
+
+    if (_errorMessage != null) {
+      return Icon(
+        Icons.error_outline,
+        size: 48,
+        color: Theme.of(context).colorScheme.error,
+      );
+    }
+
+    if (_updateStatus == UpdateStatus.optionalUpdateAvailable ||
+        _updateStatus == UpdateStatus.forceUpdateRequired) {
+      return const Icon(
+        Icons.system_update_alt,
+        size: 48,
+        color: Colors.white,
+      );
+    }
+
+    return Icon(
+      Icons.check_circle,
+      size: 48,
+      color: Theme.of(context).colorScheme.primary,
+    );
+  }
+
+  String _getTitle() {
+    if (_isChecking) return 'Checking for Updates';
+    if (_errorMessage != null) return 'Check Failed';
+    
+    if (_updateStatus == UpdateStatus.optionalUpdateAvailable ||
+        _updateStatus == UpdateStatus.forceUpdateRequired) {
+      return 'Update Available';
+    }
+    
+    return 'You\'re Up to Date';
+  }
+
+  String _getDescription() {
+    if (_isChecking) {
+      return 'Please wait while we check for the latest version...';
+    }
+
+    if (_errorMessage != null) {
+      return _errorMessage!;
+    }
+
+    if (_updateStatus == UpdateStatus.optionalUpdateAvailable ||
+        _updateStatus == UpdateStatus.forceUpdateRequired) {
+      return 'Version $_latestVersion is now available!\nYou\'re currently running v$_currentVersion';
+    }
+
+    return 'You have the latest version ($_currentVersion) installed';
+  }
+
+  Widget _buildActionButtons() {
+    if (_isChecking) {
+      return const SizedBox.shrink();
+    }
+
+    if (_errorMessage != null) {
+      return Row(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
+              ),
+              child: Text(
+                'Close',
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  _isChecking = true;
+                  _errorMessage = null;
+                });
+                _checkForUpdates();
+              },
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
+              ),
+              child: Text(
+                'Retry',
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (_updateStatus == UpdateStatus.optionalUpdateAvailable ||
+        _updateStatus == UpdateStatus.forceUpdateRequired) {
+      return Row(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
+              ),
+              child: Text(
+                'Later',
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            flex: 2,
+            child: ElevatedButton.icon(
+              onPressed: () async {
+                final updateService = UpdateService();
+                final launched = await updateService.openUpdateUrl();
+                
+                if (!launched && mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Failed to open download link'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                } else if (mounted) {
+                  Navigator.of(context).pop();
+                }
+              },
+              icon: const Icon(Icons.download, size: 20),
+              label: Text(
+                'Download',
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                backgroundColor: const Color(0xFF4CAF50),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Up to date - just close button
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: () => Navigator.of(context).pop(),
+        style: ElevatedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+          ),
+        ),
+        child: Text(
+          'Close',
+          style: GoogleFonts.inter(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
     );
   }
 }

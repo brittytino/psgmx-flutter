@@ -412,86 +412,97 @@ class _LeetCodeCardState extends State<LeetCodeCard>
               const SizedBox(height: 24),
 
               // Main Content: Circle + Stats
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // Circular Progress Ring
-                  SizedBox(
-                    width: 130,
-                    height: 130,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        CustomPaint(
-                          size: const Size(130, 130),
-                          painter: _AnimatedCircularProgressPainter(
-                            easy: stats.easySolved,
-                            medium: stats.mediumSolved,
-                            hard: stats.hardSolved,
-                            progress: _progressAnimation.value,
-                            isDark: isDark,
-                          ),
-                        ),
-                        Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isSmallScreen = constraints.maxWidth < 360;
+                  final ringSize = isSmallScreen ? 110.0 : 130.0;
+                  final spacing = isSmallScreen ? 16.0 : 24.0;
+
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Circular Progress Ring
+                      SizedBox(
+                        width: ringSize,
+                        height: ringSize,
+                        child: Stack(
+                          alignment: Alignment.center,
                           children: [
-                            Text(
-                              '${(stats.totalSolved * _progressAnimation.value).round()}',
-                              style: GoogleFonts.poppins(
-                                fontSize: 36,
-                                fontWeight: FontWeight.bold,
-                                color: textPrimary,
-                                height: 1.0,
+                            CustomPaint(
+                              size: Size(ringSize, ringSize),
+                              painter: _AnimatedCircularProgressPainter(
+                                easy: stats.easySolved,
+                                medium: stats.mediumSolved,
+                                hard: stats.hardSolved,
+                                progress: _progressAnimation.value,
+                                isDark: isDark,
                               ),
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Solved',
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                color: textSecondary,
-                                fontWeight: FontWeight.w500,
-                              ),
+                            Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    '${(stats.totalSolved * _progressAnimation.value).round()}',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: isSmallScreen ? 30 : 36,
+                                      fontWeight: FontWeight.bold,
+                                      color: textPrimary,
+                                      height: 1.0,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Solved',
+                                  style: GoogleFonts.inter(
+                                    fontSize: isSmallScreen ? 10 : 12,
+                                    color: textSecondary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                  ),
+                      ),
 
-                  const SizedBox(width: 24),
+                      SizedBox(width: spacing),
 
-                  // Stats Column
-                  Expanded(
-                    child: Column(
-                      children: [
-                        _buildStatRow(
-                          'Easy',
-                          stats.easySolved,
-                          const Color(0xFF00B8A3),
-                          isDark,
-                          _progressAnimation.value,
+                      // Stats Column
+                      Expanded(
+                        child: Column(
+                          children: [
+                            _buildStatRow(
+                              'Easy',
+                              stats.easySolved,
+                              const Color(0xFF00B8A3),
+                              isDark,
+                              _progressAnimation.value,
+                            ),
+                            const SizedBox(height: 10),
+                            _buildStatRow(
+                              'Medium',
+                              stats.mediumSolved,
+                              const Color(0xFFFFC01E),
+                              isDark,
+                              _progressAnimation.value,
+                            ),
+                            const SizedBox(height: 10),
+                            _buildStatRow(
+                              'Hard',
+                              stats.hardSolved,
+                              const Color(0xFFEF4743),
+                              isDark,
+                              _progressAnimation.value,
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 12),
-                        _buildStatRow(
-                          'Medium',
-                          stats.mediumSolved,
-                          const Color(0xFFFFC01E),
-                          isDark,
-                          _progressAnimation.value,
-                        ),
-                        const SizedBox(height: 12),
-                        _buildStatRow(
-                          'Hard',
-                          stats.hardSolved,
-                          const Color(0xFFEF4743),
-                          isDark,
-                          _progressAnimation.value,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                      ),
+                    ],
+                  );
+                },
               ),
             ],
           );

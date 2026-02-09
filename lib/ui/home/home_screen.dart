@@ -25,6 +25,7 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../attendance/daily_attendance_sheet.dart';
 import '../../ui/update/update_gate.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -616,11 +617,82 @@ class _HomeScreenState extends State<HomeScreen> with UpdateCheckMixin {
               ],
             ),
             const Spacer(),
+            _buildGitHubStarButton(context),
+            const SizedBox(width: 8),
             const _NotificationBell(),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildGitHubStarButton(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return InkWell(
+      onTap: () => _launchGitHubRepo(context),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: isDark 
+              ? [const Color(0xFF24292E), const Color(0xFF1E2226)]
+              : [const Color(0xFFEFF3F6), const Color(0xFFE6EBF1)],
+          ),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.1),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.star_rounded, 
+              size: 16, 
+              color: isDark ? const Color(0xFFFFD700) : const Color(0xFFE3B341)
+            ),
+            const SizedBox(width: 4),
+            Text(
+              'Star on GitHub',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _launchGitHubRepo(BuildContext context) async {
+    final Uri url = Uri.parse('https://github.com/brittytino/psgmx-flutter');
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open GitHub repository')),
+        );
+      }
+    } else {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('🌟 Thanks! Please tap the Star button on GitHub!'),
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildWelcomeHeader(BuildContext context, String name) {

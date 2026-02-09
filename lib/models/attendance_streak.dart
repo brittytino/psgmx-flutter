@@ -88,10 +88,20 @@ class AttendanceCalculation {
   /// Human-readable explanation of the calculation (A4)
   String get explanation {
     if (totalClassDays == 0) {
-      return 'No class days recorded yet';
+      return 'No attendance schedule available yet. Please check back later.';
     }
-    return 'Calculated from $totalClassDays class days'
-        '${totalNonClassDays > 0 ? ' (Excluding $totalNonClassDays non-class days)' : ''}';
+    
+    final markedDays = presentCount + absentCount;
+    if (markedDays == 0) {
+      return 'Attendance not yet marked for any scheduled class days ($totalClassDays total)';
+    }
+    
+    if (markedDays < totalClassDays) {
+      final unmarkedDays = totalClassDays - markedDays;
+      return 'Attendance marked for $markedDays out of $totalClassDays scheduled days ($unmarkedDays pending)';
+    }
+    
+    return 'Calculated from $totalClassDays scheduled class days';
   }
 
   /// Short summary for cards

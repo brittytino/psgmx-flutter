@@ -275,20 +275,38 @@ class _ModernLeaderboardState extends State<ModernLeaderboard> {
   }
 
   Widget _buildRestLeaderboard(List<LeetCodeStats> users, int startRank) {
-    return GridView.builder(
-      physics: const NeverScrollableScrollPhysics(),
-      shrinkWrap: true,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 1.1,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-      ),
-      itemCount: users.length,
-      itemBuilder: (ctx, idx) {
-        final user = users[idx];
-        final rank = startRank + idx;
-        return _buildLeaderboardCard(user, rank);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        int crossAxisCount = 2;
+        double childAspectRatio = 1.0;
+
+        if (width > 1200) {
+          crossAxisCount = 5;
+        } else if (width > 900) {
+          crossAxisCount = 4;
+        } else if (width > 600) {
+          crossAxisCount = 3;
+        } else if (width < 360) {
+          childAspectRatio = 0.85;
+        }
+
+        return GridView.builder(
+          physics: const NeverScrollableScrollPhysics(),
+          shrinkWrap: true,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            childAspectRatio: childAspectRatio,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+          ),
+          itemCount: users.length,
+          itemBuilder: (ctx, idx) {
+            final user = users[idx];
+            final rank = startRank + idx;
+            return _buildLeaderboardCard(user, rank);
+          },
+        );
       },
     );
   }

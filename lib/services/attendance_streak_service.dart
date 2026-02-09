@@ -146,78 +146,61 @@ class AttendanceStreakService {
       // Get scheduled attendance dates info (all dates marked)
       final daysResponse = await _supabase
           .from('scheduled_attendance_dates')
-          .select('date, is_working_day');
+          .select('date');
 
-      // Build working day map from scheduled dates
-      final workingDayMap = <String, bool>{};
+      // Build a map of attendance records by date
+      final recordsMap = <String, String>{};
+      for (var record in recordsResponse as List) {
+        recordsMap[record['date']] = record['status'];
+      }
+
+      // Build a set of scheduled dates
+      final scheduledDates = <String>{};
       for (var day in daysResponse as List) {
-        workingDayMap[day['date']] = day['is_working_day'] ?? true;
+        scheduledDates.add(day['date'] as String);
       }
 
       // Count stats
       int presentCount = 0;
       int absentCount = 0;
-      int totalClassDays = 0;
-      int totalNonClassDays = 0;
+      int totalClassDays = scheduledDates.length;
       DateTime? startDate;
       DateTime? endDate;
 
-      // Collect all unique dates from scheduled dates AND records
-      final Set<String> allRelevantDates = {};
-      for (var record in recordsResponse as List) {
-        allRelevantDates.add(record['date'] as String);
-      }
-      for (var day in daysResponse as List) {
-        allRelevantDates.add(day['date'] as String);
-      }
-
-      // Map unique dates to their status
-      for (var dateStr in allRelevantDates) {
+      // Process each scheduled date
+      for (var dateStr in scheduledDates) {
         final date = DateTime.parse(dateStr);
         
-        // Determine if it was a class day
-        // 1. Check if explicitly scheduled (takes priority)
-        // 2. Otherwise use default class days
-        final isClassDay = workingDayMap[dateStr] ?? _isDefaultClassDay(date);
-
-        if (isClassDay) {
-          totalClassDays++;
-          
-          // Check if user has a record for this class day
-          final record = (recordsResponse as List).firstWhere(
-            (r) => r['date'] == dateStr,
-            orElse: () => null,
-          );
-
-          if (record != null) {
-            final status = record['status'] as String;
-            if (status == 'PRESENT') {
-              presentCount++;
-            } else if (status == 'ABSENT') {
-              absentCount++;
-            }
-          }
-        } else {
-          totalNonClassDays++;
-        }
-
+        // Track date range
         if (startDate == null || date.isBefore(startDate)) {
           startDate = date;
         }
         if (endDate == null || date.isAfter(endDate)) {
           endDate = date;
         }
+
+        // Check if student has a record for this date
+        final status = recordsMap[dateStr];
+        if (status == 'PRESENT') {
+          presentCount++;
+        } else if (status == 'ABSENT') {
+          absentCount++;
+        }
+        // If no record, it's neither present nor absent (not yet marked)
       }
 
-      // Calculate percentage
-      final percentage =
-          totalClassDays > 0 ? (presentCount / totalClassDays) * 100 : 0.0;
+      // Calculate percentage based on marked attendance only
+      // This gives a true reflection of attendance for days that were actually marked
+      final markedDays = presentCount + absentCount;
+      final percentage = markedDays > 0 
+          ? (presentCount / markedDays) * 100 
+          : 0.0;
 
       return AttendanceCalculation(
         presentCount: presentCount,
         absentCount: absentCount,
         totalClassDays: totalClassDays,
-        totalNonClassDays: totalNonClassDays,
+        totalNonClassDays: 0,
         attendancePercentage: percentage,
         startDate: startDate,
         endDate: endDate,
