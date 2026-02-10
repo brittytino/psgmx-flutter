@@ -56,8 +56,8 @@ class _DailyAttendanceSheetState extends State<DailyAttendanceSheet> {
       final isRep = context.read<UserProvider>().isPlacementRep;
 
       for (var m in members) {
-        // Production-grade: If rep and data exists in provider's preloaded map, use it
-        if (isRep && provider.statusMap.containsKey(m.uid)) {
+        // Use preloaded data if available (for updates), otherwise default to ABSENT
+        if (provider.statusMap.containsKey(m.uid)) {
           _statusMap[m.uid] = provider.statusMap[m.uid]!;
         } else {
           _statusMap[m.uid] = 'ABSENT';
