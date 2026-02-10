@@ -777,13 +777,31 @@ class NotificationService extends ChangeNotifier {
     NotificationType type = NotificationType.announcement,
     String channel = 'psgmx_channel_main',
     bool persistToDatabase = true, // Save to DB for in-app viewing
+    String? uniqueKey, // For deduplication (e.g., 'potd_2026-02-10')
   }) async {
     // Persist to database for in-app notification list (production-grade UX)
     if (persistToDatabase) {
       try {
         final user = _supabase.auth.currentUser;
         if (user != null) {
-          final response = await _supabase.from('notifications').insert({
+          // Check for duplicates if uniqueKey provided
+          if (uniqueKey != null) {
+            final existing = await _supabase
+                .from('notifications')
+                .select('id')
+                .eq('created_by', user.id)
+                .eq('title', title)
+                .eq('generated_at', DateTime.now().toIso8601String().split('T')[0])
+                .maybeSingle();
+            
+            if (existing != null) {
+              debugPrint('[Notification] ⏭️ Skipping duplicate: $title');
+              return; // Already exists, skip
+            }
+          }
+          
+          // Insert without manually adding to cache (let realtime handle it)
+          await _supabase.from('notifications').insert({
             'title': title,
             'message': body,
             'notification_type': type.name,
@@ -792,18 +810,14 @@ class NotificationService extends ChangeNotifier {
             'created_by': user.id,
             'is_active': true,
             'generated_at': DateTime.now().toIso8601String(),
-          }).select().single();
+          });
           
-          // Add to cache with proper DB ID
-          final dbNotif = AppNotification.fromMap(response);
-          _cachedNotifications.insert(0, dbNotif);
-          notifyListeners();
-          
+          // DO NOT add to cache here - realtime subscription will handle it
           debugPrint('[Notification] ✅ Persisted to database: $title');
         }
       } catch (e) {
-        debugPrint('[Notification] Failed to persist to DB (falling back to cache only): $e');
-        // Fallback: Add to cache only
+        debugPrint('[Notification] Failed to persist to DB: $e');
+        // Fallback: Add to cache only without realtime
         final transientNotif = AppNotification(
           id: 'local_${DateTime.now().millisecondsSinceEpoch}',
           title: title,

@@ -92,6 +92,27 @@ class _HomeScreenState extends State<HomeScreen> with UpdateCheckMixin {
     }
   }
 
+  Future<Map<String, dynamic>> _getAttendanceStatus(String? teamId) async {
+    if (teamId == null) return {'hasSubmitted': false, 'markedCount': 0};
+    
+    try {
+      final supabase = Supabase.instance.client;
+      final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      
+      final response = await supabase
+          .from('attendance_records')
+          .select('id')
+          .eq('team_id', teamId)
+          .eq('date', todayStr);
+      
+      final count = (response as List).length;
+      return {'hasSubmitted': count > 0, 'markedCount': count};
+    } catch (e) {
+      debugPrint('[HomeScreen] Error checking attendance: $e');
+      return {'hasSubmitted': false, 'markedCount': 0};
+    }
+  }
+
   Future<void> _refreshAll() async {
     if (!mounted) return;
     
@@ -554,8 +575,19 @@ class _HomeScreenState extends State<HomeScreen> with UpdateCheckMixin {
 
                   // 4. Attendance Actions
                   if (showAttendanceAction) ...[
-                    AttendanceActionCard(
-                        onTap: () => _showAttendanceSheet(context)),
+                    FutureBuilder<Map<String, dynamic>>(
+                      future: _getAttendanceStatus(userProvider.currentUser?.teamId),
+                      builder: (context, snapshot) {
+                        final hasSubmitted = snapshot.data?['hasSubmitted'] ?? false;
+                        final markedCount = snapshot.data?['markedCount'] ?? 0;
+                        
+                        return AttendanceActionCard(
+                          onTap: () => _showAttendanceSheet(context),
+                          hasSubmitted: hasSubmitted,
+                          markedCount: markedCount,
+                        );
+                      },
+                    ),
                     const SizedBox(height: AppSpacing.xxl),
                   ],
 

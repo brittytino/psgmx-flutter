@@ -769,7 +769,7 @@ class _RepTasksView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-        length: 3,
+        length: 4, // Changed from 3 to 4
         child: Scaffold(
           body: NestedScrollView(
             headerSliverBuilder: (context, innerBoxIsScrolled) => [
@@ -791,8 +791,8 @@ class _RepTasksView extends StatelessWidget {
                       ),
                     ),
                     child: TabBar(
-                      isScrollable: false,
-                      tabAlignment: TabAlignment.fill,
+                      isScrollable: true, // Changed to true for 4 tabs
+                      tabAlignment: TabAlignment.start,
                       indicatorSize: TabBarIndicatorSize.tab,
                       indicator: BoxDecoration(
                         border: Border(
@@ -812,6 +812,7 @@ class _RepTasksView extends StatelessWidget {
                         fontSize: 14,
                       ),
                       tabs: const [
+                        Tab(text: "MY TASKS"), // NEW: Personal tasks
                         Tab(text: "TASKS"),
                         Tab(text: "NEW ENTRY"),
                         Tab(text: "BULK UPLOAD"),
@@ -824,6 +825,7 @@ class _RepTasksView extends StatelessWidget {
             body: const TabBarView(
               physics: NeverScrollableScrollPhysics(),
               children: [
+                _StudentTasksView(), // NEW: Rep's personal tasks
                 _RepTaskManagementView(),
                 _SingleEntryForm(),
                 _BulkUploadForm(),

@@ -694,8 +694,9 @@ class LeetCodeProvider extends ChangeNotifier {
           id: 9999, // Fixed ID for daily updates
           title: 'LeetCode POTD: ${potd['title']}',
           body: '${potd['difficulty']} • AR: ${potd['acRate']}',
-          type: NotificationType.leetcode, // Ensure correct type
+          type: NotificationType.leetcode,
           payload: 'https://leetcode.com${potd['link']}',
+          uniqueKey: 'potd_$todayStr', // Deduplicate by date
         );
         
         // Mark as done for today

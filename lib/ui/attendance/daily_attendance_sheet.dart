@@ -62,6 +62,9 @@ class _DailyAttendanceSheetState extends State<DailyAttendanceSheet> {
           _statusMap[m.uid] = 'ABSENT';
         }
       }
+      
+      // Force rebuild to show colors correctly
+      setState(() {});
     }
   }
 
