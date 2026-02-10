@@ -123,11 +123,11 @@ jobs:
             Run this query on your Supabase database:
             ```sql
             UPDATE app_config SET 
-                latest_version = '2.2.7', 
+                latest_version = '${{ steps.version.outputs.VERSION }}', 
                 force_update = true,
                 update_message = 'Essential Update: Team Leaders can now correct/update today''s attendance. Fixed notification bugs and optimized UI. Kindly update now.',
                 github_release_url = 'https://github.com/brittytino/psgmx-flutter/releases/latest',
-                android_download_url = 'https://github.com/brittytino/psgmx-flutter/releases/download/v2.2.7/PSGMX-v2.2.7-android.apk'
+                android_download_url = 'https://github.com/brittytino/psgmx-flutter/releases/download/${{ steps.version.outputs.TAG }}/PSGMX-${{ steps.version.outputs.TAG }}-android.apk'
             WHERE id IS NOT NULL;
             ```
 
