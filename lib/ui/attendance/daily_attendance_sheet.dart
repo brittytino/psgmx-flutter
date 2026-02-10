@@ -53,7 +53,6 @@ class _DailyAttendanceSheetState extends State<DailyAttendanceSheet> {
   void _ensureStatusMapInitialized(List<AppUser> members) {
     if (_statusMap.isEmpty && members.isNotEmpty) {
       final provider = context.read<AttendanceProvider>();
-      final isRep = context.read<UserProvider>().isPlacementRep;
 
       for (var m in members) {
         // Use preloaded data if available (for updates), otherwise default to ABSENT
@@ -397,32 +396,6 @@ class _DailyAttendanceSheetState extends State<DailyAttendanceSheet> {
             ),
           ),
         ),
-      ),
-    );
-  }
-
-
-  Widget _buildSubmittedView() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.check_circle_rounded, size: 64, color: Theme.of(context).colorScheme.primary),
-          const SizedBox(height: 16),
-          Text(
-            "All Caught Up!", 
-            style: GoogleFonts.poppins(
-              fontSize: 20, 
-              fontWeight: FontWeight.bold
-            )
-          ),
-          const SizedBox(height: 8),
-          Text(
-            "Attendance for today has been submitted.",
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
-          ),
-        ],
       ),
     );
   }
