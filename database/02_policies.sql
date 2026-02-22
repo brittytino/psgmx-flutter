@@ -8,6 +8,61 @@
 -- ========================================
 
 -- ========================================
+-- HELPER FUNCTIONS (required by policies below)
+-- ========================================
+
+CREATE OR REPLACE FUNCTION has_role(user_id UUID, role_name TEXT)
+RETURNS BOOLEAN AS $$
+DECLARE
+    user_roles JSONB;
+BEGIN
+    SELECT roles INTO user_roles FROM users WHERE id = user_id;
+    RETURN COALESCE((user_roles->>role_name)::BOOLEAN, FALSE);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION is_placement_rep(user_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN has_role(user_id, 'isPlacementRep');
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION is_coordinator(user_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN has_role(user_id, 'isCoordinator');
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION is_team_leader(user_id UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN has_role(user_id, 'isTeamLeader');
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION get_user_team(user_id UUID)
+RETURNS TEXT AS $$
+DECLARE
+    user_team TEXT;
+BEGIN
+    SELECT team_id INTO user_team FROM users WHERE id = user_id;
+    RETURN user_team;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION is_date_scheduled(check_date DATE)
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM scheduled_attendance_dates
+        WHERE date = check_date
+    );
+END;
+$$ LANGUAGE plpgsql STABLE;
+
+-- ========================================
 -- ENABLE RLS ON ALL TABLES
 -- ========================================
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
@@ -210,6 +265,13 @@ DROP POLICY IF EXISTS "notifications_manage" ON notifications;
 CREATE POLICY "notifications_manage" ON notifications
     FOR ALL USING (is_placement_rep(auth.uid()) OR is_coordinator(auth.uid()));
 
+-- Any authenticated user can insert a notification
+-- (used by showNotification() for personal/system notifications)
+DROP POLICY IF EXISTS "notifications_insert_auth" ON notifications;
+CREATE POLICY "notifications_insert_auth" ON notifications
+    FOR INSERT TO authenticated
+    WITH CHECK (TRUE);
+
 -- ========================================
 -- NOTIFICATION_READS POLICIES
 -- ========================================
@@ -229,13 +291,18 @@ CREATE POLICY "task_completions_read_own" ON task_completions
     FOR SELECT TO authenticated
     USING (user_id = auth.uid());
 
--- Team Leaders can read their team's submissions
+-- Team Leaders can read submissions belonging to students on their team
+-- (task_completions has no team_id column; we resolve via the users table)
 DROP POLICY IF EXISTS "task_completions_read_team" ON task_completions;
 CREATE POLICY "task_completions_read_team" ON task_completions
     FOR SELECT TO authenticated
     USING (
-        is_team_leader(auth.uid()) 
-        AND team_id = get_user_team(auth.uid())
+        is_team_leader(auth.uid())
+        AND EXISTS (
+            SELECT 1 FROM users u
+            WHERE u.id = task_completions.user_id
+              AND u.team_id = get_user_team(auth.uid())
+        )
     );
 
 -- Placement Reps can read ALL submissions
@@ -287,29 +354,9 @@ BEGIN
     RAISE NOTICE '';
     RAISE NOTICE '========================================';
     RAISE NOTICE '✅ STEP 2 COMPLETE: RLS POLICIES';
--- ========================================
--- APP CONFIG POLICIES
--- ========================================
-
-ALTER TABLE app_config ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Allow public read access to app_config" ON app_config;
-CREATE POLICY "Allow public read access to app_config" ON app_config
-    FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Only service role can modify app_config" ON app_config;
-CREATE POLICY "Only service role can modify app_config" ON app_config
-    FOR ALL USING (auth.role() = 'service_role')
-    WITH CHECK (auth.role() = 'service_role');
-
--- ========================================
--- FINISH
--- ========================================
-DO $$
-BEGIN
     RAISE NOTICE '========================================';
-    RAISE NOTICE '✅ RLS Policies setup successfully.';
-    RAISE NOTICE 'Policies applied to all 13 tables.';
+    RAISE NOTICE 'Policies applied to all tables.';
     RAISE NOTICE 'NEXT: Run 03_functions.sql';
     RAISE NOTICE '========================================';
 END $$;
+

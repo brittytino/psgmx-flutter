@@ -92,20 +92,15 @@ jobs:
             - **Android APK**: `PSGMX-${{ steps.version.outputs.TAG }}-android.apk`
             
             ### 🔥 What's New in v2.2.7
-            
+
             #### Critical Fixes
-            - ✅ **Fixed POTD Notification Duplicates**: LeetCode Problem of the Day notifications now appear only once
-            - ✅ **Enhanced Team Leader Attendance UI**: Visual status indicators show current attendance state with color-coded switches
-            - ✅ **Attendance Card Status Display**: Shows submission status and marked student count
-            - ✅ **My Tasks for Coordinators/Reps**: Added personal task tracking for Coordinators and Placement Representatives
-            
-            #### Improvements
-            - 🎨 Team Leader attendance card now shows:
-              - 🟢 Green: Already submitted with student count
-              - 🟠 Orange: Not yet submitted
-            - 🔄 Real-time status updates for attendance marking
-            - 📋 Coordinators/Reps can now track their personal daily tasks
-            - 🐛 Fixed notification deduplication logic
+            - ✅ **Migrated to new Supabase project** — fresh DB with all policies corrected
+            - ✅ **Team Leader attendance** — can now mark/update attendance for any past scheduled date (not just today)
+            - ✅ **Attendance action card** — always visible for TLs; tappable even after first submission to allow corrections
+            - ✅ **Fixed class-day detection** — uses `scheduled_attendance_dates` (same source as the sheet) instead of legacy `attendance_days`
+            - ✅ **Birthday local notifications** — now fire a real Android/iOS push in addition to the in-app DB entry
+            - ✅ **Fixed RLS policies** — `task_completions` team policy, `notifications` insert for all authenticated users, `target_audience` constraint
+            - ✅ **Fixed DB syntax** — removed orphaned DO $$ block and broken users seed insert from SQL scripts
 
             ### 📋 Installation
             1. Download the APK file from assets below

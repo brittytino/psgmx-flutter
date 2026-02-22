@@ -162,7 +162,8 @@ CREATE TABLE IF NOT EXISTS notifications (
     message TEXT NOT NULL,
     notification_type TEXT NOT NULL CHECK (notification_type IN ('motivation', 'reminder', 'alert', 'announcement')),
     tone TEXT CHECK (tone IN ('serious', 'friendly', 'humorous')),
-    target_audience TEXT NOT NULL CHECK (target_audience IN ('all', 'students', 'team_leaders', 'coordinators', 'placement_reps', 'G1', 'G2')),
+    -- 'user' = personal notification scoped to the creator only (used by showNotification())
+    target_audience TEXT NOT NULL CHECK (target_audience IN ('all', 'students', 'team_leaders', 'coordinators', 'placement_reps', 'G1', 'G2', 'user')),
     generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     valid_until TIMESTAMPTZ,
     created_by UUID REFERENCES users(id),

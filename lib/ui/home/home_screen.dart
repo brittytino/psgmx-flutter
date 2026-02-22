@@ -9,7 +9,7 @@ import '../../providers/navigation_provider.dart';
 import '../../services/supabase_db_service.dart';
 import '../../services/quote_service.dart';
 import '../../services/notification_service.dart';
-import '../../services/attendance_service.dart';
+import '../../services/attendance_schedule_service.dart';
 import '../../services/task_completion_service.dart';
 import '../../services/attendance_streak_service.dart';
 import '../../services/performance_service.dart';
@@ -148,8 +148,11 @@ class _HomeScreenState extends State<HomeScreen> with UpdateCheckMixin {
     if (!mounted) return;
     setState(() => _isLoadingClassStatus = true);
     try {
-      final attendanceService = AttendanceService();
-      final isDay = await attendanceService.isWorkingDay(DateTime.now());
+      // Use AttendanceScheduleService.isDateScheduled() — consistent with DailyAttendanceSheet.
+      // This checks whether today's date exists as a row in scheduled_attendance_dates,
+      // which is the same source of truth the sheet uses when listing selectable dates.
+      final scheduleService = AttendanceScheduleService();
+      final isDay = await scheduleService.isDateScheduled(DateTime.now());
       if (mounted) setState(() => _isClassDay = isDay);
     } catch (e) {
       // Fail safe to TRUE so we don't accidentally block attendance if network fails
@@ -220,13 +223,17 @@ class _HomeScreenState extends State<HomeScreen> with UpdateCheckMixin {
   }
 
   void _showAttendanceSheet(BuildContext context) {
+    // Always open the sheet — team leaders may need to mark attendance for
+    // a previous scheduled date even when today is not a class day.
+    // The sheet itself validates the selected date against the schedule.
     if (!_isClassDay) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text(
-                "Today is marked as a NON-CLASS day. Attendance not required.")),
+          content: Text(
+              "Today is not a scheduled class day. You can still update records for past scheduled dates."),
+          duration: Duration(seconds: 3),
+        ),
       );
-      return;
     }
     showModalBottomSheet(
       context: context,
@@ -478,8 +485,9 @@ class _HomeScreenState extends State<HomeScreen> with UpdateCheckMixin {
     // Determine Dashboard Type
     final isStudentView =
         !userProvider.isCoordinator && !userProvider.isPlacementRep;
-    // Show Daily Attendance action for Team Leaders (on class days)
-    final showAttendanceAction = userProvider.isTeamLeader && _isClassDay;
+    // Show Daily Attendance action for all Team Leaders — always visible so they can
+    // mark/update attendance for today or any past scheduled date via the sheet.
+    final showAttendanceAction = userProvider.isTeamLeader;
 
     return Scaffold(
       floatingActionButton: FloatingActionButton(
@@ -580,48 +588,10 @@ class _HomeScreenState extends State<HomeScreen> with UpdateCheckMixin {
                       builder: (context, snapshot) {
                         final hasSubmitted = snapshot.data?['hasSubmitted'] ?? false;
                         final markedCount = snapshot.data?['markedCount'] ?? 0;
-                        
-                        // Strict specific rule: If TL and already marked, SHOW completed state (not hidden)
-                        if (userProvider.isTeamLeader && !userProvider.isPlacementRep && hasSubmitted) {
-                           return PremiumCard(
-                             color: Theme.of(context).colorScheme.tertiaryContainer.withValues(alpha: 0.4),
-                             onTap: () {}, // No action
-                             child: Row(
-                               children: [
-                                 Container(
-                                   padding: const EdgeInsets.all(AppSpacing.sm),
-                                   decoration: BoxDecoration(
-                                     color: Theme.of(context).colorScheme.tertiary,
-                                     shape: BoxShape.circle,
-                                   ),
-                                   child: const Icon(Icons.check_rounded, color: Colors.white),
-                                 ),
-                                 const SizedBox(width: AppSpacing.md),
-                                 Expanded(
-                                   child: Column(
-                                     crossAxisAlignment: CrossAxisAlignment.start,
-                                     children: [
-                                       Text(
-                                         "All Caught Up!",
-                                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                           fontWeight: FontWeight.bold,
-                                           color: Theme.of(context).colorScheme.onTertiaryContainer,
-                                         ),
-                                       ),
-                                       Text(
-                                         "Attendance marked for today",
-                                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                           color: Theme.of(context).colorScheme.onTertiaryContainer.withValues(alpha: 0.8),
-                                         ),
-                                       ),
-                                     ],
-                                   ),
-                                 ),
-                               ],
-                             ),
-                           );
-                        }
-                        
+                        // AttendanceActionCard handles both states:
+                        //   hasSubmitted=false → "Mark Team Attendance" (action required)
+                        //   hasSubmitted=true  → "Update Team Attendance" (tap to edit)
+                        // Always tappable so TLs can update today or past scheduled dates.
                         return AttendanceActionCard(
                           onTap: () => _showAttendanceSheet(context),
                           hasSubmitted: hasSubmitted,

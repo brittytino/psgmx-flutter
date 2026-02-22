@@ -19,23 +19,21 @@ class AttendanceProvider extends ChangeNotifier {
 
   AttendanceProvider(this._supabaseService);
 
-  Future<void> _preloadStatuses(String? teamId) async {
+  Future<void> _preloadStatuses(String? teamId, String dateStr) async {
     try {
-      final today = DateTime.now().toIso8601String().split('T')[0];
       var query = _supabaseService.client
           .from('attendance_records')
           .select('user_id, status, student_id, student_email, student_name')
-          .eq('date', today);
-      
+          .eq('date', dateStr);
+
       if (teamId != null) {
         query = query.eq('team_id', teamId);
       }
 
       final response = await query;
-      
+
       _statusMap.clear();
       for (var record in response as List) {
-        // Handle different column naming if applicable
         final key = record['user_id'] ?? record['student_id'] ?? record['student_email'];
         if (key != null) {
           _statusMap[key] = record['status'];
@@ -46,10 +44,12 @@ class AttendanceProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> loadTeamMembers(String teamId) async {
+  Future<void> loadTeamMembers(String teamId, {DateTime? forDate}) async {
     _isLoading = true;
     notifyListeners();
-    
+
+    final dateStr = (forDate ?? DateTime.now()).toIso8601String().split('T')[0];
+
     try {
       // 1. Fetch from whitelist
       final whiteListResponse = await _supabaseService.client
@@ -87,14 +87,13 @@ class AttendanceProvider extends ChangeNotifier {
         );
       }).toList();
 
-      // Check if already submitted today
-      await _checkSubmissionStatus(teamId);
-      
-      // Production-grade: If already submitted, pre-load statuses into a map
-      if (_hasSubmittedToday) {
-        await _preloadStatuses(teamId);
-      }
-      
+      // Check if already submitted for the selected date
+      await _checkSubmissionStatus(teamId, dateStr);
+
+      // Always preload existing statuses for the selected date so the UI
+      // pre-fills any previously-saved records (whether or not fully submitted).
+      await _preloadStatuses(teamId, dateStr);
+
     } catch (e) {
       debugPrint('Error loading team: $e');
     } finally {
@@ -103,10 +102,12 @@ class AttendanceProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> loadAllUsers() async {
+  Future<void> loadAllUsers({DateTime? forDate}) async {
     _isLoading = true;
     notifyListeners();
-    
+
+    final dateStr = (forDate ?? DateTime.now()).toIso8601String().split('T')[0];
+
     try {
       // 1. Fetch from whitelist
       final whiteListResponse = await _supabaseService.client
@@ -143,20 +144,8 @@ class AttendanceProvider extends ChangeNotifier {
         );
       }).toList();
 
-      // For "All Students" view, we still want to see if they are marked
-      final today = DateTime.now().toIso8601String().split('T')[0];
-      final markedResponse = await _supabaseService.client
-          .from('attendance_records')
-          .select('student_id, student_email, status')
-          .eq('date', today);
-      
-      _statusMap.clear();
-      for (var record in markedResponse as List) {
-        final key = record['student_id'] ?? record['student_email'];
-        if (key != null) {
-          _statusMap[key] = record['status'];
-        }
-      }
+      // Always preload existing records for the selected date (Reps can always edit)
+      await _preloadStatuses(null, dateStr);
 
       _hasSubmittedToday = false; // Reps can always edit/submit in this mode
       
@@ -168,44 +157,60 @@ class AttendanceProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _checkSubmissionStatus(String teamId) async {
-    final today = DateTime.now().toIso8601String().split('T')[0];
-    final count = await _supabaseService.client
-        .from('attendance_records')
-        .count()
-        .eq('team_id', teamId)
-        .eq('date', today);
-        
-    _hasSubmittedToday = count > 0;
+  Future<void> _checkSubmissionStatus(String teamId, String dateStr) async {
+    try {
+      final count = await _supabaseService.client
+          .from('attendance_records')
+          .count()
+          .eq('team_id', teamId)
+          .eq('date', dateStr);
+
+      _hasSubmittedToday = count > 0;
+    } catch (e) {
+      debugPrint('Error checking submission status: $e');
+      _hasSubmittedToday = false;
+    }
   }
 
-  Future<void> submitAttendance(String? teamId, Map<String, String> statusMap, {bool isRep = false}) async {
-    // UPDATED: Removed check to allow updating attendance for the same day
-    // if (!isRep && _hasSubmittedToday) throw Exception("Already submitted for today");
-    
-    final today = DateTime.now().toIso8601String().split('T')[0];
+  Future<void> submitAttendance(
+    String? teamId,
+    Map<String, String> statusMap, {
+    DateTime? forDate,
+    bool isRep = false,
+  }) async {
+    final dateStr = (forDate ?? DateTime.now()).toIso8601String().split('T')[0];
     final user = _supabaseService.client.auth.currentUser;
-    if (user == null) throw Exception("User not authenticated");
-    
+    if (user == null) throw Exception('User not authenticated');
+
     final List<Map<String, dynamic>> rows = [];
     final List<String> unregisteredStudents = [];
-    
+
     // UUID regex pattern
-    final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
+    final uuidRegex = RegExp(
+        r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
 
     for (var entry in statusMap.entries) {
-      final studentIdOrEmail = entry.key; 
+      final studentIdOrEmail = entry.key;
       final status = entry.value;
-      
-      // Check if it's a valid UUID (which means the student has signed up)
+
       if (uuidRegex.hasMatch(studentIdOrEmail)) {
-        // Production-grade: Get the correct team_id for this specific student from our loaded list
-        // This ensures analytics/reports are accurate even if marked by a rep
-        final student = _teamMembers.firstWhere((m) => m.uid == studentIdOrEmail);
+        // Resolve the correct team_id for analytics accuracy
+        final student = _teamMembers.firstWhere(
+          (m) => m.uid == studentIdOrEmail,
+          orElse: () => AppUser(
+            uid: studentIdOrEmail,
+            email: '',
+            regNo: '',
+            name: '',
+            teamId: teamId,
+            batch: '',
+            roles: const UserRoles(),
+          ),
+        );
         final studentTeamId = student.teamId ?? teamId ?? 'ALL';
 
         rows.add({
-          'date': today,
+          'date': dateStr,
           'user_id': studentIdOrEmail,
           'team_id': studentTeamId,
           'status': status,
@@ -221,16 +226,20 @@ class AttendanceProvider extends ChangeNotifier {
     }
 
     if (rows.isNotEmpty) {
-      // Use upsert for everything to be production-grade (prevents duplicate errors)
-      await _supabaseService.client.from('attendance_records').upsert(rows);
-      
+      // Upsert on (date, user_id) conflict — safe for both first-mark and updates
+      await _supabaseService.client
+          .from('attendance_records')
+          .upsert(rows, onConflict: 'date,user_id');
+
       if (!isRep && teamId != null) {
-        _hasSubmittedToday = true; 
+        _hasSubmittedToday = true;
       }
       notifyListeners();
-      
+
       if (unregisteredStudents.isNotEmpty) {
-        debugPrint('[Attendance] Skipping unregistered students (not signed up): ${unregisteredStudents.join(', ')}');
+        debugPrint(
+            '[Attendance] Skipping unregistered students (not signed up): '
+            '${unregisteredStudents.join(', ')}');
       }
     }
   }

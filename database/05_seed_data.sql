@@ -151,32 +151,13 @@ ON CONFLICT (email) DO UPDATE SET
     roles = EXCLUDED.roles;
 
 -- ========================================
--- SYNC TO USERS TABLE (for login)
+-- USERS TABLE NOTE
 -- ========================================
--- Note: This creates users with generated UUIDs
--- Real users are created when they sign up via auth
-
--- Insert all whitelist entries into users table
-INSERT INTO public.users (id, email, reg_no, name, team_id, batch, roles, dob, leetcode_username)
-SELECT 
-    gen_random_uuid(),  -- Generate UUID since not auth.users yet
-    w.email,
-    w.reg_no,
-    w.name,
-    w.team_id,
-    COALESCE(w.batch, 'G1'),
-    COALESCE(w.roles, '{"isStudent": true}'::jsonb),
-    w.dob,
-    w.leetcode_username
-FROM whitelist w
-ON CONFLICT (email) DO UPDATE SET
-    name = EXCLUDED.name,
-    reg_no = EXCLUDED.reg_no,
-    team_id = EXCLUDED.team_id,
-    batch = EXCLUDED.batch,
-    roles = EXCLUDED.roles,
-    dob = EXCLUDED.dob,
-    leetcode_username = EXCLUDED.leetcode_username;
+-- DO NOT seed users here.
+-- users.id is a FK to auth.users(id), so rows can only be inserted
+-- after a real Supabase Auth sign-up. Each student's user row is created
+-- automatically when they first log in (the app calls UserProvider.createOrUpdateUser).
+-- The whitelist above is the source of truth for enrolment data.
 
 -- ========================================
 -- INSERT LEETCODE STATS
@@ -189,14 +170,6 @@ FROM public.whitelist
 WHERE leetcode_username IS NOT NULL AND leetcode_username != ''
 ON CONFLICT (username) DO NOTHING;
 
--- ========================================
--- VERIFICATION
--- ========================================
-DO $$
-DECLARE
-    whitelist_count INT;
-    users_count INT;
-    leetcode_count INT;
 -- ========================================
 -- 2. APP CONFIGURATION
 -- ========================================

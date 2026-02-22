@@ -503,18 +503,23 @@ class NotificationService extends ChangeNotifier {
     }
   }
 
-  /// Send birthday notification to all users for a specific person
+  /// Send birthday notification to all users for a specific person.
+  /// Inserts a DB row (for the in-app list / realtime) AND fires a local
+  /// Android / iOS push so the user sees it even when the app is backgrounded.
   Future<bool> sendBirthdayNotification({
     required String birthdayPersonName,
     required String birthdayPersonId,
   }) async {
     try {
       final firstName = birthdayPersonName.split(' ').first;
+      final title = '🎂 Happy Birthday, $firstName!';
+      final body = 'Let\'s wish $birthdayPersonName a wonderful birthday! 🎉🎈';
 
-      // Insert birthday notification into database
+      // 1. Persist to database — realtime subscription surfaces it in the
+      //    in-app notification list for all online users.
       await _supabase.from('notifications').insert({
-        'title': '🎂 Happy Birthday, $firstName!',
-        'message': 'Let\'s wish $birthdayPersonName a wonderful birthday! 🎉🎈',
+        'title': title,
+        'message': body,
         'notification_type': 'announcement',
         'tone': 'friendly',
         'target_audience': 'all',
@@ -522,8 +527,43 @@ class NotificationService extends ChangeNotifier {
         'generated_at': DateTime.now().toIso8601String(),
       });
 
-      // No need to show local notification since the realtime subscription will pick it up
-      // and display it in the list. The sender (automated system) doesn't need a push.
+      // 2. Fire a local OS-level push notification on Android/iOS.
+      //    Realtime alone only works while the app is foregrounded, so we
+      //    explicitly call _notifications.show() to reach backgrounded users.
+      if (!kIsWeb) {
+        // Use a stable ID derived from the person name so repeated calls in
+        // the same session don't stack duplicate system notifications.
+        final notifId = 600 + (birthdayPersonName.hashCode.abs() % 399);
+
+        await _notifications.show(
+          notifId,
+          title,
+          body,
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              'psgmx_birthday',
+              'Birthday Notifications',
+              channelDescription: 'Birthday wishes and celebrations',
+              importance: Importance.high,
+              priority: Priority.high,
+              color: Color(0xFFFF6B6B),
+              playSound: true,
+              enableVibration: true,
+              enableLights: true,
+              ledColor: Color(0xFFFF6B6B),
+              ledOnMs: 1000,
+              ledOffMs: 500,
+            ),
+            iOS: DarwinNotificationDetails(
+              presentSound: true,
+              presentAlert: true,
+              presentBadge: true,
+            ),
+          ),
+          payload: 'birthday:$birthdayPersonId',
+        );
+        debugPrint('[Notification] 🎂 Local birthday push fired for $birthdayPersonName (id=$notifId)');
+      }
 
       return true;
     } catch (e) {
