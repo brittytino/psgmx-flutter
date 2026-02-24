@@ -10,8 +10,10 @@ The policies in `02_policies.sql` call helper functions defined in `03_functions
 **You must run functions before policies.**
 
 ```
-01_schema.sql    03_functions.sql    02_policies.sql
-  04_triggers.sql    05_seed_data.sql    06_ecampus_schema.sql→ 07_bulk_onboard_users.sql ⚡```
+01_schema.sql → 03_functions.sql → 02_policies.sql
+→ 04_triggers.sql → 05_seed_data.sql → 06_ecampus_schema.sql
+→ 07_bulk_onboard_users.sql → 08_ecampus_bunked_schema.sql
+```
 
 ---
 
@@ -114,6 +116,15 @@ Pre-creates all 123 students in `auth.users` so they can LOGIN via OTP (not sign
 > After this, all 123 students can login via OTP immediately.
 
 ---
+### Step 8 — Bunked Subject Cache (`08_ecampus_bunked_schema.sql`)
+
+Creates per-subject bunked details used by the app and the daily sync job.
+
+1. Open `database/08_ecampus_bunked_schema.sql`
+2. Copy → paste into a **new SQL Editor tab** → click **Run**
+3. ✅ No errors in output panel = success
+
+---
 ##  Post-Setup Checklist
 
 - [ ] **Table Editor**  `whitelist` has 123 rows
@@ -134,6 +145,7 @@ Pre-creates all 123 students in `auth.users` so they can LOGIN via OTP (not sign
 | `05_seed_data.sql` | 5th | 123-student whitelist + app config |
 | `06_ecampus_schema.sql` | 6th | Bunker screen attendance/CGPA cache |
 | `07_bulk_onboard_users.sql` | 7th ⚡ | Pre-create auth.users for all 123 (enables OTP login) |
+| `08_ecampus_bunked_schema.sql` | 8th | Per-subject bunked cache |
 
 ---
 

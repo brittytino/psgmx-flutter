@@ -32,6 +32,9 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
 API_SECRET = os.environ.get("API_SECRET", "psg-bunker-api-secret")
 
+if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
+    raise RuntimeError("Missing SUPABASE_URL or SUPABASE_SERVICE_KEY")
+
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 # ─── FastAPI app ─────────────────────────────────────────────────────────────
@@ -301,6 +304,33 @@ def _upsert_cgpa(rollno: str, data: dict) -> None:
     ).execute()
 
 
+def _upsert_bunked(rollno: str, subjects: list[dict]) -> None:
+    if not subjects:
+        return
+
+    rows = []
+    synced_at = datetime.utcnow().isoformat()
+    for s in subjects:
+        rows.append(
+            {
+                "reg_no": rollno,
+                "course_code": s.get("course_code"),
+                "course_title": s.get("course_title"),
+                "total_hours": s.get("total_hours", 0),
+                "total_present": s.get("total_present", 0),
+                "percentage": s.get("percentage"),
+                "can_bunk": s.get("can_bunk", 0),
+                "need_attend": s.get("classes_to_attend", 0),
+                "synced_at": synced_at,
+            }
+        )
+
+    supabase.table("ecampus_bunked_subjects").upsert(
+        rows,
+        on_conflict="reg_no,course_code",
+    ).execute()
+
+
 def _read_attendance(rollno: str) -> dict | None:
     result = (
         supabase.table("ecampus_attendance")
@@ -374,6 +404,7 @@ def sync_user(
     # 5. Store in Supabase
     _upsert_attendance(rollno, att_data)
     _upsert_cgpa(rollno, cgpa_data)
+    _upsert_bunked(rollno, att_data.get("subjects", []))
     log.info(f"[sync] {rollno} – data stored ✔")
 
     synced_at = datetime.utcnow().isoformat()
@@ -449,6 +480,7 @@ def sync_all_users(x_api_secret: str | None = Header(None)):
             cgpa_data  = _fetch_cgpa(session)
             _upsert_attendance(rollno, att_data)
             _upsert_cgpa(rollno, cgpa_data)
+            _upsert_bunked(rollno, att_data.get("subjects", []))
             success.append(rollno)
             log.info(f"[sync-all] ✔ {rollno}")
         except Exception as exc:
