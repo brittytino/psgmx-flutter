@@ -127,7 +127,65 @@ CREATE TRIGGER on_leetcode_stat_update
     EXECUTE FUNCTION notify_leetcode_milestone();
 
 -- ========================================
--- 2. MAINTENANCE TRIGGERS
+-- 2. AUTH TRIGGER: Auto-create user profile on first login
+-- ========================================
+-- When a student completes OTP login, Supabase inserts into auth.users.
+-- This trigger fires immediately after and copies their data from
+-- the whitelist into public.users using the real auth UUID.
+-- This is the ONLY correct way to populate users — never use gen_random_uuid().
+
+CREATE OR REPLACE FUNCTION handle_new_user()
+RETURNS TRIGGER AS $$
+DECLARE
+    wl RECORD;
+BEGIN
+    -- Look up this email in the whitelist
+    SELECT * INTO wl FROM public.whitelist WHERE email = NEW.email;
+
+    IF wl IS NOT NULL THEN
+        -- Create the users row with the real auth UUID
+        INSERT INTO public.users (
+            id,
+            email,
+            reg_no,
+            name,
+            team_id,
+            batch,
+            roles,
+            leetcode_username,
+            dob,
+            birthday_notifications_enabled,
+            leetcode_notifications_enabled,
+            task_reminders_enabled
+        ) VALUES (
+            NEW.id,   -- Real UUID from auth.users — no gen_random_uuid()!
+            NEW.email,
+            wl.reg_no,
+            wl.name,
+            wl.team_id,
+            COALESCE(wl.batch, 'G1'),
+            COALESCE(wl.roles, '{"isStudent": true, "isTeamLeader": false, "isCoordinator": false, "isPlacementRep": false}'::jsonb),
+            wl.leetcode_username,
+            wl.dob,
+            TRUE,
+            TRUE,
+            TRUE
+        )
+        ON CONFLICT (id) DO NOTHING;  -- Idempotent: safe to re-run
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+    AFTER INSERT ON auth.users
+    FOR EACH ROW
+    EXECUTE FUNCTION handle_new_user();
+
+-- ========================================
+-- 3. MAINTENANCE TRIGGERS
 -- ========================================
 
 -- TRIGGER: App Config Timestamp

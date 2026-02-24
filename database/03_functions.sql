@@ -180,6 +180,6 @@ BEGIN
     RAISE NOTICE '  - get_scheduled_dates';
     RAISE NOTICE '  - update_leetcode_username_unified';
     RAISE NOTICE '';
-    RAISE NOTICE 'NEXT: Run 04_triggers.sql';
+    RAISE NOTICE 'NEXT: Run 02_policies.sql  (functions must exist before policies)';
     RAISE NOTICE '========================================';
 END $$;

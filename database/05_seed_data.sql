@@ -101,17 +101,17 @@ INSERT INTO public.whitelist (email, name, reg_no, batch, team_id, dob, leetcode
 ('25mx321@psgtech.ac.in', 'Karthick K', '25MX321', 'G2', 'T15', '2004-10-05', 'Karthick0531', '{"isStudent": true, "isTeamLeader": false, "isCoordinator": false, "isPlacementRep": false}'),
 ('25mx322@psgtech.ac.in', 'Kasbiya M', '25MX322', 'G2', 'T18', '2005-04-04', 'kasbiya_l', '{"isStudent": true, "isTeamLeader": false, "isCoordinator": false, "isPlacementRep": false}'),
 ('25mx323@psgtech.ac.in', 'Keerthanaa J', '25MX323', 'G2', 'T05', '2005-05-29', 'Kize_Bright', '{"isStudent": true, "isTeamLeader": false, "isCoordinator": false, "isPlacementRep": false}'),
-('25mx324@psgtech.ac.in', 'Kevin Johnson A A', '25MX324', 'G2', 'T21', NULL, 'Kevin_0104', '{"isStudent": true, "isTeamLeader": false, "isCoordinator": false, "isPlacementRep": false}'),
+('25mx324@psgtech.ac.in', 'Kevin Johnson A A', '25MX324', 'G2', 'T21', '2004-11-01', 'Kevin_0104', '{"isStudent": true, "isTeamLeader": false, "isCoordinator": false, "isPlacementRep": false}'),
 ('25mx325@psgtech.ac.in', 'Kirsaan F', '25MX325', 'G2', 'T20', '2004-08-27', 'ClyHz34SHz', '{"isStudent": true, "isTeamLeader": true, "isCoordinator": false, "isPlacementRep": false}'),
 ('25mx326@psgtech.ac.in', 'Meyappan R', '25MX326', 'G2', 'T19', NULL, 'Meyappan_R', '{"isStudent": true, "isTeamLeader": true, "isCoordinator": false, "isPlacementRep": false}'),
 ('25mx327@psgtech.ac.in', 'Mithra N', '25MX327', 'G2', 'T06', '2004-09-13', 'im_mithra', '{"isStudent": true, "isTeamLeader": true, "isCoordinator": false, "isPlacementRep": false}'),
-('25mx328@psgtech.ac.in', 'Mithulesh N', '25MX328', 'G2', 'T05', NULL, 'Mithulesh_N', '{"isStudent": true, "isTeamLeader": false, "isCoordinator": false, "isPlacementRep": false}'),
+('25mx328@psgtech.ac.in', 'Mithulesh N', '25MX328', 'G2', 'T05', '2004-09-13', 'Mithulesh_N', '{"isStudent": true, "isTeamLeader": false, "isCoordinator": false, "isPlacementRep": false}'),
 ('25mx329@psgtech.ac.in', 'Mohana Priya M', '25MX329', 'G2', 'T13', '2004-07-19', 'mohanapriya19', '{"isStudent": true, "isTeamLeader": false, "isCoordinator": false, "isPlacementRep": false}'),
 ('25mx330@psgtech.ac.in', 'Monish P', '25MX330', 'G2', 'T14', NULL, '9AIYYQsbfu', '{"isStudent": true, "isTeamLeader": false, "isCoordinator": false, "isPlacementRep": false}'),
 ('25mx331@psgtech.ac.in', 'Mugundhan K P', '25MX331', 'G2', 'T12', NULL, 'Mukunth06', '{"isStudent": true, "isTeamLeader": false, "isCoordinator": false, "isPlacementRep": false}'),
 ('25mx332@psgtech.ac.in', 'Muthu Sailappan', '25MX332', 'G2', 'T01', NULL, 'muthusailappan', '{"isStudent": true, "isTeamLeader": false, "isCoordinator": false, "isPlacementRep": false}'),
 ('25mx333@psgtech.ac.in', 'Naga Sruthi M', '25MX333', 'G2', 'T08', '2004-08-20', 'Nagasruthimanivannan', '{"isStudent": true, "isTeamLeader": false, "isCoordinator": false, "isPlacementRep": false}'),
-('25mx334@psgtech.ac.in', 'Nandhithasri', '25MX334', 'G2', 'T03', NULL, 'nandhithasri315', '{"isStudent": true, "isTeamLeader": false, "isCoordinator": false, "isPlacementRep": false}'),
+('25mx334@psgtech.ac.in', 'Nandhithasri', '25MX334', 'G2', 'T03', '2005-01-03', 'nandhithasri315', '{"isStudent": true, "isTeamLeader": false, "isCoordinator": false, "isPlacementRep": false}'),
 ('25mx335@psgtech.ac.in', 'Naveen Pranab T', '25MX335', 'G2', 'T21', NULL, 'Naveenpranab', '{"isStudent": true, "isTeamLeader": false, "isCoordinator": false, "isPlacementRep": false}'),
 ('25mx336@psgtech.ac.in', 'Nitheesh Muthu Krishnan C', '25MX336', 'G2', 'T07', '2005-07-05', 'nitheeshmk5', '{"isStudent": true, "isTeamLeader": true, "isCoordinator": true, "isPlacementRep": false}'),
 ('25mx337@psgtech.ac.in', 'Nithyashree C', '25MX337', 'G2', 'T19', NULL, 'Nithyashree_C', '{"isStudent": true, "isTeamLeader": false, "isCoordinator": false, "isPlacementRep": false}'),
@@ -130,7 +130,7 @@ INSERT INTO public.whitelist (email, name, reg_no, batch, team_id, dob, leetcode
 ('25mx350@psgtech.ac.in', 'Srivikashni S', '25MX350', 'G2', 'T09', '2004-09-06', 'SRIVIKASHNI', '{"isStudent": true, "isTeamLeader": false, "isCoordinator": false, "isPlacementRep": false}'),
 ('25mx351@psgtech.ac.in', 'Suriya C S', '25MX351', 'G2', 'T06', NULL, 'suriyaCSD', '{"isStudent": true, "isTeamLeader": false, "isCoordinator": false, "isPlacementRep": false}'),
 ('25mx352@psgtech.ac.in', 'Tamilini S', '25MX352', 'G2', 'T09', '2004-10-29', 'oi8UIWVPvT', '{"isStudent": true, "isTeamLeader": true, "isCoordinator": false, "isPlacementRep": false}'),
-('25mx353@psgtech.ac.in', 'Thrisha R', '25MX353', 'G2', 'T10', NULL, 'Thrishaa123', '{"isStudent": true, "isTeamLeader": false, "isCoordinator": false, "isPlacementRep": false}'),
+('25mx353@psgtech.ac.in', 'Thrisha R', '25MX353', 'G2', 'T10', '2004-02-23', 'Thrishaa123', '{"isStudent": true, "isTeamLeader": false, "isCoordinator": false, "isPlacementRep": false}'),
 ('25mx354@psgtech.ac.in', 'Tino Britty J', '25MX354', 'G2', 'T18', '2004-07-08', 'tinobritty', '{"isStudent": true, "isTeamLeader": false, "isCoordinator": false, "isPlacementRep": true}'),
 ('25mx355@psgtech.ac.in', 'Vaishali S', '25MX355', 'G2', 'T20', '2005-01-02', '__Vaishu_7__', '{"isStudent": true, "isTeamLeader": false, "isCoordinator": false, "isPlacementRep": false}'),
 ('25mx356@psgtech.ac.in', 'Vignesh M', '25MX356', 'G2', 'T08', '2004-01-31', 'Vix-codes', '{"isStudent": true, "isTeamLeader": false, "isCoordinator": false, "isPlacementRep": false}'),
@@ -151,32 +151,12 @@ ON CONFLICT (email) DO UPDATE SET
     roles = EXCLUDED.roles;
 
 -- ========================================
--- SYNC TO USERS TABLE (for login)
+-- NOTE: users table is NOT pre-populated here.
+-- The users table references auth.users(id) via FK.
+-- Rows are auto-created by the handle_new_user trigger
+-- (in 04_triggers.sql) the moment a student completes
+-- their first OTP login. This is the correct Supabase pattern.
 -- ========================================
--- Note: This creates users with generated UUIDs
--- Real users are created when they sign up via auth
-
--- Insert all whitelist entries into users table
-INSERT INTO public.users (id, email, reg_no, name, team_id, batch, roles, dob, leetcode_username)
-SELECT 
-    gen_random_uuid(),  -- Generate UUID since not auth.users yet
-    w.email,
-    w.reg_no,
-    w.name,
-    w.team_id,
-    COALESCE(w.batch, 'G1'),
-    COALESCE(w.roles, '{"isStudent": true}'::jsonb),
-    w.dob,
-    w.leetcode_username
-FROM whitelist w
-ON CONFLICT (email) DO UPDATE SET
-    name = EXCLUDED.name,
-    reg_no = EXCLUDED.reg_no,
-    team_id = EXCLUDED.team_id,
-    batch = EXCLUDED.batch,
-    roles = EXCLUDED.roles,
-    dob = EXCLUDED.dob,
-    leetcode_username = EXCLUDED.leetcode_username;
 
 -- ========================================
 -- INSERT LEETCODE STATS
@@ -190,15 +170,7 @@ WHERE leetcode_username IS NOT NULL AND leetcode_username != ''
 ON CONFLICT (username) DO NOTHING;
 
 -- ========================================
--- VERIFICATION
--- ========================================
-DO $$
-DECLARE
-    whitelist_count INT;
-    users_count INT;
-    leetcode_count INT;
--- ========================================
--- 2. APP CONFIGURATION
+-- APP CONFIGURATION
 -- ========================================
 
 INSERT INTO app_config (

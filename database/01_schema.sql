@@ -46,7 +46,7 @@ CREATE INDEX IF NOT EXISTS idx_users_roles ON users USING GIN(roles);
 CREATE TABLE IF NOT EXISTS whitelist (
     email TEXT PRIMARY KEY,
     name TEXT,
-    reg_no TEXT,
+    reg_no TEXT UNIQUE,
     batch TEXT,
     team_id TEXT,
     dob DATE,

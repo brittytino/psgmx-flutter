@@ -2,8 +2,21 @@
 -- PSG BUNKER – eCampus Tables
 -- ========================================
 -- File 6: Attendance & CGPA cache from PSG eCampus portal
--- Run this in Supabase SQL Editor AFTER 01_schema.sql
+-- Run this in Supabase SQL Editor AFTER 05_seed_data.sql
 -- ========================================
+
+-- Ensure whitelist.reg_no has a UNIQUE constraint
+-- (required for FK references below; safe to run even if already set)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'whitelist_reg_no_unique'
+          AND conrelid = 'whitelist'::regclass
+    ) THEN
+        ALTER TABLE whitelist ADD CONSTRAINT whitelist_reg_no_unique UNIQUE (reg_no);
+    END IF;
+END $$;
 
 -- TABLE: ecampus_attendance
 -- One row per student, stores full JSON payload returned by the scraper.

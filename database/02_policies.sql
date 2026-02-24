@@ -234,8 +234,12 @@ DROP POLICY IF EXISTS "task_completions_read_team" ON task_completions;
 CREATE POLICY "task_completions_read_team" ON task_completions
     FOR SELECT TO authenticated
     USING (
-        is_team_leader(auth.uid()) 
-        AND team_id = get_user_team(auth.uid())
+        is_team_leader(auth.uid())
+        AND EXISTS (
+            SELECT 1 FROM users
+            WHERE users.id = task_completions.user_id
+              AND users.team_id = get_user_team(auth.uid())
+        )
     );
 
 -- Placement Reps can read ALL submissions
@@ -280,36 +284,14 @@ CREATE POLICY "app_config_update_admin" ON app_config
     FOR UPDATE USING (is_placement_rep(auth.uid()) OR is_coordinator(auth.uid()));
 
 -- ========================================
--- SUCCESS MESSAGE
+-- FINISH
 -- ========================================
 DO $$
 BEGIN
     RAISE NOTICE '';
     RAISE NOTICE '========================================';
-    RAISE NOTICE '✅ STEP 2 COMPLETE: RLS POLICIES';
--- ========================================
--- APP CONFIG POLICIES
--- ========================================
-
-ALTER TABLE app_config ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Allow public read access to app_config" ON app_config;
-CREATE POLICY "Allow public read access to app_config" ON app_config
-    FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Only service role can modify app_config" ON app_config;
-CREATE POLICY "Only service role can modify app_config" ON app_config
-    FOR ALL USING (auth.role() = 'service_role')
-    WITH CHECK (auth.role() = 'service_role');
-
--- ========================================
--- FINISH
--- ========================================
-DO $$
-BEGIN
-    RAISE NOTICE '========================================';
-    RAISE NOTICE '✅ RLS Policies setup successfully.';
-    RAISE NOTICE 'Policies applied to all 13 tables.';
-    RAISE NOTICE 'NEXT: Run 03_functions.sql';
+    RAISE NOTICE '✅ STEP 3 COMPLETE: RLS POLICIES';
+    RAISE NOTICE 'Policies applied to all tables.';
+    RAISE NOTICE 'NEXT: Run 04_triggers.sql';
     RAISE NOTICE '========================================';
 END $$;
