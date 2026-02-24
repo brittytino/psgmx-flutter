@@ -23,6 +23,7 @@ import 'providers/announcement_provider.dart';
 import 'providers/attendance_provider.dart';
 import 'providers/navigation_provider.dart';
 import 'providers/theme_provider.dart';
+import 'providers/ecampus_provider.dart';
 import 'services/auth_service.dart';
 import 'services/supabase_service.dart';
 import 'services/supabase_db_service.dart';
@@ -108,6 +109,9 @@ class PsgMxApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(
           create: (_) => ThemeProvider(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => EcampusProvider(),
         ),
       ],
       child: const PsgMxAppInner(),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/user_provider.dart';
+import '../../providers/ecampus_provider.dart';
 import '../../models/app_user.dart';
 import '../../core/theme/app_dimens.dart';
 import '../../services/notification_service.dart';
@@ -362,6 +363,7 @@ class ProfileScreen extends StatelessWidget {
             style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
             onPressed: () {
               Navigator.pop(context); // Close dialog
+              context.read<EcampusProvider>().reset();
               provider.signOut();
             }, 
             child: const Text("Sign Out")

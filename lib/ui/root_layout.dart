@@ -6,6 +6,7 @@ import '../core/utils/responsive_helper.dart';
 import 'home/home_screen.dart';
 import 'tasks/tasks_screen.dart';
 import 'attendance/comprehensive_attendance_screen.dart';
+import 'bunker/bunker_screen.dart';
 import 'reports/modern_reports_screen.dart';
 import 'profile/profile_screen.dart';
 
@@ -37,6 +38,7 @@ class _RootLayoutState extends State<RootLayout> {
       const HomeScreen(),
       const TasksScreen(),
       const ComprehensiveAttendanceScreen(),
+      const BunkerScreen(),
       if (showReports) const ModernReportsScreen(),
       const ProfileScreen(),
     ];
@@ -57,6 +59,11 @@ class _RootLayoutState extends State<RootLayout> {
         icon: const Icon(Icons.calendar_today_outlined), 
         selectedIcon: Icon(Icons.calendar_today, color: Theme.of(context).colorScheme.primary), 
         label: 'Attendance'
+      ),
+      NavigationDestination(
+        icon: const Icon(Icons.school_outlined),
+        selectedIcon: Icon(Icons.school, color: Theme.of(context).colorScheme.primary),
+        label: 'Bunker'
       ),
       if (showReports)
         NavigationDestination(
