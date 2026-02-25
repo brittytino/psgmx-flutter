@@ -61,9 +61,9 @@ class _RootLayoutState extends State<RootLayout> {
         label: 'Attendance'
       ),
       NavigationDestination(
-        icon: const Icon(Icons.school_outlined),
-        selectedIcon: Icon(Icons.school, color: Theme.of(context).colorScheme.primary),
-        label: 'Bunker'
+        icon: const Icon(Icons.insights_outlined),
+        selectedIcon: Icon(Icons.insights, color: Theme.of(context).colorScheme.primary),
+        label: 'Academics'
       ),
       if (showReports)
         NavigationDestination(

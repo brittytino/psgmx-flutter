@@ -23,6 +23,33 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- Student attendance summary view used by reports and attendance services
+CREATE OR REPLACE VIEW student_attendance_summary AS
+SELECT
+    u.id AS student_id,
+    u.id AS user_id,
+    u.email,
+    u.reg_no,
+    u.name,
+    u.team_id,
+    u.batch,
+    COALESCE(SUM(CASE WHEN ar.status = 'PRESENT' THEN 1 ELSE 0 END), 0)::int AS present_count,
+    COALESCE(SUM(CASE WHEN ar.status = 'ABSENT' THEN 1 ELSE 0 END), 0)::int AS absent_count,
+    COALESCE(SUM(CASE WHEN ar.status IN ('PRESENT', 'ABSENT') THEN 1 ELSE 0 END), 0)::int AS total_working_days,
+    CASE
+        WHEN COALESCE(SUM(CASE WHEN ar.status IN ('PRESENT', 'ABSENT') THEN 1 ELSE 0 END), 0) = 0 THEN 0.0
+        ELSE ROUND(
+            COALESCE(SUM(CASE WHEN ar.status = 'PRESENT' THEN 1 ELSE 0 END), 0)::numeric
+            / NULLIF(COALESCE(SUM(CASE WHEN ar.status IN ('PRESENT', 'ABSENT') THEN 1 ELSE 0 END), 0), 0)
+            * 100,
+            2
+        )
+    END AS attendance_percentage
+FROM users u
+LEFT JOIN attendance_records ar ON ar.user_id = u.id
+WHERE COALESCE((u.roles->>'isStudent')::boolean, true) = true
+GROUP BY u.id, u.email, u.reg_no, u.name, u.team_id, u.batch;
+
 -- Check if user is placement rep
 CREATE OR REPLACE FUNCTION is_placement_rep(user_id UUID)
 RETURNS BOOLEAN AS $$
@@ -93,6 +120,33 @@ BEGIN
     ORDER BY sad.date ASC;
 END;
 $$ LANGUAGE plpgsql STABLE;
+
+-- Team task completion stats for a date
+CREATE OR REPLACE FUNCTION get_team_task_completion_stats(
+    p_team_id TEXT,
+    p_date DATE
+)
+RETURNS TABLE (
+    total_members INT,
+    completed_count INT,
+    completion_percentage NUMERIC
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        COUNT(u.id)::int AS total_members,
+        SUM(CASE WHEN tc.completed THEN 1 ELSE 0 END)::int AS completed_count,
+        CASE
+            WHEN COUNT(u.id) = 0 THEN 0
+            ELSE ROUND(SUM(CASE WHEN tc.completed THEN 1 ELSE 0 END)::numeric / COUNT(u.id) * 100, 2)
+        END AS completion_percentage
+    FROM users u
+    LEFT JOIN task_completions tc
+        ON tc.user_id = u.id
+       AND tc.task_date = p_date
+    WHERE u.team_id = p_team_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ========================================
 -- FIX: LeetCode Username Synchronization
@@ -178,6 +232,8 @@ BEGIN
     RAISE NOTICE '  - get_user_team';
     RAISE NOTICE '  - is_date_scheduled';
     RAISE NOTICE '  - get_scheduled_dates';
+    RAISE NOTICE '  - get_team_task_completion_stats';
+    RAISE NOTICE '  - student_attendance_summary (view)';
     RAISE NOTICE '  - update_leetcode_username_unified';
     RAISE NOTICE '';
     RAISE NOTICE 'NEXT: Run 02_policies.sql  (functions must exist before policies)';

@@ -156,7 +156,9 @@ BEGIN
             dob,
             birthday_notifications_enabled,
             leetcode_notifications_enabled,
-            task_reminders_enabled
+            task_reminders_enabled,
+            attendance_alerts_enabled,
+            announcements_enabled
         ) VALUES (
             NEW.id,   -- Real UUID from auth.users — no gen_random_uuid()!
             NEW.email,
@@ -167,6 +169,8 @@ BEGIN
             COALESCE(wl.roles, '{"isStudent": true, "isTeamLeader": false, "isCoordinator": false, "isPlacementRep": false}'::jsonb),
             wl.leetcode_username,
             wl.dob,
+            TRUE,
+            TRUE,
             TRUE,
             TRUE,
             TRUE

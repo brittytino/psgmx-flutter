@@ -28,6 +28,8 @@ CREATE TABLE IF NOT EXISTS users (
     birthday_notifications_enabled BOOLEAN DEFAULT TRUE,
     leetcode_notifications_enabled BOOLEAN DEFAULT TRUE,
     task_reminders_enabled BOOLEAN DEFAULT TRUE,
+    attendance_alerts_enabled BOOLEAN DEFAULT TRUE,
+    announcements_enabled BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -170,6 +172,22 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 
 -- ========================================
+-- TABLE 8B: announcements
+-- ========================================
+CREATE TABLE IF NOT EXISTS announcements (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    is_priority BOOLEAN NOT NULL DEFAULT FALSE,
+    expiry_date TIMESTAMPTZ,
+    created_by UUID REFERENCES users(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_announcements_created_at ON announcements(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_announcements_priority ON announcements(is_priority DESC);
+
+-- ========================================
 -- TABLE 9: notification_reads
 -- ========================================
 CREATE TABLE IF NOT EXISTS notification_reads (
@@ -200,17 +218,37 @@ CREATE TABLE IF NOT EXISTS attendance_days (
 CREATE TABLE IF NOT EXISTS task_completions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    task_id UUID NOT NULL REFERENCES daily_tasks(id) ON DELETE CASCADE,
-    proof_link TEXT,
-    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'verified', 'rejected')),
+    task_date DATE NOT NULL,
+    completed BOOLEAN NOT NULL DEFAULT FALSE,
+    completed_at TIMESTAMPTZ,
     verified_by UUID REFERENCES users(id),
     verified_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(user_id, task_id)
+    UNIQUE(user_id, task_date)
 );
 CREATE INDEX IF NOT EXISTS idx_completions_user_id ON task_completions(user_id);
-CREATE INDEX IF NOT EXISTS idx_completions_task_id ON task_completions(task_id);
+CREATE INDEX IF NOT EXISTS idx_completions_task_date ON task_completions(task_date);
+
+-- ========================================
+-- TABLE 11B: defaulter_flags
+-- ========================================
+CREATE TABLE IF NOT EXISTS defaulter_flags (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    defaulter_status BOOLEAN NOT NULL DEFAULT FALSE,
+    defaulter_reason TEXT NOT NULL DEFAULT '',
+    consecutive_absences INT NOT NULL DEFAULT 0,
+    attendance_percentage NUMERIC(5,2),
+    detected_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    resolved_at TIMESTAMPTZ,
+    resolved_by UUID REFERENCES users(id),
+    notes TEXT,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_defaulter_status ON defaulter_flags(defaulter_status);
+CREATE INDEX IF NOT EXISTS idx_defaulter_detected_at ON defaulter_flags(detected_at DESC);
 
 -- ========================================
 -- TABLE 12: app_config

@@ -6,9 +6,10 @@ import '../../providers/ecampus_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../models/ecampus_attendance.dart';
 import '../../models/ecampus_cgpa.dart';
+import '../../services/ecampus_service.dart';
 import 'widgets/subject_attendance_card.dart';
 
-/// Main "Bunker Mode" screen – shows PSG eCampus attendance (tab 1) and
+/// Main "Academic Insights" screen – shows PSG eCampus attendance (tab 1) and
 /// CGPA (tab 2) with a pull-to-sync trigger.
 class BunkerScreen extends StatefulWidget {
   const BunkerScreen({super.key});
@@ -20,6 +21,8 @@ class BunkerScreen extends StatefulWidget {
 class _BunkerScreenState extends State<BunkerScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  bool _syncAllInProgress = false;
+  bool _dobDialogShown = false;
 
   @override
   void initState() {
@@ -27,9 +30,17 @@ class _BunkerScreenState extends State<BunkerScreen>
     _tabController = TabController(length: 2, vsync: this);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final rollno =
-          context.read<UserProvider>().currentUser?.regNo;
-      if (rollno != null && rollno.isNotEmpty) {
+      final userProvider = context.read<UserProvider>();
+      final user = userProvider.currentUser;
+      if (user == null) return;
+
+      if (user.dob == null) {
+        _showDobRequiredDialog(userProvider);
+        return;
+      }
+
+      final rollno = user.regNo;
+      if (rollno.isNotEmpty) {
         context.read<EcampusProvider>().init(rollno);
       }
     });
@@ -42,10 +53,189 @@ class _BunkerScreenState extends State<BunkerScreen>
   }
 
   Future<void> _onRefresh() async {
-    final rollno =
-        context.read<UserProvider>().currentUser?.regNo;
-    if (rollno != null) {
+    final userProvider = context.read<UserProvider>();
+    final user = userProvider.currentUser;
+    if (user == null) return;
+
+    if (user.dob == null) {
+      _showDobRequiredDialog(userProvider);
+      return;
+    }
+
+    if (user.regNo.isNotEmpty) {
       await context.read<EcampusProvider>().sync();
+    }
+  }
+
+  Future<void> _showDobRequiredDialog(UserProvider userProvider) async {
+    if (_dobDialogShown || !mounted) return;
+    _dobDialogShown = true;
+
+    final theme = Theme.of(context);
+    final picked = await showDialog<DateTime>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.cake_outlined, color: theme.colorScheme.primary),
+            const SizedBox(width: 8),
+            const Text('Add your DOB'),
+          ],
+        ),
+        content: Text(
+          'To view attendance insights, set your date of birth. This is used to '
+          'securely generate your eCampus password in the required format '
+          '(e.g. 08jul04).',
+          style: theme.textTheme.bodyMedium,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: const Text('Not now'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              final now = DateTime.now();
+              final initial = userProvider.currentUser?.dob ??
+                  DateTime(now.year - 20, now.month, now.day);
+              final pickedDate = await showDatePicker(
+                context: ctx,
+                initialDate: initial,
+                firstDate: DateTime(1990),
+                lastDate: DateTime(now.year - 10),
+                helpText: 'Select your date of birth',
+              );
+              if (!ctx.mounted) return;
+              Navigator.of(ctx).pop(pickedDate);
+            },
+            icon: const Icon(Icons.edit_calendar),
+            label: const Text('Pick date'),
+          ),
+        ],
+      ),
+    );
+
+    if (picked != null) {
+      try {
+        await userProvider.updateDob(picked);
+        final rollno = userProvider.currentUser?.regNo;
+        if (rollno != null && rollno.isNotEmpty && mounted) {
+          context.read<EcampusProvider>().init(rollno);
+        }
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save DOB: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+
+    _dobDialogShown = false;
+  }
+
+  Future<void> _syncAllStudents() async {
+    if (_syncAllInProgress) return;
+
+    final userProvider = context.read<UserProvider>();
+    if (!userProvider.isActualPlacementRep) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Refresh all students?'),
+        content: const Text(
+          'This will sync attendance and CGPA for all students and can take several minutes. Continue?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Start sync'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !mounted) return;
+
+    setState(() => _syncAllInProgress = true);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Syncing all students...'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+
+    try {
+      final result = await EcampusService().syncAllUsers();
+      final total = result['total'] ?? 0;
+      final success = result['success_count'] ?? 0;
+      final failed = result['failed_count'] ?? 0;
+      final failedList = (result['failed'] as List?) ?? [];
+
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Sync results'),
+          content: SizedBox(
+            width: 360,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Total: $total'),
+                  Text('Succeeded: $success'),
+                  Text('Failed: $failed'),
+                  if (failedList.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Failed roll numbers',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 6),
+                    ...failedList.map((item) {
+                      final rollno = item['rollno'] ?? 'Unknown';
+                      final error = item['error'] ?? 'Unknown error';
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Text('- $rollno: $error'),
+                      );
+                    }),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Sync failed: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _syncAllInProgress = false);
+      }
     }
   }
 
@@ -53,6 +243,45 @@ class _BunkerScreenState extends State<BunkerScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final user = context.watch<UserProvider>().currentUser;
+
+    if (user != null && user.dob == null) {
+      return Scaffold(
+        backgroundColor:
+            isDark ? const Color(0xFF0F0F1A) : const Color(0xFFF5F5F5),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.cake_outlined,
+                    size: 64,
+                    color: theme.colorScheme.onSurface
+                        .withValues(alpha: 0.4)),
+                const SizedBox(height: 16),
+                Text(
+                  'Set your date of birth to access attendance insights.',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    color: theme.colorScheme.onSurface
+                        .withValues(alpha: 0.7),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton.icon(
+                  onPressed: () =>
+                      _showDobRequiredDialog(context.read<UserProvider>()),
+                  icon: const Icon(Icons.edit_calendar),
+                  label: const Text('Set DOB'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor:
@@ -74,7 +303,7 @@ class _BunkerScreenState extends State<BunkerScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Bunker Mode 🏕️',
+                    'Academic Insights',
                     style: GoogleFonts.inter(
                       fontSize: 22,
                       fontWeight: FontWeight.w800,
@@ -109,13 +338,30 @@ class _BunkerScreenState extends State<BunkerScreen>
                       ? const SizedBox(
                           width: 20,
                           height: 20,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2),
+                          child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.sync_rounded),
                   tooltip: 'Sync from eCampus',
                   onPressed: prov.isSyncing ? null : _onRefresh,
                 ),
+              ),
+              Consumer<UserProvider>(
+                builder: (_, userProv, __) {
+                  if (!userProv.isActualPlacementRep) {
+                    return const SizedBox.shrink();
+                  }
+                  return IconButton(
+                    icon: _syncAllInProgress
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.sync_alt_rounded),
+                    tooltip: 'Sync all students',
+                    onPressed: _syncAllInProgress ? null : _syncAllStudents,
+                  );
+                },
               ),
             ],
             bottom: TabBar(

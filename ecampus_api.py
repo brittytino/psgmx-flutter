@@ -30,7 +30,7 @@ log = logging.getLogger("ecampus_api")
 # ─── Supabase client ─────────────────────────────────────────────────────────
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
-API_SECRET = os.environ.get("API_SECRET", "psg-bunker-api-secret")
+API_SECRET = os.environ.get("API_SECRET", "change-me-to-a-long-random-string")
 
 _supabase: Client | None = None
 
@@ -55,6 +55,51 @@ def _get_supabase() -> Client:
             detail="Supabase configuration invalid. Check SUPABASE_SERVICE_KEY.",
         )
     return _supabase
+
+
+def _get_bearer_token(authorization: str | None) -> str | None:
+    if not authorization:
+        return None
+    parts = authorization.split(" ")
+    if len(parts) == 2 and parts[0].lower() == "bearer":
+        return parts[1]
+    return None
+
+
+def _require_placement_rep(authorization: str | None) -> str:
+    token = _get_bearer_token(authorization)
+    if not token:
+        raise HTTPException(status_code=401, detail="Missing bearer token")
+
+    sb = _get_supabase()
+    try:
+        user_res = sb.auth.get_user(token)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid auth token")
+
+    user = getattr(user_res, "user", None)
+    if user is None and isinstance(user_res, dict):
+        user = user_res.get("user")
+
+    user_id = getattr(user, "id", None) if user is not None else None
+    if user_id is None and isinstance(user, dict):
+        user_id = user.get("id")
+
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid auth token")
+
+    role_row = (
+        sb.table("users")
+        .select("roles")
+        .eq("id", user_id)
+        .maybe_single()
+        .execute()
+    )
+    roles = role_row.data.get("roles") if role_row.data else None
+    if not isinstance(roles, dict) or not roles.get("isPlacementRep", False):
+        raise HTTPException(status_code=403, detail="Placement rep access required")
+
+    return user_id
 
 # ─── FastAPI app ─────────────────────────────────────────────────────────────
 app = FastAPI(
@@ -469,12 +514,16 @@ def get_cgpa(
 
 
 @app.post("/api/ecampus/sync-all")
-def sync_all_users(x_api_secret: str | None = Header(None)):
+def sync_all_users(
+    x_api_secret: str | None = Header(None),
+    authorization: str | None = Header(None),
+):
     """
     Syncs eCampus data for ALL students in the whitelist that have a DOB set.
     Useful for a scheduled cron job (run nightly).  Returns a summary.
     """
     _check_secret(x_api_secret)
+    _require_placement_rep(authorization)
 
     result = (
         _get_supabase().table("whitelist")

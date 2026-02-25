@@ -18,8 +18,10 @@ ALTER TABLE scheduled_attendance_dates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE attendance_records ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE announcements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notification_reads ENABLE ROW LEVEL SECURITY;
 ALTER TABLE task_completions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE defaulter_flags ENABLE ROW LEVEL SECURITY;
 ALTER TABLE app_config ENABLE ROW LEVEL SECURITY;
 
 -- ========================================
@@ -211,6 +213,18 @@ CREATE POLICY "notifications_manage" ON notifications
     FOR ALL USING (is_placement_rep(auth.uid()) OR is_coordinator(auth.uid()));
 
 -- ========================================
+-- ANNOUNCEMENTS POLICIES
+-- ========================================
+
+DROP POLICY IF EXISTS "announcements_read_all" ON announcements;
+CREATE POLICY "announcements_read_all" ON announcements
+    FOR SELECT USING (TRUE);
+
+DROP POLICY IF EXISTS "announcements_manage" ON announcements;
+CREATE POLICY "announcements_manage" ON announcements
+    FOR ALL USING (is_placement_rep(auth.uid()) OR is_coordinator(auth.uid()));
+
+-- ========================================
 -- NOTIFICATION_READS POLICIES
 -- ========================================
 
@@ -252,23 +266,74 @@ CREATE POLICY "task_completions_read_rep" ON task_completions
 DROP POLICY IF EXISTS "task_completions_insert_own" ON task_completions;
 CREATE POLICY "task_completions_insert_own" ON task_completions
     FOR INSERT TO authenticated
-    WITH CHECK (user_id = auth.uid());
+    WITH CHECK (
+        user_id = auth.uid()
+        OR (
+            is_team_leader(auth.uid())
+            AND EXISTS (
+                SELECT 1 FROM users
+                WHERE users.id = task_completions.user_id
+                  AND users.team_id = get_user_team(auth.uid())
+            )
+        )
+        OR is_placement_rep(auth.uid())
+        OR is_coordinator(auth.uid())
+    );
 
 -- Team Leaders can verify (update) their team's submissions
 DROP POLICY IF EXISTS "task_completions_update_verify" ON task_completions;
 CREATE POLICY "task_completions_update_verify" ON task_completions
     FOR UPDATE TO authenticated
     USING (
-        is_team_leader(auth.uid()) 
+        (
+            is_team_leader(auth.uid())
+            AND EXISTS (
+                SELECT 1 FROM users
+                WHERE users.id = task_completions.user_id
+                  AND users.team_id = get_user_team(auth.uid())
+            )
+        )
         OR is_placement_rep(auth.uid())
         OR is_coordinator(auth.uid())
     );
 
--- Users can update/delete their PENDING submissions (resubmit)
+-- Users can update their own submissions
 DROP POLICY IF EXISTS "task_completions_update_own" ON task_completions;
 CREATE POLICY "task_completions_update_own" ON task_completions
     FOR UPDATE TO authenticated
-    USING (user_id = auth.uid() AND status = 'pending');
+    USING (user_id = auth.uid());
+
+-- ========================================
+-- DEFAULTER_FLAGS POLICIES
+-- ========================================
+
+DROP POLICY IF EXISTS "defaulter_read_own" ON defaulter_flags;
+CREATE POLICY "defaulter_read_own" ON defaulter_flags
+    FOR SELECT TO authenticated
+    USING (user_id = auth.uid());
+
+DROP POLICY IF EXISTS "defaulter_read_team" ON defaulter_flags;
+CREATE POLICY "defaulter_read_team" ON defaulter_flags
+    FOR SELECT TO authenticated
+    USING (
+        is_team_leader(auth.uid())
+        AND EXISTS (
+            SELECT 1 FROM users
+            WHERE users.id = defaulter_flags.user_id
+              AND users.team_id = get_user_team(auth.uid())
+        )
+    );
+
+DROP POLICY IF EXISTS "defaulter_read_admin" ON defaulter_flags;
+CREATE POLICY "defaulter_read_admin" ON defaulter_flags
+    FOR SELECT TO authenticated
+    USING (is_placement_rep(auth.uid()) OR is_coordinator(auth.uid()));
+
+DROP POLICY IF EXISTS "defaulter_manage_admin" ON defaulter_flags;
+CREATE POLICY "defaulter_manage_admin" ON defaulter_flags
+    FOR ALL TO authenticated
+    USING (is_placement_rep(auth.uid()) OR is_coordinator(auth.uid()))
+    WITH CHECK (is_placement_rep(auth.uid()) OR is_coordinator(auth.uid()));
 
 -- ========================================
 -- APP_CONFIG POLICIES

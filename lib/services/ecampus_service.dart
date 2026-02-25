@@ -11,11 +11,11 @@ import '../models/ecampus_cgpa.dart';
 class EcampusConfig {
   static const String apiUrl = String.fromEnvironment(
     'ECAMPUS_API_URL',
-    defaultValue: 'https://psg-bunker-api.onrender.com', // change to your Render URL
+    defaultValue: 'https://psgmx-ecampus-api.onrender.com', // change to your Render URL
   );
   static const String apiSecret = String.fromEnvironment(
     'ECAMPUS_API_SECRET',
-    defaultValue: 'psg-bunker-api-secret', // must match API_SECRET env var on server
+    defaultValue: 'change-me-to-a-long-random-string', // must match API_SECRET env var on server
   );
 }
 
@@ -33,6 +33,26 @@ class EcampusService {
         'X-Api-Secret': EcampusConfig.apiSecret,
       };
 
+  Map<String, String> get _authHeaders {
+    final session = _supabase.auth.currentSession;
+    final token = session?.accessToken;
+    if (token == null || token.isEmpty) {
+      return _headers;
+    }
+    return {
+      ..._headers,
+      'Authorization': 'Bearer $token',
+    };
+  }
+
+  Map<String, dynamic>? _tryDecodeJson(String body) {
+    try {
+      return jsonDecode(body) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
   // ─── Trigger a sync on the backend ────────────────────────────────────────
 
   /// Calls the backend to scrape eCampus and store fresh data in Supabase.
@@ -43,17 +63,51 @@ class EcampusService {
 
     debugPrint('[EcampusService] POST $uri');
     final response = await http
-        .post(uri, headers: _headers)
+        .post(uri, headers: _authHeaders)
         .timeout(const Duration(seconds: 60));
 
+    final body = _tryDecodeJson(response.body);
     if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
+      if (body == null) {
+        throw Exception('Unexpected response from server.');
+      }
+      return body;
     }
 
-    final body = jsonDecode(response.body);
-    throw Exception(
-      body['detail'] ?? 'Sync failed (HTTP ${response.statusCode})',
-    );
+    final detail = body?['detail'] ?? body?['message'];
+    final message = detail ??
+        (response.body.isNotEmpty
+            ? response.body
+            : 'Sync failed (HTTP ${response.statusCode})');
+    throw Exception(message);
+  }
+
+  /// Trigger a sync for all students (placement rep only).
+  Future<Map<String, dynamic>> syncAllUsers() async {
+    if (_supabase.auth.currentSession?.accessToken == null) {
+      throw Exception('Please sign in again to refresh all students.');
+    }
+    final uri = Uri.parse('${EcampusConfig.apiUrl}/api/ecampus/sync-all');
+
+    debugPrint('[EcampusService] POST $uri');
+    final response = await http
+        .post(uri, headers: _authHeaders)
+        .timeout(const Duration(minutes: 5));
+
+    final body = _tryDecodeJson(response.body);
+    if (response.statusCode == 200) {
+      if (body == null) {
+        throw Exception('Unexpected response from server.');
+      }
+      return body;
+    }
+
+    final detail = body?['detail'] ?? body?['message'];
+    final message = detail ??
+        (response.body.isNotEmpty
+            ? response.body
+            : 'Sync failed (HTTP ${response.statusCode})');
+    throw Exception(message);
   }
 
   // ─── Read from Supabase cache ─────────────────────────────────────────────
