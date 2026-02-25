@@ -32,10 +32,29 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
 API_SECRET = os.environ.get("API_SECRET", "psg-bunker-api-secret")
 
-if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
-    raise RuntimeError("Missing SUPABASE_URL or SUPABASE_SERVICE_KEY")
+_supabase: Client | None = None
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
+def _get_supabase() -> Client:
+    """Create and cache the Supabase client on first use."""
+    global _supabase
+    if _supabase is not None:
+        return _supabase
+    if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
+        log.error("Supabase env vars are missing")
+        raise HTTPException(
+            status_code=500,
+            detail="Supabase not configured. Set SUPABASE_URL and SUPABASE_SERVICE_KEY.",
+        )
+    try:
+        _supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    except Exception as exc:
+        log.error(f"Supabase init failed: {exc}")
+        raise HTTPException(
+            status_code=500,
+            detail="Supabase configuration invalid. Check SUPABASE_SERVICE_KEY.",
+        )
+    return _supabase
 
 # ─── FastAPI app ─────────────────────────────────────────────────────────────
 app = FastAPI(
@@ -269,7 +288,7 @@ def _fetch_cgpa(session: requests.Session) -> dict:
 def _get_user_dob(rollno: str) -> date:
     """Fetch DOB from Supabase whitelist table by reg_no."""
     result = (
-        supabase.table("whitelist")
+        _get_supabase().table("whitelist")
         .select("dob")
         .eq("reg_no", rollno)
         .maybe_single()
@@ -283,7 +302,7 @@ def _get_user_dob(rollno: str) -> date:
 
 
 def _upsert_attendance(rollno: str, data: dict) -> None:
-    supabase.table("ecampus_attendance").upsert(
+    _get_supabase().table("ecampus_attendance").upsert(
         {
             "reg_no": rollno,
             "data": data,
@@ -294,7 +313,7 @@ def _upsert_attendance(rollno: str, data: dict) -> None:
 
 
 def _upsert_cgpa(rollno: str, data: dict) -> None:
-    supabase.table("ecampus_cgpa").upsert(
+    _get_supabase().table("ecampus_cgpa").upsert(
         {
             "reg_no": rollno,
             "data": data,
@@ -325,7 +344,7 @@ def _upsert_bunked(rollno: str, subjects: list[dict]) -> None:
             }
         )
 
-    supabase.table("ecampus_bunked_subjects").upsert(
+    _get_supabase().table("ecampus_bunked_subjects").upsert(
         rows,
         on_conflict="reg_no,course_code",
     ).execute()
@@ -333,7 +352,7 @@ def _upsert_bunked(rollno: str, subjects: list[dict]) -> None:
 
 def _read_attendance(rollno: str) -> dict | None:
     result = (
-        supabase.table("ecampus_attendance")
+        _get_supabase().table("ecampus_attendance")
         .select("data, synced_at")
         .eq("reg_no", rollno)
         .maybe_single()
@@ -344,7 +363,7 @@ def _read_attendance(rollno: str) -> dict | None:
 
 def _read_cgpa(rollno: str) -> dict | None:
     result = (
-        supabase.table("ecampus_cgpa")
+        _get_supabase().table("ecampus_cgpa")
         .select("data, synced_at")
         .eq("reg_no", rollno)
         .maybe_single()
@@ -458,7 +477,7 @@ def sync_all_users(x_api_secret: str | None = Header(None)):
     _check_secret(x_api_secret)
 
     result = (
-        supabase.table("whitelist")
+        _get_supabase().table("whitelist")
         .select("reg_no, dob")
         .not_.is_("dob", "null")
         .not_.is_("reg_no", "null")
