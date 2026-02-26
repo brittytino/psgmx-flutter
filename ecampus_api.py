@@ -506,8 +506,13 @@ def _read_cgpa(rollno: str) -> dict | None:
     return result.data
 
 
-def _fetch_ca_timetable(session: requests.Session) -> list[list[str]]:
-    """Scrape CA test timetable rows from PSG eCampus."""
+def _fetch_ca_timetable(session: requests.Session) -> list:
+    """Scrape CA test timetable rows from PSG eCampus.
+
+    Returns either:
+        - list[list[str]] for table layouts, OR
+        - list[dict] for card layouts (course_code/course_name/test_date/slot_no/session).
+    """
     page = session.get(CA_TIMETABLE_URL, headers=HEADERS, timeout=20)
     soup = BeautifulSoup(page.text, "html.parser")
 
@@ -530,7 +535,33 @@ def _fetch_ca_timetable(session: requests.Session) -> list[list[str]]:
                 break
 
     if not table:
-        return []  # timetable not published yet
+        # Card layout (new portal UI): extract from blocks containing labels.
+        cards = []
+        for el in soup.find_all(["div", "section"]):
+            text = el.get_text(" ", strip=True)
+            if not text:
+                continue
+            lt = text.lower()
+            if "course code" in lt and "test date" in lt and "session" in lt:
+                cards.append(text)
+
+        def _extract(text: str, pattern: str) -> str:
+            m = re.search(pattern, text, re.IGNORECASE)
+            return m.group(1).strip() if m else ""
+
+        items: list[dict] = []
+        for t in cards:
+            item = {
+                "course_code": _extract(t, r"Course\s*Code\s*[:\-]?\s*([A-Z0-9]+)"),
+                "course_name": _extract(t, r"Course\s*Name\s*[:\-]?\s*([A-Za-z0-9 .,&()\-/]+)"),
+                "test_date": _extract(t, r"Test\s*Date\s*[:\-]?\s*([0-9]{1,2}/[A-Za-z]{3}/[0-9]{2,4}|[0-9]{1,2}/[0-9]{1,2}/[0-9]{2,4}|[A-Za-z]{3,9}\s+[0-9]{1,2},?\s+[0-9]{2,4})"),
+                "slot_no": _extract(t, r"Slot\s*No\s*[:\-]?\s*([A-Za-z0-9]+)"),
+                "session": _extract(t, r"Session\s*[:\-]?\s*([0-9:.\sAPMapm\-]+)"),
+            }
+            if any(v for v in item.values()):
+                items.append(item)
+
+        return items  # may be empty if timetable not published
 
     rows: list[list[str]] = []
     for tr in table.find_all("tr"):
@@ -541,7 +572,7 @@ def _fetch_ca_timetable(session: requests.Session) -> list[list[str]]:
     return rows
 
 
-def _parse_ca_timetable(rows: list[list[str]]) -> dict:
+def _parse_ca_timetable(rows: list) -> dict:
     """Parse CA timetable rows into a structured JSON payload.
 
     Returns:
@@ -549,6 +580,26 @@ def _parse_ca_timetable(rows: list[list[str]]) -> dict:
     """
     if not rows:
         return {"headers": [], "rows": [], "note": "CA timetable not published yet"}
+
+    # Card layout: rows is list of dicts
+    if isinstance(rows[0], dict):
+        headers = ["Course Code", "Course Name", "Test Date", "Slot No", "Session"]
+
+        def _norm(h: str) -> str:
+            key = re.sub(r"[^a-z0-9]+", "_", h.strip().lower()).strip("_")
+            return key or "col"
+
+        parsed_rows = []
+        for r in rows:
+            parsed_rows.append({
+                _norm("Course Code"): r.get("course_code", ""),
+                _norm("Course Name"): r.get("course_name", ""),
+                _norm("Test Date"): r.get("test_date", ""),
+                _norm("Slot No"): r.get("slot_no", ""),
+                _norm("Session"): r.get("session", ""),
+            })
+
+        return {"headers": headers, "rows": parsed_rows}
 
     header_row = rows[0]
     header_text = " ".join(header_row).lower()
@@ -987,7 +1038,14 @@ def get_ca_timetable(
     If timetable has not been published yet, rows may be empty.
     """
     _check_secret(x_api_secret)
-    row = _read_ca_timetable(rollno)
+    try:
+        row = _read_ca_timetable(rollno)
+    except Exception as exc:
+        log.error(f"[ca-timetable] read failed for {rollno}: {exc}")
+        raise HTTPException(
+            status_code=502,
+            detail="Unable to read CA timetable right now. Please try again later.",
+        )
     if not row:
         raise HTTPException(
             status_code=404,
