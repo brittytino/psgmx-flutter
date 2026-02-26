@@ -396,6 +396,43 @@ def _get_user_dob(rollno: str) -> date:
     return dob_value
 
 
+def _resolve_ecampus_password(rollno: str) -> str:
+    """Return the eCampus login password to use for *rollno*.
+
+    Priority order:
+    1. Custom password in ``users.ecampus_password``  (student changed it)
+    2. DOB-derived password from ``users.dob``
+    3. DOB-derived password from ``whitelist.dob``  (with write-back)
+
+    Raises ``HTTPException(404)`` when no credential source is found.
+    """
+    sb = _get_supabase()
+
+    # 1 + 2 — check users table (service_role reads ecampus_password freely)
+    user_row = (
+        sb.table("users")
+        .select("ecampus_password, dob")
+        .eq("reg_no", rollno)
+        .maybe_single()
+        .execute()
+    )
+    if user_row.data:
+        custom_pwd = (user_row.data.get("ecampus_password") or "").strip()
+        if custom_pwd:
+            log.info(f"[creds] {rollno} – using custom eCampus password")
+            return custom_pwd
+
+        user_dob = user_row.data.get("dob")
+        if user_dob:
+            dob = _parse_dob_value(user_dob)
+            log.info(f"[creds] {rollno} – using DOB-derived password (users table)")
+            return _dob_to_password(dob)
+
+    # 3 — fallback to whitelist (also does DOB write-back)
+    dob = _get_user_dob(rollno)   # raises 404 if still not found
+    return _dob_to_password(dob)
+
+
 def _upsert_attendance(rollno: str, data: dict) -> None:
     _get_supabase().table("ecampus_attendance").upsert(
         {
@@ -630,9 +667,15 @@ def _read_ca_marks(rollno: str) -> dict | None:
     return result.data
 
 
-def _sync_single_rollno(rollno: str, dob_value: date) -> tuple[dict, dict, dict]:
-    """Sync one student end-to-end and return (attendance, cgpa, ca_marks) payloads."""
-    password = _dob_to_password(dob_value)
+def _sync_single_rollno(rollno: str, password: str) -> tuple[dict, dict, dict]:
+    """Sync one student end-to-end and return (attendance, cgpa, ca_marks) payloads.
+
+    Args:
+        rollno:   Student roll number (e.g. "25MX354").
+        password: Resolved eCampus login password – either a custom password set
+                  by the student or the default DOB-derived value.  Use
+                  ``_resolve_ecampus_password(rollno)`` to obtain this.
+    """
     session = _ecampus_session(rollno, password)
     raw_rows = _fetch_attendance(session)
     course_map = _fetch_course_map(session)
@@ -650,10 +693,15 @@ def _sync_single_rollno(rollno: str, dob_value: date) -> tuple[dict, dict, dict]
     _upsert_bunked(rollno, att_data.get("subjects", []))
     _upsert_ca_marks(rollno, ca_data)
     return att_data, cgpa_data, ca_data
-    return att_data, cgpa_data
 
 
 def _get_whitelist_students_with_dob() -> list[dict]:
+    """Return all whitelist students that have *either* a custom eCampus password
+    or a DOB.  Each item has ``reg_no`` and the pre-resolved ``password`` string
+    so callers don't need to repeat resolution logic.
+
+    Students with neither a DOB nor a custom password are skipped (logged).
+    """
     sb = _get_supabase()
     whitelist_rows = (
         sb.table("whitelist")
@@ -663,38 +711,55 @@ def _get_whitelist_students_with_dob() -> list[dict]:
         .execute()
     ).data or []
 
+    # Fetch custom passwords AND DOBs from users table in one call.
+    # service_role can read ecampus_password; authenticated clients cannot.
     users_rows = (
         sb.table("users")
-        .select("reg_no, dob")
+        .select("reg_no, dob, ecampus_password")
         .not_.is_("reg_no", "null")
-        .not_.is_("dob", "null")
         .execute()
     ).data or []
 
-    users_dob = {r.get("reg_no"): r.get("dob") for r in users_rows if r.get("reg_no")}
+    users_map: dict[str, dict] = {
+        r["reg_no"]: r for r in users_rows if r.get("reg_no")
+    }
+
     merged: list[dict] = []
-    writeback_rows: list[dict] = []   # bulk write-back DOBs found in users but not whitelist
+    writeback_rows: list[dict] = []
 
     for row in whitelist_rows:
         reg_no = row.get("reg_no")
         if not reg_no:
             continue
-        dob = row.get("dob") or users_dob.get(reg_no)
-        if not dob:
-            log.warning(f"[whitelist] {reg_no} – no DOB found in whitelist or users; skipping sync")
+
+        u = users_map.get(reg_no, {})
+        custom_pwd = (u.get("ecampus_password") or "").strip()
+
+        # Resolve password: custom > users DOB > whitelist DOB
+        if custom_pwd:
+            merged.append({"reg_no": reg_no, "password": custom_pwd})
+            log.debug(f"[whitelist] {reg_no} – using custom eCampus password")
             continue
 
-        if not row.get("dob") and users_dob.get(reg_no):
-            # Parse first so we always write the canonical YYYY-MM-DD string
-            try:
-                dob_parsed = _parse_dob_value(dob)
-                writeback_rows.append({"reg_no": reg_no, "dob": dob_parsed.isoformat()})
-            except Exception:
-                pass  # keep going even if parse fails; sync will surface the error
+        dob = row.get("dob") or u.get("dob")
+        if not dob:
+            log.warning(
+                f"[whitelist] {reg_no} – no credentials (no custom password, no DOB); skipping"
+            )
+            continue
 
-        merged.append({"reg_no": reg_no, "dob": dob})
+        try:
+            dob_parsed = _parse_dob_value(dob)
+        except Exception as exc:
+            log.warning(f"[whitelist] {reg_no} – could not parse DOB '{dob}': {exc}; skipping")
+            continue
 
-    # Bulk write-back discovered DOBs to whitelist (one call per row to avoid upsert issues)
+        # Write-back: persist DOB to whitelist if it only existed in users
+        if not row.get("dob") and u.get("dob"):
+            writeback_rows.append({"reg_no": reg_no, "dob": dob_parsed.isoformat()})
+
+        merged.append({"reg_no": reg_no, "password": _dob_to_password(dob_parsed)})
+
     for wb in writeback_rows:
         try:
             sb.table("whitelist").update({"dob": wb["dob"]}).eq("reg_no", wb["reg_no"]).execute()
@@ -730,13 +795,13 @@ def sync_user(
     _check_secret(x_api_secret)
     log.info(f"[sync] Starting sync for {rollno}")
 
-    # 1. Resolve DOB → password
-    dob    = _get_user_dob(rollno)
-    log.info(f"[sync] {rollno} – DOB resolved, logging in to eCampus")
+    # 1. Resolve eCampus password (custom > DOB-derived; 404 if neither is set)
+    password = _resolve_ecampus_password(rollno)
+    log.info(f"[sync] {rollno} – credentials resolved, logging in to eCampus")
 
     # 2. Sync + persist
     try:
-        att_data, cgpa_data, ca_data = _sync_single_rollno(rollno, dob)
+        att_data, cgpa_data, ca_data = _sync_single_rollno(rollno, password)
     except Exception as exc:
         log.error(f"[sync] Login/sync failed for {rollno}: {exc}")
         raise HTTPException(status_code=502, detail=f"eCampus sync failed: {exc}")
@@ -818,25 +883,27 @@ def sync_all_users(
     _require_placement_rep(authorization)
 
     students = _get_whitelist_students_with_dob()
-    log.info(f"[sync-all] Found {len(students)} students with DOB")
+    log.info(f"[sync-all] Found {len(students)} students with credentials (custom pwd or DOB)")
 
-    # Total whitelist count (for reporting students missing DOB)
+    # Total whitelist count (for reporting students missing credentials)
     all_whitelist = (
         _get_supabase().table("whitelist").select("reg_no", count="exact")
         .not_.is_("reg_no", "null").execute()
     )
     total_whitelist = all_whitelist.count or len(students)
-    no_dob_count = total_whitelist - len(students)
-    if no_dob_count > 0:
-        log.warning(f"[sync-all] {no_dob_count} students in whitelist have no DOB – they will be skipped")
+    no_creds_count = total_whitelist - len(students)
+    if no_creds_count > 0:
+        log.warning(
+            f"[sync-all] {no_creds_count} students in whitelist have no password/DOB – they will be skipped"
+        )
 
     success, failed = [], []
     for s in students:
         rollno = s["reg_no"]
+        password = s["password"]   # already resolved by _get_whitelist_students_with_dob
         try:
-            dob = _parse_dob_value(s["dob"])
-            log.info(f"[sync-all] syncing {rollno} (DOB={dob} → pwd={_dob_to_password(dob)})")
-            _sync_single_rollno(rollno, dob)
+            log.info(f"[sync-all] syncing {rollno}")
+            _sync_single_rollno(rollno, password)
             success.append(rollno)
             log.info(f"[sync-all] ✔ {rollno}")
         except Exception as exc:
@@ -854,8 +921,8 @@ def sync_all_users(
     return {
         "ok": True,
         "total_whitelist": total_whitelist,
-        "students_with_dob": len(students),
-        "no_dob_skipped": no_dob_count,
+        "students_with_credentials": len(students),
+        "no_credentials_skipped": no_creds_count,
         "success_count": len(success),
         "failed_count": len(failed),
         "failed": failed,

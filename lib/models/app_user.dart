@@ -72,6 +72,11 @@ class AppUser {
   final bool attendanceAlertsEnabled;
   final bool announcementsEnabled;
 
+  /// True when the student has saved a custom eCampus portal password.
+  /// The actual password is NEVER stored in this model – only this flag
+  /// is read from the DB so the UI can show the correct status.
+  final bool ecampusPasswordSet;
+
   AppUser({
     required this.uid,
     required this.email,
@@ -89,6 +94,7 @@ class AppUser {
     this.taskRemindersEnabled = true,
     this.attendanceAlertsEnabled = true,
     this.announcementsEnabled = true,
+    this.ecampusPasswordSet = false,
   })  : createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now();
 
@@ -132,6 +138,7 @@ class AppUser {
       taskRemindersEnabled: data['task_reminders_enabled'] ?? true,
       attendanceAlertsEnabled: data['attendance_alerts_enabled'] ?? true,
       announcementsEnabled: data['announcements_enabled'] ?? true,
+      ecampusPasswordSet: data['ecampus_password_set'] ?? false,
     );
   }
 
@@ -156,6 +163,7 @@ class AppUser {
       'task_reminders_enabled': taskRemindersEnabled,
       'attendance_alerts_enabled': attendanceAlertsEnabled,
       'announcements_enabled': announcementsEnabled,
+      'ecampus_password_set': ecampusPasswordSet,
     };
   }
 
@@ -169,6 +177,7 @@ class AppUser {
     bool? taskRemindersEnabled,
     bool? attendanceAlertsEnabled,
     bool? announcementsEnabled,
+    bool? ecampusPasswordSet,
     String? teamId,
   }) {
     return AppUser(
@@ -191,6 +200,7 @@ class AppUser {
       attendanceAlertsEnabled:
           attendanceAlertsEnabled ?? this.attendanceAlertsEnabled,
       announcementsEnabled: announcementsEnabled ?? this.announcementsEnabled,
+      ecampusPasswordSet: ecampusPasswordSet ?? this.ecampusPasswordSet,
     );
   }
 }

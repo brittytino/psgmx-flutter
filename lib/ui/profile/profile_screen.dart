@@ -182,6 +182,21 @@ class ProfileScreen extends StatelessWidget {
                         onTap: () => _editDob(context, provider, user.dob),
                       ),
                        Divider(height: 1, indent: 56, color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
+                      ListTile(
+                        leading: const Icon(Icons.vpn_key_outlined),
+                        title: const Text('eCampus Password'),
+                        subtitle: Text(
+                          user.ecampusPasswordSet
+                              ? 'Custom password set'
+                              : user.dob != null
+                                  ? 'Default – derived from your DOB'
+                                  : 'Not configured',
+                        ),
+                        trailing: const Icon(Icons.edit, size: 18),
+                        onTap: () => _editEcampusPassword(
+                            context, provider, user.ecampusPasswordSet),
+                      ),
+                       Divider(height: 1, indent: 56, color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
                       SwitchListTile(
                         secondary: const Icon(Icons.celebration_outlined),
                         title: const Text("Birthday Notifications"),
@@ -348,6 +363,119 @@ class ProfileScreen extends StatelessWidget {
     
     if (date != null) {
       await provider.updateDob(date);
+    }
+  }
+
+  /// Shows a dialog where the student can enter or clear their custom eCampus
+  /// portal password.  The password is stored securely on the server and is
+  /// NEVER read back to the app – only the [ecampusPasswordSet] flag is exposed.
+  Future<void> _editEcampusPassword(
+    BuildContext context,
+    UserProvider provider,
+    bool currentlySet,
+  ) async {
+    final theme = Theme.of(context);
+    final controller = TextEditingController();
+    bool obscure = true;
+
+    final result = await showDialog<String?>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.vpn_key_outlined, color: theme.colorScheme.primary),
+              const SizedBox(width: 8),
+              const Text('eCampus Password'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                currentlySet
+                    ? 'Your custom eCampus password is saved. Enter a new '
+                        'password to replace it, or tap Clear to revert to '
+                        'the default (DOB-based) password.'
+                    : 'Only set this if you changed your eCampus portal '
+                        'login password from the default format (e.g. 08jul04). '
+                        'Leave it blank if you haven\'t changed it.',
+                style: theme.textTheme.bodySmall,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                obscureText: obscure,
+                autofillHints: const [],   // prevent autofill of app credentials
+                decoration: InputDecoration(
+                  labelText: 'New eCampus Password',
+                  hintText: currentlySet ? '(leave blank to keep current)' : null,
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: Icon(obscure
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined),
+                    onPressed: () => setState(() => obscure = !obscure),
+                    tooltip: obscure ? 'Show' : 'Hide',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(null),
+              child: const Text('Cancel'),
+            ),
+            if (currentlySet)
+              TextButton(
+                style: TextButton.styleFrom(
+                    foregroundColor: theme.colorScheme.error),
+                onPressed: () => Navigator.of(ctx).pop(''),  // empty = clear
+                child: const Text('Clear'),
+              ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(ctx).pop(controller.text),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    controller.dispose();
+
+    if (result == null) return; // cancelled
+
+    // If currently set and user submitted blank input, treat as "keep existing"
+    if (currentlySet && result.trim().isEmpty) return;
+
+    try {
+      await provider.updateEcampusPassword(
+          result.trim().isEmpty ? null : result.trim());
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              result.trim().isEmpty
+                  ? 'eCampus password cleared. Using DOB-based default.'
+                  : 'Custom eCampus password saved.',
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save: $e'),
+            backgroundColor: theme.colorScheme.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 

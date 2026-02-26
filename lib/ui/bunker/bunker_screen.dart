@@ -213,7 +213,9 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
         content: Text(
           'To view attendance insights, set your date of birth. This is used to '
           'securely generate your eCampus password in the required format '
-          '(e.g. 08jul04).',
+          '(e.g. 08jul04).\n\n'
+          'If you changed your eCampus password, use the \'Custom Password\' '
+          'option on the previous screen instead.',
           style: theme.textTheme.bodyMedium,
         ),
         actions: [
@@ -263,6 +265,97 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
     }
 
     _dobDialogShown = false;
+  }
+
+  /// Quick-access dialog for students who changed their eCampus password.
+  /// Mirrors the same flow as in profile_screen.dart but surfaces it inline
+  /// so the student doesn't have to navigate away from the academics screen.
+  Future<void> _showCustomPasswordDialog(UserProvider userProvider) async {
+    if (!mounted) return;
+    final theme = Theme.of(context);
+    final controller = TextEditingController();
+    bool obscure = true;
+
+    final result = await showDialog<String?>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.vpn_key_outlined, color: theme.colorScheme.primary),
+              const SizedBox(width: 8),
+              const Text('Custom eCampus Password'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Enter the password you use to log in to the eCampus portal. '
+                'Only needed if you changed it from the default DOB-based format '
+                '(e.g. 08jul04).',
+                style: theme.textTheme.bodySmall,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                obscureText: obscure,
+                autofillHints: const [],
+                decoration: InputDecoration(
+                  labelText: 'eCampus Password',
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: Icon(obscure
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined),
+                    onPressed: () => setState(() => obscure = !obscure),
+                    tooltip: obscure ? 'Show' : 'Hide',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(null),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(ctx).pop(controller.text),
+              child: const Text('Save & Load'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    controller.dispose();
+    if (result == null || result.trim().isEmpty) return;
+
+    try {
+      await userProvider.updateEcampusPassword(result.trim());
+      final rollno = userProvider.currentUser?.regNo;
+      if (rollno != null && rollno.isNotEmpty && mounted) {
+        context.read<EcampusProvider>().init(rollno);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Password saved. Loading your data\u2026'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to save password: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   Future<void> _syncAllStudents() async {
@@ -472,7 +565,7 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
     final isDark = theme.brightness == Brightness.dark;
     final user = context.watch<UserProvider>().currentUser;
 
-    if (!_isPlacementRep && user != null && user.dob == null) {
+    if (!_isPlacementRep && user != null && user.dob == null && !user.ecampusPasswordSet) {
       return Scaffold(
         backgroundColor:
             isDark ? const Color(0xFF0F0F1A) : const Color(0xFFF5F5F5),
@@ -482,26 +575,45 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.cake_outlined,
+                Icon(Icons.lock_person_outlined,
                     size: 64,
                     color: theme.colorScheme.onSurface
                         .withValues(alpha: 0.4)),
                 const SizedBox(height: 16),
                 Text(
-                  'Set your date of birth to access attendance insights.',
+                  'eCampus Credentials Required',
+                  style: GoogleFonts.inter(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'To load your attendance and academic data, set your date '  
+                  'of birth (used to generate your eCampus password), or '   
+                  'enter a custom password if you changed it on the portal.',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
-                    fontSize: 14,
-                    color: theme.colorScheme.onSurface
-                        .withValues(alpha: 0.7),
+                    fontSize: 13,
+                    height: 1.5,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
                 ElevatedButton.icon(
                   onPressed: () =>
                       _showDobRequiredDialog(context.read<UserProvider>()),
                   icon: const Icon(Icons.edit_calendar),
-                  label: const Text('Set DOB'),
+                  label: const Text('Set Date of Birth'),
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: () => _showCustomPasswordDialog(
+                      context.read<UserProvider>()),
+                  icon: const Icon(Icons.vpn_key_outlined),
+                  label: const Text('Use Custom Password'),
                 ),
               ],
             ),
