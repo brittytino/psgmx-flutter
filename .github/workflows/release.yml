@@ -106,16 +106,8 @@ jobs:
             ### 📥 Download
             - **Android APK**: `PSGMX-${{ steps.version.outputs.TAG }}-android.apk`
             
-            ### 🔥 What's New in v2.2.7
-
-            #### Critical Fixes
-            - ✅ **Migrated to new Supabase project** — fresh DB with all policies corrected
-            - ✅ **Team Leader attendance** — can now mark/update attendance for any past scheduled date (not just today)
-            - ✅ **Attendance action card** — always visible for TLs; tappable even after first submission to allow corrections
-            - ✅ **Fixed class-day detection** — uses `scheduled_attendance_dates` (same source as the sheet) instead of legacy `attendance_days`
-            - ✅ **Birthday local notifications** — now fire a real Android/iOS push in addition to the in-app DB entry
-            - ✅ **Fixed RLS policies** — `task_completions` team policy, `notifications` insert for all authenticated users, `target_audience` constraint
-            - ✅ **Fixed DB syntax** — removed orphaned DO $$ block and broken users seed insert from SQL scripts
+            ### 🔥 What's New in this release
+            - ✅ See the changelog and commits for the full list of updates.
 
             ### 📋 Installation
             1. Download the APK file from assets below
@@ -135,7 +127,7 @@ jobs:
             UPDATE app_config SET 
                 latest_version = '${{ steps.version.outputs.VERSION }}', 
                 force_update = true,
-                update_message = 'Essential Update: Team Leaders can now correct/update today''s attendance. Fixed notification bugs and optimized UI. Kindly update now.',
+                update_message = 'A new PSGMX update is available. Please update to the latest version.',
                 github_release_url = 'https://github.com/brittytino/psgmx-flutter/releases/latest',
                 android_download_url = 'https://github.com/brittytino/psgmx-flutter/releases/download/${{ steps.version.outputs.TAG }}/PSGMX-${{ steps.version.outputs.TAG }}-android.apk'
             WHERE id IS NOT NULL;
