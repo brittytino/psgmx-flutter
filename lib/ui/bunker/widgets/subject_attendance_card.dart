@@ -185,7 +185,7 @@ class SubjectAttendanceCard extends StatelessWidget {
                       if (subject.isSafe && subject.canBunk > 0)
                         _StatPill(
                           icon: Icons.beach_access_rounded,
-                          label: 'Bunk ${subject.canBunk}',
+                          label: 'Can miss ${subject.canBunk}',
                           color: const Color(0xFF4CAF50),
                           isDark: isDark,
                         )

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../providers/ecampus_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../models/ecampus_attendance.dart';
@@ -11,28 +12,38 @@ import 'widgets/subject_attendance_card.dart';
 
 /// Main "Academic Insights" screen – shows PSG eCampus attendance (tab 1) and
 /// CGPA (tab 2) with a pull-to-sync trigger.
-class BunkerScreen extends StatefulWidget {
-  const BunkerScreen({super.key});
+class AcademicInsightsScreen extends StatefulWidget {
+  const AcademicInsightsScreen({super.key});
 
   @override
-  State<BunkerScreen> createState() => _BunkerScreenState();
+  State<AcademicInsightsScreen> createState() => _AcademicInsightsScreenState();
 }
 
-class _BunkerScreenState extends State<BunkerScreen>
+class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool _syncAllInProgress = false;
   bool _dobDialogShown = false;
+  bool _isPlacementRep = false;
+  bool _isLoadingAllStudents = false;
+  String? _allStudentsError;
+  List<_StudentAcademicEntry> _allStudents = [];
 
   @override
   void initState() {
     super.initState();
+    _isPlacementRep = context.read<UserProvider>().isActualPlacementRep;
     _tabController = TabController(length: 2, vsync: this);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final userProvider = context.read<UserProvider>();
       final user = userProvider.currentUser;
       if (user == null) return;
+
+      if (_isPlacementRep) {
+        _loadAllStudentsAcademicData();
+        return;
+      }
 
       if (user.dob == null) {
         _showDobRequiredDialog(userProvider);
@@ -46,25 +57,87 @@ class _BunkerScreenState extends State<BunkerScreen>
     });
   }
 
+  double? _asDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString());
+  }
+
+  Future<void> _loadAllStudentsAcademicData() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoadingAllStudents = true;
+      _allStudentsError = null;
+    });
+
+    try {
+      final supabase = Supabase.instance.client;
+      final whitelistResponse = await supabase
+          .from('whitelist')
+          .select('reg_no, name, dob')
+          .order('reg_no');
+
+      final attendanceResponse = await supabase
+          .from('ecampus_attendance')
+          .select('reg_no, data');
+
+      final cgpaResponse = await supabase
+          .from('ecampus_cgpa')
+          .select('reg_no, data');
+
+      final attendanceMap = <String, Map<String, dynamic>>{};
+      for (final row in (attendanceResponse as List)) {
+        final regNo = row['reg_no']?.toString();
+        if (regNo == null) continue;
+        attendanceMap[regNo] = (row['data'] as Map?)?.cast<String, dynamic>() ?? {};
+      }
+
+      final cgpaMap = <String, Map<String, dynamic>>{};
+      for (final row in (cgpaResponse as List)) {
+        final regNo = row['reg_no']?.toString();
+        if (regNo == null) continue;
+        cgpaMap[regNo] = (row['data'] as Map?)?.cast<String, dynamic>() ?? {};
+      }
+
+      final items = (whitelistResponse as List).map((row) {
+        final regNo = row['reg_no']?.toString() ?? '';
+        final attendanceData = attendanceMap[regNo] ?? const <String, dynamic>{};
+        final cgpaData = cgpaMap[regNo] ?? const <String, dynamic>{};
+        final summary = (attendanceData['summary'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
+
+        final dobValue = row['dob']?.toString();
+
+        return _StudentAcademicEntry(
+          regNo: regNo,
+          name: row['name']?.toString() ?? '-',
+          dobText: (dobValue == null || dobValue.isEmpty) ? 'null' : dobValue,
+          attendancePercentage: _asDouble(summary['overall_percentage']),
+          cgpa: _asDouble(cgpaData['cgpa']),
+        );
+      }).toList();
+
+      if (!mounted) return;
+      setState(() {
+        _allStudents = items;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _allStudentsError = 'Unable to load all students academic data right now.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingAllStudents = false;
+        });
+      }
+    }
+  }
+
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
-  }
-
-  Future<void> _onRefresh() async {
-    final userProvider = context.read<UserProvider>();
-    final user = userProvider.currentUser;
-    if (user == null) return;
-
-    if (user.dob == null) {
-      _showDobRequiredDialog(userProvider);
-      return;
-    }
-
-    if (user.regNo.isNotEmpty) {
-      await context.read<EcampusProvider>().sync();
-    }
   }
 
   Future<void> _showDobRequiredDialog(UserProvider userProvider) async {
@@ -144,12 +217,12 @@ class _BunkerScreenState extends State<BunkerScreen>
     final userProvider = context.read<UserProvider>();
     if (!userProvider.isActualPlacementRep) return;
 
-    final confirm = await showDialog<bool>(
+    final start = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Refresh all students?'),
+        title: const Text('Sync all student data?'),
         content: const Text(
-          'This will sync attendance and CGPA for all students and can take several minutes. Continue?',
+          'This will refresh attendance and CGPA for all students and store the latest values in Supabase.',
         ),
         actions: [
           TextButton(
@@ -158,85 +231,167 @@ class _BunkerScreenState extends State<BunkerScreen>
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Start sync'),
+            child: const Text('Start'),
           ),
         ],
       ),
     );
 
-    if (confirm != true || !mounted) return;
+    if (start != true || !mounted) return;
 
     setState(() => _syncAllInProgress = true);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Syncing all students...'),
-        behavior: SnackBarBehavior.floating,
-      ),
+
+    final syncState = ValueNotifier<_SyncAllDialogState>(
+      const _SyncAllDialogState.loading(),
     );
 
-    try {
-      final result = await EcampusService().syncAllUsers();
-      final total = result['total'] ?? 0;
-      final success = result['success_count'] ?? 0;
-      final failed = result['failed_count'] ?? 0;
-      final failedList = (result['failed'] as List?) ?? [];
+    () async {
+      try {
+        final result = await EcampusService().syncAllUsers();
+        final total = result['total'] ?? 0;
+        final success = result['success_count'] ?? 0;
+        final failed = result['failed_count'] ?? 0;
+        final failedList = (result['failed'] as List?) ?? [];
 
-      if (!mounted) return;
-      await showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Sync results'),
-          content: SizedBox(
-            width: 360,
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Total: $total'),
-                  Text('Succeeded: $success'),
-                  Text('Failed: $failed'),
-                  if (failedList.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Failed roll numbers',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 6),
-                    ...failedList.map((item) {
-                      final rollno = item['rollno'] ?? 'Unknown';
-                      final error = item['error'] ?? 'Unknown error';
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: Text('- $rollno: $error'),
-                      );
-                    }),
-                  ],
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Close'),
-            ),
-          ],
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Sync failed: $e'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _syncAllInProgress = false);
+        await _loadAllStudentsAcademicData();
+
+        syncState.value = _SyncAllDialogState.success(
+          total: total,
+          success: success,
+          failed: failed,
+          failedList: failedList,
+        );
+      } catch (e) {
+        syncState.value = const _SyncAllDialogState.error(
+          'Unable to complete sync right now. Please try again.',
+        );
+      } finally {
+        if (mounted) {
+          setState(() => _syncAllInProgress = false);
+        }
       }
-    }
+    }();
+
+    if (!mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return ValueListenableBuilder<_SyncAllDialogState>(
+          valueListenable: syncState,
+          builder: (_, state, __) {
+            return Dialog(
+              backgroundColor:
+                  isDark ? const Color(0xFF171728) : Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          state.isLoading
+                              ? Icons.sync
+                              : state.isSuccess
+                                  ? Icons.check_circle_rounded
+                                  : Icons.error_outline_rounded,
+                          color: state.isLoading
+                              ? Theme.of(ctx).colorScheme.primary
+                              : state.isSuccess
+                                  ? Colors.green
+                                  : Colors.redAccent,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          state.isLoading
+                              ? 'Sync in progress'
+                              : state.isSuccess
+                                  ? 'Sync completed'
+                                  : 'Sync failed',
+                          style: GoogleFonts.inter(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          onPressed: () => Navigator.of(ctx).pop(),
+                          icon: const Icon(Icons.close_rounded),
+                          tooltip: 'Close',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    if (state.isLoading) ...[
+                      Text(
+                        'Refreshing all student attendance and CGPA records. You can close this dialog and continue using the app.',
+                        style: GoogleFonts.inter(fontSize: 13),
+                      ),
+                      const SizedBox(height: 14),
+                      const LinearProgressIndicator(minHeight: 6),
+                    ] else if (state.isSuccess) ...[
+                      Text('Total: ${state.total}', style: GoogleFonts.inter(fontSize: 13)),
+                      Text('Succeeded: ${state.success}', style: GoogleFonts.inter(fontSize: 13)),
+                      Text('Failed: ${state.failed}', style: GoogleFonts.inter(fontSize: 13)),
+                      if (state.failedList.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        Text(
+                          'Failed roll numbers',
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        SizedBox(
+                          height: 140,
+                          child: ListView.builder(
+                            itemCount: state.failedList.length,
+                            itemBuilder: (_, index) {
+                              final item = state.failedList[index] as Map;
+                              final rollno = item['rollno'] ?? 'Unknown';
+                              return Text(
+                                '- $rollno',
+                                style: GoogleFonts.inter(fontSize: 12),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ] else ...[
+                      Text(
+                        state.errorMessage ??
+                            'Unable to complete sync right now. Please try again.',
+                        style: GoogleFonts.inter(fontSize: 13),
+                      ),
+                    ],
+                    if (!state.isLoading) ...[
+                      const SizedBox(height: 14),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: FilledButton(
+                          onPressed: () => Navigator.of(ctx).pop(),
+                          child: const Text('Done'),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    syncState.dispose();
   }
 
   @override
@@ -244,6 +399,10 @@ class _BunkerScreenState extends State<BunkerScreen>
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final user = context.watch<UserProvider>().currentUser;
+
+    if (_isPlacementRep) {
+      return _buildPlacementRepView(context, isDark, theme);
+    }
 
     if (user != null && user.dob == null) {
       return Scaffold(
@@ -332,19 +491,6 @@ class _BunkerScreenState extends State<BunkerScreen>
               ),
             ),
             actions: [
-              Consumer<EcampusProvider>(
-                builder: (_, prov, __) => IconButton(
-                  icon: prov.isSyncing
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.sync_rounded),
-                  tooltip: 'Sync from eCampus',
-                  onPressed: prov.isSyncing ? null : _onRefresh,
-                ),
-              ),
               Consumer<UserProvider>(
                 builder: (_, userProv, __) {
                   if (!userProv.isActualPlacementRep) {
@@ -381,22 +527,189 @@ class _BunkerScreenState extends State<BunkerScreen>
         ],
         body: TabBarView(
           controller: _tabController,
-          children: [
-            _AttendanceTab(onRefresh: _onRefresh),
-            _CgpaTab(onRefresh: _onRefresh),
+          children: const [
+            _AttendanceTab(),
+            _CgpaTab(),
           ],
         ),
       ),
     );
   }
+
+  Widget _buildPlacementRepView(
+      BuildContext context, bool isDark, ThemeData theme) {
+    return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF0F0F1A) : const Color(0xFFF5F5F5),
+      appBar: AppBar(
+        title: const Text('Academic Insights'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Reload from database',
+            onPressed: _isLoadingAllStudents ? null : _loadAllStudentsAcademicData,
+          ),
+          IconButton(
+            icon: _syncAllInProgress
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.sync_alt_rounded),
+            tooltip: 'Sync all students',
+            onPressed: _syncAllInProgress ? null : _syncAllStudents,
+          ),
+        ],
+      ),
+      body: _isLoadingAllStudents
+          ? const Center(child: CircularProgressIndicator())
+          : _allStudentsError != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(
+                      _allStudentsError!,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(fontSize: 14),
+                    ),
+                  ),
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  itemBuilder: (_, i) {
+                    final item = _allStudents[i];
+                    final attendance = item.attendancePercentage == null
+                        ? '—'
+                        : '${item.attendancePercentage!.toStringAsFixed(1)}%';
+                    final cgpa = item.cgpa == null
+                        ? '—'
+                        : item.cgpa!.toStringAsFixed(2);
+                    return Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF171728) : Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: theme.colorScheme.onSurface.withValues(alpha: 0.08),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(item.name,
+                                    style: GoogleFonts.inter(
+                                        fontSize: 14, fontWeight: FontWeight.w700)),
+                                const SizedBox(height: 4),
+                                Text('${item.regNo}  •  DOB: ${item.dobText}',
+                                    style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        color: theme.colorScheme.onSurface
+                                            .withValues(alpha: 0.6))),
+                              ],
+                            ),
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text('Attendance $attendance',
+                                  style: GoogleFonts.inter(fontSize: 12)),
+                              const SizedBox(height: 4),
+                              Text('CGPA $cgpa',
+                                  style: GoogleFonts.inter(
+                                      fontSize: 12, fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemCount: _allStudents.length,
+                ),
+    );
+  }
+}
+
+class _SyncAllDialogState {
+  final bool isLoading;
+  final bool isSuccess;
+  final String? errorMessage;
+  final int total;
+  final int success;
+  final int failed;
+  final List failedList;
+
+  const _SyncAllDialogState._({
+    required this.isLoading,
+    required this.isSuccess,
+    required this.errorMessage,
+    required this.total,
+    required this.success,
+    required this.failed,
+    required this.failedList,
+  });
+
+  const _SyncAllDialogState.loading()
+      : this._(
+          isLoading: true,
+          isSuccess: false,
+          errorMessage: null,
+          total: 0,
+          success: 0,
+          failed: 0,
+          failedList: const [],
+        );
+
+  const _SyncAllDialogState.success({
+    required int total,
+    required int success,
+    required int failed,
+    required List failedList,
+  }) : this._(
+          isLoading: false,
+          isSuccess: true,
+          errorMessage: null,
+          total: total,
+          success: success,
+          failed: failed,
+          failedList: failedList,
+        );
+
+  const _SyncAllDialogState.error(String message)
+      : this._(
+          isLoading: false,
+          isSuccess: false,
+          errorMessage: message,
+          total: 0,
+          success: 0,
+          failed: 0,
+          failedList: const [],
+        );
+}
+
+class _StudentAcademicEntry {
+  final String regNo;
+  final String name;
+  final String dobText;
+  final double? attendancePercentage;
+  final double? cgpa;
+
+  const _StudentAcademicEntry({
+    required this.regNo,
+    required this.name,
+    required this.dobText,
+    required this.attendancePercentage,
+    required this.cgpa,
+  });
 }
 
 // ─── Attendance Tab ──────────────────────────────────────────────────────────
 
 class _AttendanceTab extends StatelessWidget {
-  final Future<void> Function() onRefresh;
-
-  const _AttendanceTab({required this.onRefresh});
+  const _AttendanceTab();
 
   @override
   Widget build(BuildContext context) {
@@ -411,56 +724,49 @@ class _AttendanceTab extends StatelessWidget {
             message: prov.errorMessage ?? 'Something went wrong',
             onRetry: () => context
                 .read<EcampusProvider>()
-                .sync(),
+                .init(context.read<UserProvider>().currentUser?.regNo ?? ''),
           );
         }
 
         if (prov.attendance == null) {
-          return _EmptyView(
-            message: 'No attendance data yet.\nTap sync to fetch from eCampus.',
-            onSync: onRefresh,
-            isSyncing: prov.isSyncing,
+          return const _EmptyView(
+            message: 'No attendance data available yet.\nYour placement representative will refresh and publish updates.',
           );
         }
 
-        return RefreshIndicator(
-          onRefresh: onRefresh,
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverToBoxAdapter(
-                child: _AttendanceSummaryCard(
-                    summary: prov.attendance!.summary),
-              ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding:
-                      const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  child: Text(
-                    'Subject-wise Breakdown',
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.3,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withValues(alpha: 0.5),
-                    ),
+        return CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverToBoxAdapter(
+              child: _AttendanceSummaryCard(summary: prov.attendance!.summary),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Text(
+                  'Subject-wise Breakdown',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.3,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.5),
                   ),
                 ),
               ),
-              SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (ctx, i) => SubjectAttendanceCard(
-                    subject: prov.attendance!.subjects[i],
-                  ),
-                  childCount: prov.attendance!.subjects.length,
+            ),
+            SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (ctx, i) => SubjectAttendanceCard(
+                  subject: prov.attendance!.subjects[i],
                 ),
+                childCount: prov.attendance!.subjects.length,
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 24)),
-            ],
-          ),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 24)),
+          ],
         );
       },
     );
@@ -477,9 +783,9 @@ class _AttendanceSummaryCard extends StatelessWidget {
         ? const Color(0xFF4CAF50)
         : const Color(0xFFEF5350);
 
-    final String bunkMsg = summary.isSafe
-        ? '🎉 You can bunk ${summary.overallCanBunk} more class${summary.overallCanBunk == 1 ? '' : 'es'}'
-        : '⚠️ Attend ${summary.overallNeedAttend} more class${summary.overallNeedAttend == 1 ? '' : 'es'} to reach 75%';
+    final String complianceMsg = summary.isSafe
+      ? '✅ Attendance is healthy. You can miss up to ${summary.overallCanBunk} class${summary.overallCanBunk == 1 ? '' : 'es'} and remain above 75%.'
+      : '⚠️ Attend ${summary.overallNeedAttend} more class${summary.overallNeedAttend == 1 ? '' : 'es'} to meet the 75% requirement.';
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -589,7 +895,7 @@ class _AttendanceSummaryCard extends StatelessWidget {
 
             const SizedBox(height: 18),
 
-            // Bunk message
+            // Attendance recommendation message
             Container(
               padding:
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -598,7 +904,7 @@ class _AttendanceSummaryCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                bunkMsg,
+                complianceMsg,
                 style: GoogleFonts.inter(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -673,9 +979,7 @@ class _SummaryChip extends StatelessWidget {
 // ─── CGPA Tab ─────────────────────────────────────────────────────────────────
 
 class _CgpaTab extends StatelessWidget {
-  final Future<void> Function() onRefresh;
-
-  const _CgpaTab({required this.onRefresh});
+  const _CgpaTab();
 
   @override
   Widget build(BuildContext context) {
@@ -689,36 +993,31 @@ class _CgpaTab extends StatelessWidget {
           return _ErrorView(
             message: prov.errorMessage ?? 'Something went wrong',
             onRetry: () =>
-                context.read<EcampusProvider>().sync(),
+                context.read<EcampusProvider>().init(
+                    context.read<UserProvider>().currentUser?.regNo ?? ''),
           );
         }
 
         if (prov.cgpa == null) {
-          return _EmptyView(
-            message:
-                'No CGPA data yet.\nTap sync to fetch from eCampus.',
-            onSync: onRefresh,
-            isSyncing: prov.isSyncing,
+          return const _EmptyView(
+            message: 'No CGPA data available yet.\nYour placement representative will refresh and publish updates.',
           );
         }
 
-        return RefreshIndicator(
-          onRefresh: onRefresh,
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverToBoxAdapter(
-                child: _CgpaSummaryCard(cgpa: prov.cgpa!),
-              ),
-              SliverToBoxAdapter(
-                child: _SemesterSgpaSection(cgpa: prov.cgpa!),
-              ),
-              SliverToBoxAdapter(
-                child: _CourseResultsSection(cgpa: prov.cgpa!),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 24)),
-            ],
-          ),
+        return CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverToBoxAdapter(
+              child: _CgpaSummaryCard(cgpa: prov.cgpa!),
+            ),
+            SliverToBoxAdapter(
+              child: _SemesterSgpaSection(cgpa: prov.cgpa!),
+            ),
+            SliverToBoxAdapter(
+              child: _CourseResultsSection(cgpa: prov.cgpa!),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 24)),
+          ],
         );
       },
     );
@@ -1082,11 +1381,8 @@ class _CourseResultsSection extends StatelessWidget {
 
 class _EmptyView extends StatelessWidget {
   final String message;
-  final Future<void> Function() onSync;
-  final bool isSyncing;
 
-  const _EmptyView(
-      {required this.message, required this.onSync, required this.isSyncing});
+  const _EmptyView({required this.message});
 
   @override
   Widget build(BuildContext context) {
@@ -1114,19 +1410,6 @@ class _EmptyView extends StatelessWidget {
                     .withValues(alpha: 0.5),
                 height: 1.5,
               ),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: isSyncing ? null : onSync,
-              icon: isSyncing
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child:
-                          CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.sync_rounded, size: 18),
-              label: Text(isSyncing ? 'Syncing…' : 'Sync Now',
-                  style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
             ),
           ],
         ),

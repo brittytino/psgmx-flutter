@@ -417,6 +417,32 @@ def _read_cgpa(rollno: str) -> dict | None:
     return result.data
 
 
+def _sync_single_rollno(rollno: str, dob_value: date) -> tuple[dict, dict]:
+    """Sync one student end-to-end and return attendance + cgpa payloads."""
+    password = _dob_to_password(dob_value)
+    session = _ecampus_session(rollno, password)
+    raw_rows = _fetch_attendance(session)
+    course_map = _fetch_course_map(session)
+    att_data = _parse_attendance(raw_rows, course_map)
+    cgpa_data = _fetch_cgpa(session)
+    _upsert_attendance(rollno, att_data)
+    _upsert_cgpa(rollno, cgpa_data)
+    _upsert_bunked(rollno, att_data.get("subjects", []))
+    return att_data, cgpa_data
+
+
+def _get_whitelist_students_with_dob() -> list[dict]:
+    result = (
+        _get_supabase().table("whitelist")
+        .select("reg_no, dob")
+        .not_.is_("dob", "null")
+        .not_.is_("reg_no", "null")
+        .order("reg_no")
+        .execute()
+    )
+    return result.data or []
+
+
 # ─── API Routes ──────────────────────────────────────────────────────────────
 
 def _check_secret(x_api_secret: str | None) -> None:
@@ -444,31 +470,15 @@ def sync_user(
 
     # 1. Resolve DOB → password
     dob    = _get_user_dob(rollno)
-    password = _dob_to_password(dob)
     log.info(f"[sync] {rollno} – DOB resolved, logging in to eCampus")
 
-    # 2. Authenticate
+    # 2. Sync + persist
     try:
-        session = _ecampus_session(rollno, password)
+        att_data, cgpa_data = _sync_single_rollno(rollno, dob)
     except Exception as exc:
-        log.error(f"[sync] Login failed for {rollno}: {exc}")
-        raise HTTPException(status_code=502, detail=f"eCampus login failed: {exc}")
+        log.error(f"[sync] Login/sync failed for {rollno}: {exc}")
+        raise HTTPException(status_code=502, detail=f"eCampus sync failed: {exc}")
 
-    # 3. Fetch attendance
-    try:
-        raw_rows   = _fetch_attendance(session)
-        course_map = _fetch_course_map(session)
-        att_data   = _parse_attendance(raw_rows, course_map)
-    except ValueError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
-
-    # 4. Fetch CGPA
-    cgpa_data = _fetch_cgpa(session)
-
-    # 5. Store in Supabase
-    _upsert_attendance(rollno, att_data)
-    _upsert_cgpa(rollno, cgpa_data)
-    _upsert_bunked(rollno, att_data.get("subjects", []))
     log.info(f"[sync] {rollno} – data stored ✔")
 
     synced_at = datetime.utcnow().isoformat()
@@ -525,30 +535,15 @@ def sync_all_users(
     _check_secret(x_api_secret)
     _require_placement_rep(authorization)
 
-    result = (
-        _get_supabase().table("whitelist")
-        .select("reg_no, dob")
-        .not_.is_("dob", "null")
-        .not_.is_("reg_no", "null")
-        .execute()
-    )
-    students = result.data or []
+    students = _get_whitelist_students_with_dob()
     log.info(f"[sync-all] Found {len(students)} students with DOB")
 
     success, failed = [], []
     for s in students:
         rollno = s["reg_no"]
         try:
-            dob      = datetime.strptime(s["dob"], "%Y-%m-%d").date()
-            password = _dob_to_password(dob)
-            session  = _ecampus_session(rollno, password)
-            raw_rows   = _fetch_attendance(session)
-            course_map = _fetch_course_map(session)
-            att_data   = _parse_attendance(raw_rows, course_map)
-            cgpa_data  = _fetch_cgpa(session)
-            _upsert_attendance(rollno, att_data)
-            _upsert_cgpa(rollno, cgpa_data)
-            _upsert_bunked(rollno, att_data.get("subjects", []))
+            dob = datetime.strptime(s["dob"], "%Y-%m-%d").date()
+            _sync_single_rollno(rollno, dob)
             success.append(rollno)
             log.info(f"[sync-all] ✔ {rollno}")
         except Exception as exc:
@@ -562,6 +557,52 @@ def sync_all_users(
         "failed_count": len(failed),
         "failed": failed,
         "synced_at": datetime.utcnow().isoformat(),
+    }
+
+
+@app.get("/api/ecampus/sync-all/status")
+def sync_all_status(
+    x_api_secret: str | None = Header(None),
+    authorization: str | None = Header(None),
+):
+    """Returns bulk-sync coverage info so placement rep can verify DB writes."""
+    _check_secret(x_api_secret)
+    _require_placement_rep(authorization)
+
+    students = _get_whitelist_students_with_dob()
+    expected_regnos = {s["reg_no"] for s in students if s.get("reg_no")}
+
+    att_rows = (
+        _get_supabase().table("ecampus_attendance")
+        .select("reg_no, synced_at")
+        .execute()
+    ).data or []
+    cgpa_rows = (
+        _get_supabase().table("ecampus_cgpa")
+        .select("reg_no, synced_at")
+        .execute()
+    ).data or []
+
+    att_regnos = {r.get("reg_no") for r in att_rows if r.get("reg_no")}
+    cgpa_regnos = {r.get("reg_no") for r in cgpa_rows if r.get("reg_no")}
+
+    missing_attendance = sorted(list(expected_regnos - att_regnos))
+    missing_cgpa = sorted(list(expected_regnos - cgpa_regnos))
+
+    latest_att = max((r.get("synced_at", "") for r in att_rows), default="")
+    latest_cgpa = max((r.get("synced_at", "") for r in cgpa_rows), default="")
+
+    return {
+        "ok": True,
+        "expected_students": len(expected_regnos),
+        "attendance_rows": len(att_rows),
+        "cgpa_rows": len(cgpa_rows),
+        "latest_attendance_sync": latest_att or None,
+        "latest_cgpa_sync": latest_cgpa or None,
+        "missing_attendance_count": len(missing_attendance),
+        "missing_cgpa_count": len(missing_cgpa),
+        "missing_attendance": missing_attendance[:50],
+        "missing_cgpa": missing_cgpa[:50],
     }
 
 

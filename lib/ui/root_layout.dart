@@ -38,7 +38,7 @@ class _RootLayoutState extends State<RootLayout> {
       const HomeScreen(),
       const TasksScreen(),
       const ComprehensiveAttendanceScreen(),
-      const BunkerScreen(),
+      const AcademicInsightsScreen(),
       if (showReports) const ModernReportsScreen(),
       const ProfileScreen(),
     ];

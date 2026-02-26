@@ -105,10 +105,30 @@ class EcampusProvider extends ChangeNotifier {
   }
 
   void _setError(String msg) {
-    _errorMessage = msg;
+    _errorMessage = _toUserFriendlyError(msg);
     _status = EcampusStatus.error;
     debugPrint('[EcampusProvider] $msg');
     notifyListeners();
+  }
+
+  String _toUserFriendlyError(String raw) {
+    final text = raw.toLowerCase();
+    if (text.contains('invalid api secret') || text.contains('401')) {
+      return 'Service authentication failed. Please contact admin.';
+    }
+    if (text.contains('attendance table not found')) {
+      return 'Unable to read attendance from the academic portal right now. Please try again later.';
+    }
+    if (text.contains('login may have failed') || text.contains('login failed')) {
+      return 'Academic portal login failed. Verify your DOB is set correctly and try again later.';
+    }
+    if (text.contains('failed to load data')) {
+      return 'Unable to load academic data right now. Please try again.';
+    }
+    if (text.contains('sync failed')) {
+      return 'Unable to refresh academic data right now. Please try again later.';
+    }
+    return 'Something went wrong while loading academic data.';
   }
 
   void _cancelSubscriptions() {

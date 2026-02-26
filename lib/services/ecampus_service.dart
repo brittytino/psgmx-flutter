@@ -5,7 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/ecampus_attendance.dart';
 import '../models/ecampus_cgpa.dart';
 
-/// Configuration for the PSG Bunker eCampus API backend.
+/// Configuration for the PSG eCampus API backend.
 /// Set ECAMPUS_API_URL and ECAMPUS_API_SECRET via --dart-define at build time
 /// or override the defaults below for development.
 class EcampusConfig {
@@ -19,7 +19,7 @@ class EcampusConfig {
   );
 }
 
-/// Service that communicates with the PSG Bunker FastAPI backend and reads
+/// Service that communicates with the PSG FastAPI backend and reads
 /// cached data directly from Supabase.
 class EcampusService {
   static final EcampusService _instance = EcampusService._internal();
