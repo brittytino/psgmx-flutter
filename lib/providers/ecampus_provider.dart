@@ -72,10 +72,17 @@ class EcampusProvider extends ChangeNotifier {
         _cgpa = c;
         notifyListeners();
       });
-      _caSub = _service.caMarksStream(rollno).listen((ca) {
-        _caMarks = ca;
-        notifyListeners();
-      });
+      _caSub = _service.caMarksStream(rollno).listen(
+        (ca) {
+          _caMarks = ca;
+          notifyListeners();
+        },
+        onError: (Object e) {
+          // Non-fatal: keep subscription alive; CA marks will appear once synced.
+          debugPrint('[EcampusProvider] caMarksStream error (non-fatal): $e');
+        },
+        cancelOnError: false,
+      );
     } catch (e) {
       _setError('Failed to load data: $e');
     }

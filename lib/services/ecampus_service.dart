@@ -72,7 +72,10 @@ class EcampusService {
         statusCode == 500 ||
         statusCode == 502 ||
         statusCode == 503 ||
-        statusCode == 504;
+        statusCode == 504 ||
+        statusCode == 524 ||
+        statusCode == 525 ||
+        statusCode == 526;
   }
 
   String _friendlyErrorMessage(http.Response response) {
@@ -257,8 +260,10 @@ class EcampusService {
       if (result == null) return null;
       return EcampusCaMarks.fromSupabase(result);
     } catch (e) {
-      debugPrint('[EcampusService] getCaMarks error: $e');
-      rethrow;
+      // Non-fatal: table may not exist yet (migration pending) or transient
+      // network error (e.g. Cloudflare 525).  Attendance + CGPA must still load.
+      debugPrint('[EcampusService] getCaMarks error (non-fatal): $e');
+      return null;
     }
   }
 
@@ -310,6 +315,11 @@ class EcampusService {
         .map((rows) {
           if (rows.isEmpty) return null;
           return EcampusCaMarks.fromSupabase(rows.first);
+        })
+        .handleError((Object e) {
+          // Table may not exist yet (migration pending) or SSL error.
+          // Swallow silently so the stream stays alive when data appears later.
+          debugPrint('[EcampusService] caMarksStream error (non-fatal): $e');
         });
   }
 }

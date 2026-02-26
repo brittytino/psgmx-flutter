@@ -42,6 +42,22 @@ class LeetCodeProvider extends ChangeNotifier {
     }
     return username.trim();
   }
+
+  /// Returns a short, log-safe error summary.
+  /// Truncates HTML error pages (e.g. Cloudflare 525 SSL pages) so they don't
+  /// flood the log with hundreds of lines of markup.
+  String _sanitizeError(Object e) {
+    final s = e.toString();
+    if (s.contains('<!DOCTYPE') || s.contains('<html') || s.contains('</html>')) {
+      // Extract just the first meaningful line / code from the HTML
+      final codeMatch = RegExp(r'Error code (\d+)').firstMatch(s);
+      final code = codeMatch?.group(1);
+      return code != null
+          ? 'HTTP $code (SSL/network error – Supabase temporarily unreachable)'
+          : 'HTML error page received (Supabase temporarily unreachable)';
+    }
+    return s.length > 300 ? '${s.substring(0, 300)}…' : s;
+  }
   
   LeetCodeStats? getCachedStats(String username) {
     final clean = _cleanUsername(username);
@@ -112,7 +128,7 @@ class LeetCodeProvider extends ChangeNotifier {
       return stats ?? _statsCache[username];
       
     } catch (e) {
-      debugPrint('Error fetching LeetCode stats: $e');
+      debugPrint('Error fetching LeetCode stats: ${_sanitizeError(e)}');
       _pendingRequests.remove(username);
       _isLoading = false;
       notifyListeners();
@@ -242,7 +258,7 @@ class LeetCodeProvider extends ChangeNotifier {
       notifyListeners();
       return mergedUsers;
     } catch (e) {
-      debugPrint('Error fetching all users: $e');
+      debugPrint('Error fetching all users: ${_sanitizeError(e)}');
       return _allUsers; // Return cached data
     }
   }
