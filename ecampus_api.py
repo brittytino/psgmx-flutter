@@ -120,6 +120,7 @@ BASE_URL    = "https://ecampus.psgtech.ac.in/studzone2/"
 ATT_URL     = BASE_URL + "AttWfPercView.aspx"
 COURSE_URL  = BASE_URL + "AttWfStudTimtab.aspx"
 RESULT_URL  = BASE_URL + "FrmEpsStudResult.aspx"
+CA_URL      = BASE_URL + "FrmCaStudMarkView.aspx"
 
 HEADERS = {
     "User-Agent": (
@@ -466,17 +467,189 @@ def _read_cgpa(rollno: str) -> dict | None:
     return result.data
 
 
-def _sync_single_rollno(rollno: str, dob_value: date) -> tuple[dict, dict]:
-    """Sync one student end-to-end and return attendance + cgpa payloads."""
+def _fetch_ca_marks(session: requests.Session) -> list[list[str]]:
+    """Scrape CA (Continuous Assessment) internal marks table."""
+    page = session.get(CA_URL, headers=HEADERS, timeout=20)
+    soup = BeautifulSoup(page.text, "html.parser")
+    # PSG eCampus shows CA marks in a table with id 'DgCamarks' or similar.
+    # We try multiple selectors to stay robust across portal upgrades.
+    table = (
+        soup.find("table", {"id": "DgCamarks"})
+        or soup.find("table", {"id": "GvCaMark"})
+        or soup.find("table", {"id": "gvCAMark"})
+        or soup.find("table", {"class": "cssbody"})
+    )
+    if not table:
+        return []  # CA marks not available yet (portal hasn't published them)
+
+    rows: list[list[str]] = []
+    for tr in table.find_all("tr"):
+        cols = [td.get_text(separator=" ", strip=True) for td in tr.find_all("td")]
+        cols = [c for c in cols if c]  # drop empty cells
+        if cols:
+            rows.append(cols)
+    return rows
+
+
+def _parse_ca_marks(rows: list[list[str]]) -> dict:
+    """
+    Parse raw CA marks table rows into a structured dict.
+
+    PSG eCampus CA marks table columns (typical):
+      0: Course Code
+      1: Course Title
+      2: Assessment type (CA1 / CA2)
+      3: Marks Obtained
+      4: Maximum Marks
+    OR (older portal layout where each row is one subject with CA1 & CA2 inline):
+      0: S.No
+      1: Course Code
+      2: Course Title
+      3: CA1 marks
+      4: CA1 max
+      5: CA2 marks   (may be absent / '--' / '0' if not conducted)
+      6: CA2 max
+    We auto-detect the layout by inspecting column count.
+    """
+    if not rows:
+        return {"subjects": [], "note": "CA marks not published yet"}
+
+    # ── Detect layout ────────────────────────────────────────────────────────
+    sample = rows[0]
+
+    def _safe_float(v: str) -> float | None:
+        v = v.strip().replace("--", "").replace("-", "")
+        try:
+            return float(v) if v else None
+        except ValueError:
+            return None
+
+    subjects_dict: dict[str, dict] = {}
+
+    # Layout A: each row = one test for one course (multiple rows per course)
+    # Typical cols: [code, title, 'CA1'/'CA2', marks, max_marks]
+    if len(sample) >= 5 and any(
+        kw in " ".join(sample).upper() for kw in ("CA1", "CA2", "CA-1", "CA-2")
+    ):
+        for row in rows:
+            if len(row) < 4:
+                continue
+            code    = row[0].strip()
+            title   = row[1].strip() if len(row) > 1 else code
+            ca_type = row[2].strip().upper().replace("-", "").replace(" ", "")
+            mark    = _safe_float(row[3])
+            max_m   = _safe_float(row[4]) if len(row) > 4 else None
+
+            # Skip header rows
+            if not code or code.upper() in ("COURSE CODE", "S.NO", "NO"):
+                continue
+
+            if code not in subjects_dict:
+                subjects_dict[code] = {
+                    "course_code": code,
+                    "course_title": title,
+                    "ca_tests": [],
+                }
+
+            if ca_type in ("CA1", "CA-1", "FIRSTCA"):
+                test_label = "CA1"
+            elif ca_type in ("CA2", "CA-2", "SECONDCA"):
+                test_label = "CA2"
+            else:
+                test_label = ca_type or "CA"
+
+            pct = round(mark / max_m * 100, 2) if mark is not None and max_m else None
+            subjects_dict[code]["ca_tests"].append({
+                "test": test_label,
+                "marks": mark,
+                "max_marks": max_m,
+                "percentage": pct,
+            })
+
+    else:
+        # Layout B: each row = one subject, CA1 & CA2 columns inline
+        # Typical cols: [sno, code, title, ca1_marks, ca1_max, ca2_marks, ca2_max]
+        for row in rows:
+            n = len(row)
+            if n < 3:
+                continue
+            # Try to find the code column (skip S.No)
+            offset = 0
+            if n >= 7 and row[0].replace(".", "").strip().isdigit():
+                offset = 1
+            code  = row[offset].strip()
+            title = row[offset + 1].strip() if n > offset + 1 else code
+
+            if not code or code.upper() in ("COURSE CODE", "S.NO", "NO"):
+                continue
+
+            ca_tests = []
+            ca1_m   = _safe_float(row[offset + 2]) if n > offset + 2 else None
+            ca1_max = _safe_float(row[offset + 3]) if n > offset + 3 else None
+            ca2_m   = _safe_float(row[offset + 4]) if n > offset + 4 else None
+            ca2_max = _safe_float(row[offset + 5]) if n > offset + 5 else None
+
+            if ca1_m is not None or ca1_max is not None:
+                pct = round(ca1_m / ca1_max * 100, 2) if ca1_m and ca1_max else None
+                ca_tests.append({"test": "CA1", "marks": ca1_m, "max_marks": ca1_max, "percentage": pct})
+
+            if ca2_m is not None or ca2_max is not None:
+                pct = round(ca2_m / ca2_max * 100, 2) if ca2_m and ca2_max else None
+                ca_tests.append({"test": "CA2", "marks": ca2_m, "max_marks": ca2_max, "percentage": pct})
+
+            if ca_tests:
+                subjects_dict[code] = {
+                    "course_code": code,
+                    "course_title": title,
+                    "ca_tests": ca_tests,
+                }
+
+    subjects = list(subjects_dict.values())
+    return {"subjects": subjects}
+
+
+def _upsert_ca_marks(rollno: str, data: dict) -> None:
+    _get_supabase().table("ecampus_ca_marks").upsert(
+        {
+            "reg_no": rollno,
+            "data": data,
+            "synced_at": datetime.utcnow().isoformat(),
+        },
+        on_conflict="reg_no",
+    ).execute()
+
+
+def _read_ca_marks(rollno: str) -> dict | None:
+    result = (
+        _get_supabase().table("ecampus_ca_marks")
+        .select("data, synced_at")
+        .eq("reg_no", rollno)
+        .maybe_single()
+        .execute()
+    )
+    return result.data
+
+
+def _sync_single_rollno(rollno: str, dob_value: date) -> tuple[dict, dict, dict]:
+    """Sync one student end-to-end and return (attendance, cgpa, ca_marks) payloads."""
     password = _dob_to_password(dob_value)
     session = _ecampus_session(rollno, password)
     raw_rows = _fetch_attendance(session)
     course_map = _fetch_course_map(session)
     att_data = _parse_attendance(raw_rows, course_map)
     cgpa_data = _fetch_cgpa(session)
+    # CA marks – non-fatal: if the page isn’t available yet we store an empty payload
+    try:
+        ca_raw = _fetch_ca_marks(session)
+        ca_data = _parse_ca_marks(ca_raw)
+    except Exception as exc:
+        log.warning(f"[sync] {rollno} – CA marks unavailable: {exc}")
+        ca_data = {"subjects": [], "note": "CA marks page unavailable"}
     _upsert_attendance(rollno, att_data)
     _upsert_cgpa(rollno, cgpa_data)
     _upsert_bunked(rollno, att_data.get("subjects", []))
+    _upsert_ca_marks(rollno, ca_data)
+    return att_data, cgpa_data, ca_data
     return att_data, cgpa_data
 
 
@@ -563,7 +736,7 @@ def sync_user(
 
     # 2. Sync + persist
     try:
-        att_data, cgpa_data = _sync_single_rollno(rollno, dob)
+        att_data, cgpa_data, ca_data = _sync_single_rollno(rollno, dob)
     except Exception as exc:
         log.error(f"[sync] Login/sync failed for {rollno}: {exc}")
         raise HTTPException(status_code=502, detail=f"eCampus sync failed: {exc}")
@@ -577,6 +750,7 @@ def sync_user(
         "synced_at": synced_at,
         "attendance_summary": att_data["summary"],
         "cgpa": cgpa_data.get("cgpa"),
+        "ca_subjects_count": len(ca_data.get("subjects", [])),
     }
 
 
@@ -608,6 +782,25 @@ def get_cgpa(
         raise HTTPException(
             status_code=404,
             detail="No CGPA data found. Please sync first.",
+        )
+    return {"ok": True, "rollno": rollno, **row}
+
+
+@app.get("/api/ecampus/ca-marks")
+def get_ca_marks(
+    rollno: str = Query(...),
+    x_api_secret: str | None = Header(None),
+):
+    """Returns the latest cached CA marks data from Supabase.
+    If CA marks have not been published yet by the institution the
+    subjects list will be empty – that is normal behaviour.
+    """
+    _check_secret(x_api_secret)
+    row = _read_ca_marks(rollno)
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail="No CA marks data found. Please sync first.",
         )
     return {"ok": True, "rollno": rollno, **row}
 

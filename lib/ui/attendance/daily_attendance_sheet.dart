@@ -113,18 +113,17 @@ class _DailyAttendanceSheetState extends State<DailyAttendanceSheet> {
     _loadAttendanceData();       // then load members + preloaded statuses
   }
 
-  /// Fetches all scheduled dates from the past 90 days up to and including
-  /// today. Never fetches future dates â€” TLs cannot pre-mark sessions.
+  /// Fetches all scheduled dates up to and including today.
+  /// Future dates are not included so TLs cannot pre-mark sessions.
   Future<void> _loadScheduledDates() async {
     if (!mounted) return;
     setState(() => _isLoadingDates = true);
     try {
       final today = _todayMidnight();
-      final start = today.subtract(const Duration(days: 90));
-      final dates = await AttendanceScheduleService().getScheduledDatesInRange(
-        startDate: start,
-        endDate: today,
-      );
+      final allDates = await AttendanceScheduleService().getScheduledDates();
+      final dates = allDates
+          .where((d) => !d.date.isAfter(today))
+          .toList();
       if (!mounted) return;
 
       // Sort newest â†’ oldest.

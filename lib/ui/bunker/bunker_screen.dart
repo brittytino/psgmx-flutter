@@ -7,6 +7,7 @@ import '../../providers/ecampus_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../models/ecampus_attendance.dart';
 import '../../models/ecampus_cgpa.dart';
+import '../../models/ecampus_ca_marks.dart';
 import '../../services/ecampus_service.dart';
 import 'widgets/subject_attendance_card.dart';
 
@@ -36,7 +37,7 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
   void initState() {
     super.initState();
     _isPlacementRep = context.read<UserProvider>().isActualPlacementRep;
-    _tabController = TabController(length: _isPlacementRep ? 3 : 2, vsync: this);
+    _tabController = TabController(length: _isPlacementRep ? 4 : 3, vsync: this);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final userProvider = context.read<UserProvider>();
@@ -589,11 +590,13 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
                   ? const [
                       Tab(text: 'Attendance'),
                       Tab(text: 'CGPA'),
+                      Tab(text: 'CA Tests'),
                       Tab(text: 'All Students'),
                     ]
                   : const [
                       Tab(text: 'Attendance'),
                       Tab(text: 'CGPA'),
+                      Tab(text: 'CA Tests'),
                     ],
             ),
           ),
@@ -604,11 +607,13 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
               ? [
                   const _AttendanceTab(),
                   const _CgpaTab(),
+                  const _CaTestTab(),
                   _buildAllStudentsReportTab(context, isDark, theme),
                 ]
               : const [
                   _AttendanceTab(),
                   _CgpaTab(),
+                  _CaTestTab(),
                 ],
         ),
       ),
@@ -1922,8 +1927,9 @@ class _CourseResultsSection extends StatelessWidget {
 
 class _EmptyView extends StatelessWidget {
   final String message;
+  final IconData? icon;
 
-  const _EmptyView({required this.message});
+  const _EmptyView({required this.message, this.icon});
 
   @override
   Widget build(BuildContext context) {
@@ -1933,7 +1939,7 @@ class _EmptyView extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.cloud_off_rounded,
+            Icon(icon ?? Icons.cloud_off_rounded,
                 size: 64,
                 color: Theme.of(context)
                     .colorScheme
@@ -1997,6 +2003,390 @@ class _ErrorView extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CA TESTS TAB
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _CaTestTab extends StatelessWidget {
+  const _CaTestTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<EcampusProvider>(
+      builder: (context, prov, _) {
+        if (prov.isLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (prov.status == EcampusStatus.error) {
+          return _ErrorView(
+            message: prov.errorMessage ?? 'Something went wrong',
+            onRetry: () => context
+                .read<EcampusProvider>()
+                .init(context.read<UserProvider>().currentUser?.regNo ?? ''),
+          );
+        }
+
+        final ca = prov.caMarks;
+
+        if (ca == null) {
+          return const _EmptyView(
+            message:
+                'CA marks data is not available yet.\nYour placement representative will refresh and publish updates.',
+          );
+        }
+
+        if (!ca.hasData) {
+          return _EmptyView(
+            icon: Icons.assignment_outlined,
+            message: ca.note?.isNotEmpty == true
+                ? ca.note!
+                : 'CA marks have not been published on the academic portal yet.',
+          );
+        }
+
+        return CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverToBoxAdapter(
+              child: _CaHeaderCard(ca: ca),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, i) => _CaSubjectCard(subject: ca.subjects[i]),
+                  childCount: ca.subjects.length,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _CaHeaderCard extends StatelessWidget {
+  final EcampusCaMarks ca;
+  const _CaHeaderCard({required this.ca});
+
+  @override
+  Widget build(BuildContext context) {
+    final subjectsWithBothCa =
+        ca.subjects.where((s) => s.ca2 != null).length;
+    final totalSubjects = ca.subjects.length;
+    final hasAnyGoodMarks =
+        ca.subjects.any((s) => s.ca1?.status == CaMarkStatus.good);
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1A1A3E), Color(0xFF2D2B55)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+            color: const Color(0xFF6C63FF).withValues(alpha: 0.4), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+              color: const Color(0xFF6C63FF).withValues(alpha: 0.18),
+              blurRadius: 16,
+              offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: const Color(0xFF6C63FF).withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(Icons.assignment_turned_in_rounded,
+                color: Color(0xFF9D97FF), size: 26),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Continuous Assessment',
+                  style: GoogleFonts.inter(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '$totalSubjects subject${totalSubjects == 1 ? '' : 's'}'
+                  '${subjectsWithBothCa > 0 ? ' • CA2 available for $subjectsWithBothCa' : ''}',
+                  style: GoogleFonts.inter(
+                      fontSize: 12, color: Colors.white60),
+                ),
+              ],
+            ),
+          ),
+          if (hasAnyGoodMarks)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: Colors.green.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                    color: Colors.green.withValues(alpha: 0.5), width: 1),
+              ),
+              child: Text('On Track',
+                  style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.greenAccent)),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CaSubjectCard extends StatelessWidget {
+  final CaSubject subject;
+  const _CaSubjectCard({required this.subject});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final ca1 = subject.ca1;
+    final ca2 = subject.ca2;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E2E) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.07)
+              : Colors.black.withValues(alpha: 0.07),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Course header
+            Row(
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6C63FF).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    subject.courseCode,
+                    style: GoogleFonts.jetBrainsMono(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF9D97FF),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    subject.courseTitle,
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            // CA chips row
+            Row(
+              children: [
+                if (ca1 != null) ...[
+                  Expanded(child: _CaChip(result: ca1, label: 'CA 1')),
+                  const SizedBox(width: 10),
+                ],
+                if (ca2 != null)
+                  Expanded(child: _CaChip(result: ca2, label: 'CA 2'))
+                else if (ca1 != null)
+                  const Expanded(child: _CaPendingChip(label: 'CA 2')),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CaChip extends StatelessWidget {
+  final CaTestResult result;
+  final String label;
+  const _CaChip({required this.result, required this.label});
+
+  Color _statusColor(CaMarkStatus s) {
+    switch (s) {
+      case CaMarkStatus.good:
+        return const Color(0xFF4CAF50);
+      case CaMarkStatus.average:
+        return const Color(0xFFFF9800);
+      case CaMarkStatus.poor:
+        return const Color(0xFFEF5350);
+      case CaMarkStatus.pending:
+        return Colors.grey;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final c = _statusColor(result.status);
+    final marks = result.marks;
+    final max = result.maxMarks;
+    final pct = result.percentage;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: c.withValues(alpha: isDark ? 0.12 : 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: c.withValues(alpha: 0.4), width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.8,
+              color: c,
+            ),
+          ),
+          const SizedBox(height: 4),
+          if (marks != null && max != null)
+            Text(
+              '${_fmt(marks)} / ${_fmt(max)}',
+              style: GoogleFonts.inter(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            )
+          else
+            Text(
+              result.status == CaMarkStatus.pending ? 'Pending' : '—',
+              style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white54 : Colors.black38),
+            ),
+          if (pct != null) ...[
+            const SizedBox(height: 2),
+            Row(
+              children: [
+                Text(
+                  '${pct.toStringAsFixed(1)}%',
+                  style: GoogleFonts.inter(fontSize: 11, color: c),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: (pct / 100).clamp(0.0, 1.0),
+                      minHeight: 4,
+                      backgroundColor: c.withValues(alpha: 0.15),
+                      valueColor: AlwaysStoppedAnimation<Color>(c),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _fmt(double v) =>
+      v == v.truncateToDouble() ? v.toInt().toString() : v.toStringAsFixed(1);
+}
+
+class _CaPendingChip extends StatelessWidget {
+  final String label;
+  const _CaPendingChip({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.grey.withValues(alpha: isDark ? 0.1 : 0.07),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+            color: Colors.grey.withValues(alpha: 0.3), width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.8,
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Not Published',
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: isDark ? Colors.white38 : Colors.black38,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Available after CA 1',
+            style: GoogleFonts.inter(
+                fontSize: 10,
+                color: isDark ? Colors.white24 : Colors.black26),
+          ),
+        ],
       ),
     );
   }

@@ -859,7 +859,8 @@ class _ScheduleClassesTabState extends State<_ScheduleClassesTab> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      final scheduled = await _scheduleService.getUpcomingScheduledDates();
+      final scheduled = await _scheduleService.getScheduledDates();
+      scheduled.sort((a, b) => b.date.compareTo(a.date));
       if (mounted) {
         setState(() {
           _scheduledDates = scheduled;
@@ -921,7 +922,7 @@ class _ScheduleClassesTabState extends State<_ScheduleClassesTab> {
                             ),
                           ),
                           Text(
-                            '${_scheduledDates.length} upcoming classes',
+                            '${_scheduledDates.length} scheduled classes',
                             style: GoogleFonts.inter(
                               fontSize: 13,
                               color: Colors.grey[600],
@@ -981,7 +982,7 @@ class _ScheduleClassesTabState extends State<_ScheduleClassesTab> {
                   Icon(Icons.event_busy, size: 64, color: Colors.grey[400]),
                   const SizedBox(height: 16),
                   Text(
-                    'No upcoming classes scheduled',
+                    'No classes scheduled',
                     style: GoogleFonts.inter(
                       fontSize: 16,
                       color: Colors.grey[600],
@@ -1128,11 +1129,12 @@ class _ScheduleClassesTabState extends State<_ScheduleClassesTab> {
   Future<void> _showAddScheduleDialog(BuildContext context) async {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final now = DateTime.now();
     final selectedDate = await showDatePicker(
       context: context,
-      initialDate: DateTime.now().add(const Duration(days: 1)),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      initialDate: now,
+      firstDate: now.subtract(const Duration(days: 730)),
+      lastDate: now.add(const Duration(days: 365)),
       helpText: 'Select Class Date',
     );
 

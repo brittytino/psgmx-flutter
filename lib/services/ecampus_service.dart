@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/ecampus_attendance.dart';
+import '../models/ecampus_ca_marks.dart';
 import '../models/ecampus_cgpa.dart';
 
 /// Configuration for the PSG eCampus API backend.
@@ -243,6 +244,24 @@ class EcampusService {
     }
   }
 
+  /// Reads CA marks data for [rollno] directly from Supabase cache.
+  /// Returns null when no data has been synced yet.
+  Future<EcampusCaMarks?> getCaMarks(String rollno) async {
+    try {
+      final result = await _supabase
+          .from('ecampus_ca_marks')
+          .select('reg_no, data, synced_at')
+          .eq('reg_no', rollno)
+          .maybeSingle();
+
+      if (result == null) return null;
+      return EcampusCaMarks.fromSupabase(result);
+    } catch (e) {
+      debugPrint('[EcampusService] getCaMarks error: $e');
+      rethrow;
+    }
+  }
+
   /// Convenience: sync and then immediately return the fresh attendance data.
   Future<EcampusAttendance?> syncAndGetAttendance(String rollno) async {
     await syncUser(rollno);
@@ -279,6 +298,18 @@ class EcampusService {
         .map((rows) {
           if (rows.isEmpty) return null;
           return EcampusCgpa.fromSupabase(rows.first);
+        });
+  }
+
+  /// Returns a stream that emits whenever the CA marks row for [rollno] changes.
+  Stream<EcampusCaMarks?> caMarksStream(String rollno) {
+    return _supabase
+        .from('ecampus_ca_marks')
+        .stream(primaryKey: ['id'])
+        .eq('reg_no', rollno)
+        .map((rows) {
+          if (rows.isEmpty) return null;
+          return EcampusCaMarks.fromSupabase(rows.first);
         });
   }
 }
