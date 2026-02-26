@@ -147,6 +147,8 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
         final summary = (attendanceData['summary'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
 
         final dobValue = userDobMap[regNo] ?? row['dob'];
+        // isSynced = true only if a row exists in ecampus_attendance OR ecampus_cgpa
+        final isSynced = attendanceMap.containsKey(regNo) || cgpaMap.containsKey(regNo);
 
         return _StudentAcademicEntry(
           regNo: regNo,
@@ -155,6 +157,7 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
           dobText: _formatDob(dobValue),
           attendancePercentage: _asDouble(summary['overall_percentage']),
           cgpa: _asDouble(cgpaData['cgpa']),
+          isSynced: isSynced,
         );
       }).toList()
         ..sort((a, b) {
@@ -298,10 +301,12 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
     () async {
       try {
         final result = await EcampusService().syncAllUsers();
-        final total = result['total'] ?? 0;
+        // Support both old field name (total) and new (students_with_dob)
+        final total = result['students_with_dob'] ?? result['total'] ?? 0;
         final success = result['success_count'] ?? 0;
         final failed = result['failed_count'] ?? 0;
         final failedList = (result['failed'] as List?) ?? [];
+        final noDobSkipped = result['no_dob_skipped'] ?? 0;
 
         await _loadAllStudentsAcademicData();
 
@@ -310,6 +315,7 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
           success: success,
           failed: failed,
           failedList: failedList,
+          noDobSkipped: noDobSkipped,
         );
       } catch (e) {
         final message = e
@@ -394,28 +400,36 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
                       const SizedBox(height: 14),
                       const LinearProgressIndicator(minHeight: 6),
                     ] else if (state.isSuccess) ...[
-                      Text('Total: ${state.total}', style: GoogleFonts.inter(fontSize: 13)),
-                      Text('Succeeded: ${state.success}', style: GoogleFonts.inter(fontSize: 13)),
-                      Text('Failed: ${state.failed}', style: GoogleFonts.inter(fontSize: 13)),
+                      Text(
+                        'Synced: ${state.total}  •  ✔ ${state.success}  •  ✗ ${state.failed}',
+                        style: GoogleFonts.inter(fontSize: 13),
+                      ),
                       if (state.failedList.isNotEmpty) ...[
                         const SizedBox(height: 10),
                         Text(
-                          'Failed roll numbers',
+                          'Failed – check DOB or eCampus login',
                           style: GoogleFonts.inter(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
+                            color: Colors.redAccent,
                           ),
                         ),
                         const SizedBox(height: 4),
                         SizedBox(
-                          height: 140,
+                          height: 160,
                           child: ListView.builder(
                             itemCount: state.failedList.length,
                             itemBuilder: (_, index) {
                               final item = state.failedList[index] as Map;
                               final rollno = item['rollno'] ?? 'Unknown';
+                              final errType = (item['error_type'] ?? '') as String;
+                              final suffix = errType == 'login_failed'
+                                  ? ' (wrong DOB?)'
+                                  : errType == 'network_error'
+                                      ? ' (timeout)'
+                                      : '';
                               return Text(
-                                '- $rollno',
+                                '• $rollno$suffix',
                                 style: GoogleFonts.inter(fontSize: 12),
                               );
                             },
@@ -868,6 +882,12 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
                         ? const Color(0xFF10101C)
                         : const Color(0xFFF7F8FA),
                     borderRadius: BorderRadius.circular(12),
+                    border: !item.isSynced
+                        ? Border.all(
+                            color: Colors.orange.withValues(alpha: 0.4),
+                            width: 1,
+                          )
+                        : null,
                   ),
                   child: Row(
                     children: [
@@ -875,12 +895,35 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              item.name,
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                              ),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    item.name,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                                if (!item.isSynced)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      'Not synced',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.orange,
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                             const SizedBox(height: 3),
                             Text(
@@ -957,6 +1000,7 @@ class _SyncAllDialogState {
     required int success,
     required int failed,
     required List failedList,
+    int noDobSkipped = 0,
   }) : this._(
           isLoading: false,
           isSuccess: true,
@@ -986,6 +1030,8 @@ class _StudentAcademicEntry {
   final String dobText;
   final double? attendancePercentage;
   final double? cgpa;
+  /// True only when this student has a row in ecampus_attendance or ecampus_cgpa.
+  final bool isSynced;
 
   const _StudentAcademicEntry({
     required this.regNo,
@@ -994,6 +1040,7 @@ class _StudentAcademicEntry {
     required this.dobText,
     required this.attendancePercentage,
     required this.cgpa,
+    this.isSynced = true,
   });
 }
 

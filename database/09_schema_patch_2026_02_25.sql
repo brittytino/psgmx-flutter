@@ -113,17 +113,18 @@ CREATE INDEX IF NOT EXISTS idx_defaulter_status ON defaulter_flags(defaulter_sta
 CREATE INDEX IF NOT EXISTS idx_defaulter_detected_at ON defaulter_flags(detected_at DESC);
 
 -- Compatibility view expected by attendance/report screens
+-- Fixed: use whitelist as source of truth so all 123 students appear (not just logged-in ~94)
 CREATE OR REPLACE VIEW student_attendance_summary AS
 SELECT
-    u.id AS student_id,
-    u.id AS user_id,
-    u.email,
-    u.reg_no,
-    u.name,
-    u.team_id,
-    u.batch,
-    COALESCE(SUM(CASE WHEN ar.status = 'PRESENT' THEN 1 ELSE 0 END), 0)::int AS present_count,
-    COALESCE(SUM(CASE WHEN ar.status = 'ABSENT' THEN 1 ELSE 0 END), 0)::int AS absent_count,
+    u.id                                         AS student_id,
+    u.id                                         AS user_id,
+    COALESCE(u.email,   w.email)                 AS email,
+    w.reg_no,
+    COALESCE(u.name,    w.name)                  AS name,
+    COALESCE(u.team_id, w.team_id)               AS team_id,
+    COALESCE(u.batch,   w.batch)                 AS batch,
+    COALESCE(SUM(CASE WHEN ar.status = 'PRESENT'              THEN 1 ELSE 0 END), 0)::int AS present_count,
+    COALESCE(SUM(CASE WHEN ar.status = 'ABSENT'               THEN 1 ELSE 0 END), 0)::int AS absent_count,
     COALESCE(SUM(CASE WHEN ar.status IN ('PRESENT', 'ABSENT') THEN 1 ELSE 0 END), 0)::int AS total_working_days,
     CASE
         WHEN COALESCE(SUM(CASE WHEN ar.status IN ('PRESENT', 'ABSENT') THEN 1 ELSE 0 END), 0) = 0 THEN 0.0
@@ -134,10 +135,13 @@ SELECT
             2
         )
     END AS attendance_percentage
-FROM users u
+FROM whitelist w
+LEFT JOIN users u  ON u.reg_no  = w.reg_no
 LEFT JOIN attendance_records ar ON ar.user_id = u.id
-WHERE COALESCE((u.roles->>'isStudent')::boolean, true) = true
-GROUP BY u.id, u.email, u.reg_no, u.name, u.team_id, u.batch;
+WHERE w.reg_no IS NOT NULL
+GROUP BY
+    w.reg_no, w.email, w.name, w.team_id, w.batch,
+    u.id, u.email, u.name, u.team_id, u.batch;
 
 -- RLS for defaulter_flags
 ALTER TABLE defaulter_flags ENABLE ROW LEVEL SECURITY;

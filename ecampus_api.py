@@ -136,15 +136,31 @@ GRADE_MAP = {
 }
 
 
+# Locale-independent month abbreviations (PSG eCampus expects English)
+_MONTH_ABBR = ["jan", "feb", "mar", "apr", "may", "jun",
+               "jul", "aug", "sep", "oct", "nov", "dec"]
+
+
 def _dob_to_password(dob: date) -> str:
-    """Convert a date object → eCampus password format (e.g. 08jul04)."""
-    return dob.strftime("%d%b%y").lower()
+    """Convert a date → eCampus password (e.g. 08jul04).
+    Uses a hard-coded English month table so the result is the same
+    regardless of the server's locale setting.
+    """
+    return f"{dob.day:02d}{_MONTH_ABBR[dob.month - 1]}{dob.strftime('%y')}"
 
 
 def _parse_dob_value(value) -> date:
-    if isinstance(value, date):
+    """Robustly parse a DOB coming from Supabase.
+    Handles: date object, plain string '2004-07-08',
+    ISO datetime '2004-07-08T00:00:00', timezone-aware '2004-07-08T00:00:00+00:00'.
+    """
+    if isinstance(value, date) and not isinstance(value, datetime):
         return value
-    return datetime.strptime(str(value), "%Y-%m-%d").date()
+    if isinstance(value, datetime):
+        return value.date()
+    # String fallback – take the first 10 chars (YYYY-MM-DD)
+    s = str(value).strip()
+    return datetime.strptime(s[:10], "%Y-%m-%d").date()
 
 
 # ─── Scraper helpers ─────────────────────────────────────────────────────────
@@ -361,18 +377,20 @@ def _get_user_dob(rollno: str) -> date:
     if not raw_dob:
         raise HTTPException(
             status_code=404,
-            detail=f"DOB not found for roll number {rollno}",
+            detail=f"DOB not found for roll number {rollno}. "
+                   "Please set the student's date of birth in the whitelist.",
         )
 
-    if isinstance(raw_dob, date):
-        dob_value = raw_dob
-    else:
-        dob_value = datetime.strptime(str(raw_dob), "%Y-%m-%d").date()
+    # Use centralised robust parser (handles date objects, plain strings,
+    # ISO datetime strings with or without timezone)
+    dob_value = _parse_dob_value(raw_dob)
 
+    # Write-back: if DOB came from users table, persist it to whitelist
     if result.data is not None and not result.data.get("dob"):
         sb.table("whitelist").update({"dob": dob_value.isoformat()}).eq(
             "reg_no", rollno
         ).execute()
+        log.info(f"[dob] wrote back DOB {dob_value} to whitelist for {rollno}")
 
     return dob_value
 
@@ -482,6 +500,7 @@ def _get_whitelist_students_with_dob() -> list[dict]:
 
     users_dob = {r.get("reg_no"): r.get("dob") for r in users_rows if r.get("reg_no")}
     merged: list[dict] = []
+    writeback_rows: list[dict] = []   # bulk write-back DOBs found in users but not whitelist
 
     for row in whitelist_rows:
         reg_no = row.get("reg_no")
@@ -489,14 +508,26 @@ def _get_whitelist_students_with_dob() -> list[dict]:
             continue
         dob = row.get("dob") or users_dob.get(reg_no)
         if not dob:
+            log.warning(f"[whitelist] {reg_no} – no DOB found in whitelist or users; skipping sync")
             continue
 
         if not row.get("dob") and users_dob.get(reg_no):
-            sb.table("whitelist").update({"dob": str(dob)}).eq(
-                "reg_no", reg_no
-            ).execute()
+            # Parse first so we always write the canonical YYYY-MM-DD string
+            try:
+                dob_parsed = _parse_dob_value(dob)
+                writeback_rows.append({"reg_no": reg_no, "dob": dob_parsed.isoformat()})
+            except Exception:
+                pass  # keep going even if parse fails; sync will surface the error
 
         merged.append({"reg_no": reg_no, "dob": dob})
+
+    # Bulk write-back discovered DOBs to whitelist (one call per row to avoid upsert issues)
+    for wb in writeback_rows:
+        try:
+            sb.table("whitelist").update({"dob": wb["dob"]}).eq("reg_no", wb["reg_no"]).execute()
+            log.info(f"[whitelist] wrote back DOB {wb['dob']} for {wb['reg_no']}")
+        except Exception as e:
+            log.warning(f"[whitelist] DOB write-back failed for {wb['reg_no']}: {e}")
 
     return merged
 
@@ -596,21 +627,42 @@ def sync_all_users(
     students = _get_whitelist_students_with_dob()
     log.info(f"[sync-all] Found {len(students)} students with DOB")
 
+    # Total whitelist count (for reporting students missing DOB)
+    all_whitelist = (
+        _get_supabase().table("whitelist").select("reg_no", count="exact")
+        .not_.is_("reg_no", "null").execute()
+    )
+    total_whitelist = all_whitelist.count or len(students)
+    no_dob_count = total_whitelist - len(students)
+    if no_dob_count > 0:
+        log.warning(f"[sync-all] {no_dob_count} students in whitelist have no DOB – they will be skipped")
+
     success, failed = [], []
     for s in students:
         rollno = s["reg_no"]
         try:
             dob = _parse_dob_value(s["dob"])
+            log.info(f"[sync-all] syncing {rollno} (DOB={dob} → pwd={_dob_to_password(dob)})")
             _sync_single_rollno(rollno, dob)
             success.append(rollno)
             log.info(f"[sync-all] ✔ {rollno}")
         except Exception as exc:
-            failed.append({"rollno": rollno, "error": str(exc)})
-            log.error(f"[sync-all] ✗ {rollno}: {exc}")
+            error_msg = str(exc)
+            # Classify the error for easier debugging
+            if "login" in error_msg.lower() or "Attendance table not found" in error_msg:
+                error_type = "login_failed"
+            elif "timeout" in error_msg.lower() or "ConnectionError" in error_msg:
+                error_type = "network_error"
+            else:
+                error_type = "other"
+            failed.append({"rollno": rollno, "error": error_msg, "error_type": error_type})
+            log.error(f"[sync-all] ✗ {rollno} [{error_type}]: {exc}")
 
     return {
         "ok": True,
-        "total": len(students),
+        "total_whitelist": total_whitelist,
+        "students_with_dob": len(students),
+        "no_dob_skipped": no_dob_count,
         "success_count": len(success),
         "failed_count": len(failed),
         "failed": failed,
