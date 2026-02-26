@@ -141,6 +141,12 @@ def _dob_to_password(dob: date) -> str:
     return dob.strftime("%d%b%y").lower()
 
 
+def _parse_dob_value(value) -> date:
+    if isinstance(value, date):
+        return value
+    return datetime.strptime(str(value), "%Y-%m-%d").date()
+
+
 # ─── Scraper helpers ─────────────────────────────────────────────────────────
 
 def _ecampus_session(rollno: str, password: str) -> requests.Session:
@@ -331,19 +337,44 @@ def _fetch_cgpa(session: requests.Session) -> dict:
 # ─── Supabase helpers ─────────────────────────────────────────────────────────
 
 def _get_user_dob(rollno: str) -> date:
-    """Fetch DOB from Supabase whitelist table by reg_no."""
+    """Fetch DOB from Supabase whitelist or users table by reg_no."""
+    sb = _get_supabase()
     result = (
-        _get_supabase().table("whitelist")
+        sb.table("whitelist")
         .select("dob")
         .eq("reg_no", rollno)
         .maybe_single()
         .execute()
     )
-    if not result.data or not result.data.get("dob"):
-        raise HTTPException(status_code=404, detail=f"Roll number {rollno} not found in whitelist")
 
-    raw_dob = result.data["dob"]          # e.g. "2004-07-08"
-    return datetime.strptime(raw_dob, "%Y-%m-%d").date()
+    raw_dob = result.data.get("dob") if result.data else None
+    if not raw_dob:
+        user_row = (
+            sb.table("users")
+            .select("dob")
+            .eq("reg_no", rollno)
+            .maybe_single()
+            .execute()
+        )
+        raw_dob = user_row.data.get("dob") if user_row.data else None
+
+    if not raw_dob:
+        raise HTTPException(
+            status_code=404,
+            detail=f"DOB not found for roll number {rollno}",
+        )
+
+    if isinstance(raw_dob, date):
+        dob_value = raw_dob
+    else:
+        dob_value = datetime.strptime(str(raw_dob), "%Y-%m-%d").date()
+
+    if result.data is not None and not result.data.get("dob"):
+        sb.table("whitelist").update({"dob": dob_value.isoformat()}).eq(
+            "reg_no", rollno
+        ).execute()
+
+    return dob_value
 
 
 def _upsert_attendance(rollno: str, data: dict) -> None:
@@ -432,15 +463,42 @@ def _sync_single_rollno(rollno: str, dob_value: date) -> tuple[dict, dict]:
 
 
 def _get_whitelist_students_with_dob() -> list[dict]:
-    result = (
-        _get_supabase().table("whitelist")
+    sb = _get_supabase()
+    whitelist_rows = (
+        sb.table("whitelist")
         .select("reg_no, dob")
-        .not_.is_("dob", "null")
         .not_.is_("reg_no", "null")
         .order("reg_no")
         .execute()
-    )
-    return result.data or []
+    ).data or []
+
+    users_rows = (
+        sb.table("users")
+        .select("reg_no, dob")
+        .not_.is_("reg_no", "null")
+        .not_.is_("dob", "null")
+        .execute()
+    ).data or []
+
+    users_dob = {r.get("reg_no"): r.get("dob") for r in users_rows if r.get("reg_no")}
+    merged: list[dict] = []
+
+    for row in whitelist_rows:
+        reg_no = row.get("reg_no")
+        if not reg_no:
+            continue
+        dob = row.get("dob") or users_dob.get(reg_no)
+        if not dob:
+            continue
+
+        if not row.get("dob") and users_dob.get(reg_no):
+            sb.table("whitelist").update({"dob": str(dob)}).eq(
+                "reg_no", reg_no
+            ).execute()
+
+        merged.append({"reg_no": reg_no, "dob": dob})
+
+    return merged
 
 
 # ─── API Routes ──────────────────────────────────────────────────────────────
@@ -542,7 +600,7 @@ def sync_all_users(
     for s in students:
         rollno = s["reg_no"]
         try:
-            dob = datetime.strptime(s["dob"], "%Y-%m-%d").date()
+            dob = _parse_dob_value(s["dob"])
             _sync_single_rollno(rollno, dob)
             success.append(rollno)
             log.info(f"[sync-all] ✔ {rollno}")

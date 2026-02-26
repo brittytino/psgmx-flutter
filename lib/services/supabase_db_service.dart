@@ -224,11 +224,10 @@ class SupabaseDbService {
 
   Future<Map<String, dynamic>> getPlacementStats() async {
     try {
-      // 1. Total Students from USERS table (all 123 students now in users)
+      // 1. Total Students from whitelist (source of truth)
       final totalStudents = await _supabase
-          .from('users')
-          .count(CountOption.exact)
-          .eq('roles->>isStudent', 'true');
+          .from('whitelist')
+          .count(CountOption.exact);
 
       // 2. Count today's attendance
       final today = DateTime.now().toIso8601String().split('T')[0];

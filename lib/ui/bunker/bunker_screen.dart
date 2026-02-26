@@ -28,17 +28,25 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
   bool _isLoadingAllStudents = false;
   String? _allStudentsError;
   List<_StudentAcademicEntry> _allStudents = [];
+  _SortMode _sortMode = _SortMode.rollNoAsc;
+  _BatchFilter _batchFilter = _BatchFilter.all;
+  DateTime? _lastAllStudentsSyncedAt;
 
   @override
   void initState() {
     super.initState();
     _isPlacementRep = context.read<UserProvider>().isActualPlacementRep;
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: _isPlacementRep ? 3 : 2, vsync: this);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final userProvider = context.read<UserProvider>();
       final user = userProvider.currentUser;
       if (user == null) return;
+
+      final rollno = user.regNo;
+      if (rollno.isNotEmpty) {
+        context.read<EcampusProvider>().init(rollno);
+      }
 
       if (_isPlacementRep) {
         _loadAllStudentsAcademicData();
@@ -50,10 +58,6 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
         return;
       }
 
-      final rollno = user.regNo;
-      if (rollno.isNotEmpty) {
-        context.read<EcampusProvider>().init(rollno);
-      }
     });
   }
 
@@ -61,6 +65,21 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
     if (value == null) return null;
     if (value is num) return value.toDouble();
     return double.tryParse(value.toString());
+  }
+
+  String _formatDob(dynamic value) {
+    if (value == null) return 'Not set';
+    if (value is DateTime) {
+      return DateFormat('yyyy-MM-dd').format(value);
+    }
+    if (value is String && value.isNotEmpty) {
+      final parsed = DateTime.tryParse(value);
+      if (parsed != null) {
+        return DateFormat('yyyy-MM-dd').format(parsed);
+      }
+      return value;
+    }
+    return 'Not set';
   }
 
   Future<void> _loadAllStudentsAcademicData() async {
@@ -74,16 +93,19 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
       final supabase = Supabase.instance.client;
       final whitelistResponse = await supabase
           .from('whitelist')
-          .select('reg_no, name, dob')
+          .select('reg_no, name, dob, batch')
           .order('reg_no');
+
+        final usersResponse =
+          await supabase.from('users').select('reg_no, dob');
 
       final attendanceResponse = await supabase
           .from('ecampus_attendance')
-          .select('reg_no, data');
+          .select('reg_no, data, synced_at');
 
       final cgpaResponse = await supabase
           .from('ecampus_cgpa')
-          .select('reg_no, data');
+          .select('reg_no, data, synced_at');
 
       final attendanceMap = <String, Map<String, dynamic>>{};
       for (final row in (attendanceResponse as List)) {
@@ -93,10 +115,29 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
       }
 
       final cgpaMap = <String, Map<String, dynamic>>{};
+      DateTime? latestSynced;
       for (final row in (cgpaResponse as List)) {
         final regNo = row['reg_no']?.toString();
         if (regNo == null) continue;
         cgpaMap[regNo] = (row['data'] as Map?)?.cast<String, dynamic>() ?? {};
+        final syncedAt = DateTime.tryParse(row['synced_at']?.toString() ?? '');
+        if (syncedAt != null && (latestSynced == null || syncedAt.isAfter(latestSynced))) {
+          latestSynced = syncedAt;
+        }
+      }
+
+      for (final row in (attendanceResponse as List)) {
+        final syncedAt = DateTime.tryParse(row['synced_at']?.toString() ?? '');
+        if (syncedAt != null && (latestSynced == null || syncedAt.isAfter(latestSynced))) {
+          latestSynced = syncedAt;
+        }
+      }
+
+      final userDobMap = <String, dynamic>{};
+      for (final row in (usersResponse as List)) {
+        final regNo = row['reg_no']?.toString();
+        if (regNo == null) continue;
+        userDobMap[regNo] = row['dob'];
       }
 
       final items = (whitelistResponse as List).map((row) {
@@ -105,20 +146,29 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
         final cgpaData = cgpaMap[regNo] ?? const <String, dynamic>{};
         final summary = (attendanceData['summary'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
 
-        final dobValue = row['dob']?.toString();
+        final dobValue = userDobMap[regNo] ?? row['dob'];
 
         return _StudentAcademicEntry(
           regNo: regNo,
           name: row['name']?.toString() ?? '-',
-          dobText: (dobValue == null || dobValue.isEmpty) ? 'null' : dobValue,
+          batch: row['batch']?.toString() ?? 'Unknown',
+          dobText: _formatDob(dobValue),
           attendancePercentage: _asDouble(summary['overall_percentage']),
           cgpa: _asDouble(cgpaData['cgpa']),
         );
-      }).toList();
+      }).toList()
+        ..sort((a, b) {
+          const order = {'G1': 0, 'G2': 1};
+          final aOrder = order[a.batch] ?? 99;
+          final bOrder = order[b.batch] ?? 99;
+          if (aOrder != bOrder) return aOrder.compareTo(bOrder);
+          return a.regNo.compareTo(b.regNo);
+        });
 
       if (!mounted) return;
       setState(() {
         _allStudents = items;
+        _lastAllStudentsSyncedAt = latestSynced;
       });
     } catch (_) {
       if (!mounted) return;
@@ -262,8 +312,15 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
           failedList: failedList,
         );
       } catch (e) {
-        syncState.value = const _SyncAllDialogState.error(
-          'Unable to complete sync right now. Please try again.',
+        final message = e
+            .toString()
+            .replaceFirst('Exception: ', '')
+            .replaceFirst('Bad state: ', '')
+            .trim();
+        syncState.value = _SyncAllDialogState.error(
+          message.isEmpty
+              ? 'Unable to complete sync right now. Please try again.'
+              : message,
         );
       } finally {
         if (mounted) {
@@ -400,11 +457,7 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
     final isDark = theme.brightness == Brightness.dark;
     final user = context.watch<UserProvider>().currentUser;
 
-    if (_isPlacementRep) {
-      return _buildPlacementRepView(context, isDark, theme);
-    }
-
-    if (user != null && user.dob == null) {
+    if (!_isPlacementRep && user != null && user.dob == null) {
       return Scaffold(
         backgroundColor:
             isDark ? const Color(0xFF0F0F1A) : const Color(0xFFF5F5F5),
@@ -518,117 +571,353 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
               indicatorColor: theme.colorScheme.primary,
               labelStyle: GoogleFonts.inter(
                   fontWeight: FontWeight.w600, fontSize: 13),
-              tabs: const [
-                Tab(text: 'Attendance'),
-                Tab(text: 'CGPA'),
-              ],
+              tabs: _isPlacementRep
+                  ? const [
+                      Tab(text: 'Attendance'),
+                      Tab(text: 'CGPA'),
+                      Tab(text: 'All Students'),
+                    ]
+                  : const [
+                      Tab(text: 'Attendance'),
+                      Tab(text: 'CGPA'),
+                    ],
             ),
           ),
         ],
         body: TabBarView(
           controller: _tabController,
-          children: const [
-            _AttendanceTab(),
-            _CgpaTab(),
-          ],
+          children: _isPlacementRep
+              ? [
+                  const _AttendanceTab(),
+                  const _CgpaTab(),
+                  _buildAllStudentsReportTab(context, isDark, theme),
+                ]
+              : const [
+                  _AttendanceTab(),
+                  _CgpaTab(),
+                ],
         ),
       ),
     );
   }
 
-  Widget _buildPlacementRepView(
+  Widget _buildAllStudentsReportTab(
       BuildContext context, bool isDark, ThemeData theme) {
-    return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F0F1A) : const Color(0xFFF5F5F5),
-      appBar: AppBar(
-        title: const Text('Academic Insights'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            tooltip: 'Reload from database',
-            onPressed: _isLoadingAllStudents ? null : _loadAllStudentsAcademicData,
+    if (_isLoadingAllStudents) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_allStudentsError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            _allStudentsError!,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(fontSize: 14),
           ),
-          IconButton(
-            icon: _syncAllInProgress
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.sync_alt_rounded),
-            tooltip: 'Sync all students',
-            onPressed: _syncAllInProgress ? null : _syncAllStudents,
-          ),
-        ],
-      ),
-      body: _isLoadingAllStudents
-          ? const Center(child: CircularProgressIndicator())
-          : _allStudentsError != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Text(
-                      _allStudentsError!,
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(fontSize: 14),
+        ),
+      );
+    }
+
+    final g1 = _applySort(_allStudents
+      .where((item) => item.batch == 'G1')
+      .toList());
+    final g2 = _applySort(_allStudents
+      .where((item) => item.batch == 'G2')
+      .toList());
+    final others = _applySort(_allStudents
+      .where((item) => item.batch != 'G1' && item.batch != 'G2')
+      .toList());
+
+    final showG1 = _batchFilter == _BatchFilter.all || _batchFilter == _BatchFilter.g1;
+    final showG2 = _batchFilter == _BatchFilter.all || _batchFilter == _BatchFilter.g2;
+    final showOthers = _batchFilter == _BatchFilter.all;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Student Academic Report',
+                    style: GoogleFonts.inter(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                )
-              : ListView.separated(
-                  padding: const EdgeInsets.all(16),
-                  itemBuilder: (_, i) {
-                    final item = _allStudents[i];
-                    final attendance = item.attendancePercentage == null
-                        ? '—'
-                        : '${item.attendancePercentage!.toStringAsFixed(1)}%';
-                    final cgpa = item.cgpa == null
-                        ? '—'
-                        : item.cgpa!.toStringAsFixed(2);
-                    return Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF171728) : Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: theme.colorScheme.onSurface.withValues(alpha: 0.08),
+                  if (_lastAllStudentsSyncedAt != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        'Last updated ${DateFormat('dd MMM, hh:mm a').format(_lastAllStudentsSyncedAt!.toLocal())}',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.6),
                         ),
                       ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(item.name,
-                                    style: GoogleFonts.inter(
-                                        fontSize: 14, fontWeight: FontWeight.w700)),
-                                const SizedBox(height: 4),
-                                Text('${item.regNo}  •  DOB: ${item.dobText}',
-                                    style: GoogleFonts.inter(
-                                        fontSize: 12,
-                                        color: theme.colorScheme.onSurface
-                                            .withValues(alpha: 0.6))),
-                              ],
+                    ),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded),
+              tooltip: 'Reload',
+              onPressed: _isLoadingAllStudents ? null : _loadAllStudentsAcademicData,
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        _buildReportControls(context, theme),
+        const SizedBox(height: 12),
+        if (showG1) ...[
+          _buildBatchSection(
+            title: 'G1',
+            entries: g1,
+            isDark: isDark,
+            theme: theme,
+          ),
+          const SizedBox(height: 14),
+        ],
+        if (showG2) ...[
+          _buildBatchSection(
+            title: 'G2',
+            entries: g2,
+            isDark: isDark,
+            theme: theme,
+          ),
+          const SizedBox(height: 14),
+        ],
+        if (showOthers && others.isNotEmpty)
+          _buildBatchSection(
+            title: 'Others',
+            entries: others,
+            isDark: isDark,
+            theme: theme,
+          ),
+      ],
+    );
+  }
+
+  Widget _buildReportControls(BuildContext context, ThemeData theme) {
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed: () => _showSortOptions(context),
+            icon: const Icon(Icons.sort_rounded, size: 18),
+            label: Text(
+              _sortModeLabel,
+              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed: () => _showBatchOptions(context),
+            icon: const Icon(Icons.filter_alt_rounded, size: 18),
+            label: Text(
+              _batchFilterLabel,
+              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String get _sortModeLabel {
+    switch (_sortMode) {
+      case _SortMode.rollNoAsc:
+        return 'Roll No A-Z';
+      case _SortMode.rollNoDesc:
+        return 'Roll No Z-A';
+      case _SortMode.attendanceAsc:
+        return 'Attendance Low-High';
+      case _SortMode.attendanceDesc:
+        return 'Attendance High-Low';
+      case _SortMode.cgpaAsc:
+        return 'CGPA Low-High';
+      case _SortMode.cgpaDesc:
+        return 'CGPA High-Low';
+    }
+  }
+
+  String get _batchFilterLabel {
+    switch (_batchFilter) {
+      case _BatchFilter.all:
+        return 'All batches';
+      case _BatchFilter.g1:
+        return 'G1 only';
+      case _BatchFilter.g2:
+        return 'G2 only';
+    }
+  }
+
+  Future<void> _showSortOptions(BuildContext context) async {
+    final selected = await showModalBottomSheet<_SortMode>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (ctx) => _SortSheet(selected: _sortMode),
+    );
+
+    if (selected != null && mounted) {
+      setState(() => _sortMode = selected);
+    }
+  }
+
+  Future<void> _showBatchOptions(BuildContext context) async {
+    final selected = await showModalBottomSheet<_BatchFilter>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (ctx) => _BatchSheet(selected: _batchFilter),
+    );
+
+    if (selected != null && mounted) {
+      setState(() => _batchFilter = selected);
+    }
+  }
+
+  List<_StudentAcademicEntry> _applySort(List<_StudentAcademicEntry> entries) {
+    int compareNullableDouble(double? a, double? b, {required bool ascending}) {
+      if (a == null && b == null) return 0;
+      if (a == null) return 1;
+      if (b == null) return -1;
+      return ascending ? a.compareTo(b) : b.compareTo(a);
+    }
+
+    entries.sort((a, b) {
+      switch (_sortMode) {
+        case _SortMode.rollNoAsc:
+          return a.regNo.compareTo(b.regNo);
+        case _SortMode.rollNoDesc:
+          return b.regNo.compareTo(a.regNo);
+        case _SortMode.attendanceAsc:
+          return compareNullableDouble(a.attendancePercentage, b.attendancePercentage, ascending: true);
+        case _SortMode.attendanceDesc:
+          return compareNullableDouble(a.attendancePercentage, b.attendancePercentage, ascending: false);
+        case _SortMode.cgpaAsc:
+          return compareNullableDouble(a.cgpa, b.cgpa, ascending: true);
+        case _SortMode.cgpaDesc:
+          return compareNullableDouble(a.cgpa, b.cgpa, ascending: false);
+      }
+    });
+
+    return entries;
+  }
+
+  Widget _buildBatchSection({
+    required String title,
+    required List<_StudentAcademicEntry> entries,
+    required bool isDark,
+    required ThemeData theme,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF171728) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: theme.colorScheme.onSurface.withValues(alpha: 0.08),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$title (${entries.length})',
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: theme.colorScheme.primary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (entries.isEmpty)
+            Text(
+              'No students available in this group.',
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
+            )
+          else
+            ...entries.map((item) {
+              final attendance = item.attendancePercentage == null
+                  ? '—'
+                  : '${item.attendancePercentage!.toStringAsFixed(1)}%';
+              final cgpa =
+                  item.cgpa == null ? '—' : item.cgpa!.toStringAsFixed(2);
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? const Color(0xFF10101C)
+                        : const Color(0xFFF7F8FA),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item.name,
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
+                            const SizedBox(height: 3),
+                            Text(
+                              '${item.regNo}  •  DOB: ${item.dobText}',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                color: theme.colorScheme.onSurface
+                                    .withValues(alpha: 0.62),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            'Attendance $attendance',
+                            style: GoogleFonts.inter(fontSize: 11.5),
                           ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text('Attendance $attendance',
-                                  style: GoogleFonts.inter(fontSize: 12)),
-                              const SizedBox(height: 4),
-                              Text('CGPA $cgpa',
-                                  style: GoogleFonts.inter(
-                                      fontSize: 12, fontWeight: FontWeight.w600)),
-                            ],
+                          const SizedBox(height: 3),
+                          Text(
+                            'CGPA $cgpa',
+                            style: GoogleFonts.inter(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ],
                       ),
-                    );
-                  },
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
-                  itemCount: _allStudents.length,
+                    ],
+                  ),
                 ),
+              );
+            }),
+        ],
+      ),
     );
   }
 }
@@ -693,6 +982,7 @@ class _SyncAllDialogState {
 class _StudentAcademicEntry {
   final String regNo;
   final String name;
+  final String batch;
   final String dobText;
   final double? attendancePercentage;
   final double? cgpa;
@@ -700,10 +990,214 @@ class _StudentAcademicEntry {
   const _StudentAcademicEntry({
     required this.regNo,
     required this.name,
+    required this.batch,
     required this.dobText,
     required this.attendancePercentage,
     required this.cgpa,
   });
+}
+
+enum _SortMode {
+  rollNoAsc,
+  rollNoDesc,
+  attendanceAsc,
+  attendanceDesc,
+  cgpaAsc,
+  cgpaDesc,
+}
+
+enum _BatchFilter {
+  all,
+  g1,
+  g2,
+}
+
+class _SortSheet extends StatelessWidget {
+  final _SortMode selected;
+
+  const _SortSheet({required this.selected});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Sort by',
+            style: GoogleFonts.inter(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 10),
+          _SortTile(
+            icon: Icons.sort_by_alpha_rounded,
+            label: 'Roll number A-Z',
+            value: _SortMode.rollNoAsc,
+            groupValue: selected,
+          ),
+          _SortTile(
+            icon: Icons.sort_by_alpha_rounded,
+            label: 'Roll number Z-A',
+            value: _SortMode.rollNoDesc,
+            groupValue: selected,
+          ),
+          _SortTile(
+            icon: Icons.trending_up_rounded,
+            label: 'Attendance low to high',
+            value: _SortMode.attendanceAsc,
+            groupValue: selected,
+          ),
+          _SortTile(
+            icon: Icons.trending_down_rounded,
+            label: 'Attendance high to low',
+            value: _SortMode.attendanceDesc,
+            groupValue: selected,
+          ),
+          _SortTile(
+            icon: Icons.insights_rounded,
+            label: 'CGPA low to high',
+            value: _SortMode.cgpaAsc,
+            groupValue: selected,
+          ),
+          _SortTile(
+            icon: Icons.insights_rounded,
+            label: 'CGPA high to low',
+            value: _SortMode.cgpaDesc,
+            groupValue: selected,
+          ),
+          const SizedBox(height: 6),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () => Navigator.of(context).pop(selected),
+              child: Text(
+                'Close',
+                style: TextStyle(color: theme.colorScheme.primary),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SortTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final _SortMode value;
+  final _SortMode groupValue;
+
+  const _SortTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.groupValue,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(icon, size: 20),
+      title: Text(
+        label,
+        style: GoogleFonts.inter(fontSize: 13),
+      ),
+      trailing: groupValue == value
+          ? Icon(Icons.check_circle_rounded,
+              color: Theme.of(context).colorScheme.primary)
+          : const Icon(Icons.radio_button_unchecked_rounded, size: 20),
+      onTap: () => Navigator.of(context).pop(value),
+    );
+  }
+}
+
+class _BatchSheet extends StatelessWidget {
+  final _BatchFilter selected;
+
+  const _BatchSheet({required this.selected});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Filter by batch',
+            style: GoogleFonts.inter(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 10),
+          _BatchTile(
+            label: 'All batches',
+            value: _BatchFilter.all,
+            groupValue: selected,
+          ),
+          _BatchTile(
+            label: 'G1 only',
+            value: _BatchFilter.g1,
+            groupValue: selected,
+          ),
+          _BatchTile(
+            label: 'G2 only',
+            value: _BatchFilter.g2,
+            groupValue: selected,
+          ),
+          const SizedBox(height: 6),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () => Navigator.of(context).pop(selected),
+              child: Text(
+                'Close',
+                style: TextStyle(color: Theme.of(context).colorScheme.primary),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BatchTile extends StatelessWidget {
+  final String label;
+  final _BatchFilter value;
+  final _BatchFilter groupValue;
+
+  const _BatchTile({
+    required this.label,
+    required this.value,
+    required this.groupValue,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: const Icon(Icons.groups_rounded, size: 20),
+      title: Text(
+        label,
+        style: GoogleFonts.inter(fontSize: 13),
+      ),
+      trailing: groupValue == value
+          ? Icon(Icons.check_circle_rounded,
+              color: Theme.of(context).colorScheme.primary)
+          : const Icon(Icons.radio_button_unchecked_rounded, size: 20),
+      onTap: () => Navigator.of(context).pop(value),
+    );
+  }
 }
 
 // ─── Attendance Tab ──────────────────────────────────────────────────────────

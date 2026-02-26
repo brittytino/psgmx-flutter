@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -53,6 +54,102 @@ class EcampusService {
     }
   }
 
+  bool _isColdStartMessage(String text) {
+    final lower = text.toLowerCase();
+    return lower.contains('spin down with inactivity') ||
+        lower.contains('delay requests by 50 seconds') ||
+        lower.contains('service unavailable') ||
+        lower.contains('upstream request timeout') ||
+        lower.contains('gateway timeout') ||
+        lower.contains('bad gateway');
+  }
+
+  bool _isRetryableStatus(int statusCode) {
+    return statusCode == 408 ||
+        statusCode == 425 ||
+        statusCode == 429 ||
+        statusCode == 500 ||
+        statusCode == 502 ||
+        statusCode == 503 ||
+        statusCode == 504;
+  }
+
+  String _friendlyErrorMessage(http.Response response) {
+    final body = _tryDecodeJson(response.body);
+    final detail = (body?['detail'] ?? body?['message'])?.toString();
+    final raw = (detail != null && detail.isNotEmpty)
+        ? detail
+        : response.body.toString();
+
+    if (_isColdStartMessage(raw) || _isRetryableStatus(response.statusCode)) {
+      return 'Server is waking up. Please wait a few seconds and try again.';
+    }
+
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      return 'Your session has expired. Please sign in again.';
+    }
+
+    if (response.statusCode == 404) {
+      return 'Academic sync service is temporarily unavailable. Please try again later.';
+    }
+
+    if (response.statusCode >= 500) {
+      return 'Academic sync service is temporarily unavailable. Please try again shortly.';
+    }
+
+    return 'Unable to complete the request right now. Please try again.';
+  }
+
+  Future<void> _warmUpBackend() async {
+    final uri = Uri.parse('${EcampusConfig.apiUrl}/api/ecampus/sync-all/status');
+    try {
+      await http
+          .get(uri, headers: _authHeaders)
+          .timeout(const Duration(seconds: 20));
+    } catch (_) {
+      // Best-effort warmup only.
+    }
+  }
+
+  Future<http.Response> _postWithRetry(
+    Uri uri, {
+    required Map<String, String> headers,
+    required Duration timeout,
+    int maxAttempts = 2,
+  }) async {
+    Object? lastError;
+
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        final response = await http.post(uri, headers: headers).timeout(timeout);
+        final hasColdStart = _isColdStartMessage(response.body);
+        final shouldRetry =
+            attempt < maxAttempts && (_isRetryableStatus(response.statusCode) || hasColdStart);
+
+        if (shouldRetry) {
+          await Future.delayed(Duration(seconds: 2 * attempt));
+          continue;
+        }
+
+        return response;
+      } on TimeoutException catch (e) {
+        lastError = e;
+        if (attempt >= maxAttempts) break;
+        await Future.delayed(Duration(seconds: 2 * attempt));
+      } catch (e) {
+        lastError = e;
+        if (attempt >= maxAttempts) break;
+        await Future.delayed(Duration(seconds: 2 * attempt));
+      }
+    }
+
+    throw Exception(
+      lastError is TimeoutException
+          ? 'Server is taking longer than expected. Please try again.'
+          : 'Unable to reach academic sync service right now. Please try again.',
+    );
+  }
+
   // ─── Trigger a sync on the backend ────────────────────────────────────────
 
   /// Calls the backend to scrape eCampus and store fresh data in Supabase.
@@ -62,9 +159,13 @@ class EcampusService {
         .replace(queryParameters: {'rollno': rollno});
 
     debugPrint('[EcampusService] POST $uri');
-    final response = await http
-        .post(uri, headers: _authHeaders)
-        .timeout(const Duration(seconds: 60));
+    await _warmUpBackend();
+    final response = await _postWithRetry(
+      uri,
+      headers: _authHeaders,
+      timeout: const Duration(seconds: 90),
+      maxAttempts: 2,
+    );
 
     final body = _tryDecodeJson(response.body);
     if (response.statusCode == 200) {
@@ -74,12 +175,7 @@ class EcampusService {
       return body;
     }
 
-    final detail = body?['detail'] ?? body?['message'];
-    final message = detail ??
-        (response.body.isNotEmpty
-            ? response.body
-            : 'Sync failed (HTTP ${response.statusCode})');
-    throw Exception(message);
+    throw Exception(_friendlyErrorMessage(response));
   }
 
   /// Trigger a sync for all students (placement rep only).
@@ -90,9 +186,13 @@ class EcampusService {
     final uri = Uri.parse('${EcampusConfig.apiUrl}/api/ecampus/sync-all');
 
     debugPrint('[EcampusService] POST $uri');
-    final response = await http
-        .post(uri, headers: _authHeaders)
-        .timeout(const Duration(minutes: 5));
+    await _warmUpBackend();
+    final response = await _postWithRetry(
+      uri,
+      headers: _authHeaders,
+      timeout: const Duration(minutes: 6),
+      maxAttempts: 2,
+    );
 
     final body = _tryDecodeJson(response.body);
     if (response.statusCode == 200) {
@@ -102,12 +202,7 @@ class EcampusService {
       return body;
     }
 
-    final detail = body?['detail'] ?? body?['message'];
-    final message = detail ??
-        (response.body.isNotEmpty
-            ? response.body
-            : 'Sync failed (HTTP ${response.statusCode})');
-    throw Exception(message);
+    throw Exception(_friendlyErrorMessage(response));
   }
 
   // ─── Read from Supabase cache ─────────────────────────────────────────────
