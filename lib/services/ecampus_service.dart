@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/ecampus_attendance.dart';
 import '../models/ecampus_ca_marks.dart';
+import '../models/ecampus_ca_timetable.dart';
 import '../models/ecampus_cgpa.dart';
 
 /// Configuration for the PSG eCampus API backend.
@@ -267,6 +268,26 @@ class EcampusService {
     }
   }
 
+  /// Reads CA timetable data for [rollno] directly from Supabase cache.
+  /// Returns null when no data has been synced yet.
+  Future<EcampusCaTimetable?> getCaTimetable(String rollno) async {
+    try {
+      final result = await _supabase
+          .from('ecampus_ca_timetable')
+          .select('reg_no, data, synced_at')
+          .eq('reg_no', rollno)
+          .maybeSingle();
+
+      if (result == null) return null;
+      return EcampusCaTimetable.fromSupabase(result);
+    } catch (e) {
+      // Non-fatal: table may not exist yet (migration pending) or transient
+      // network error (e.g. Cloudflare 525).  Other data must still load.
+      debugPrint('[EcampusService] getCaTimetable error (non-fatal): $e');
+      return null;
+    }
+  }
+
   /// Convenience: sync and then immediately return the fresh attendance data.
   Future<EcampusAttendance?> syncAndGetAttendance(String rollno) async {
     await syncUser(rollno);
@@ -320,6 +341,21 @@ class EcampusService {
           // Table may not exist yet (migration pending) or SSL error.
           // Swallow silently so the stream stays alive when data appears later.
           debugPrint('[EcampusService] caMarksStream error (non-fatal): $e');
+        });
+  }
+
+  /// Returns a stream that emits whenever the CA timetable row for [rollno] changes.
+  Stream<EcampusCaTimetable?> caTimetableStream(String rollno) {
+    return _supabase
+        .from('ecampus_ca_timetable')
+        .stream(primaryKey: ['id'])
+        .eq('reg_no', rollno)
+        .map((rows) {
+          if (rows.isEmpty) return null;
+          return EcampusCaTimetable.fromSupabase(rows.first);
+        })
+        .handleError((Object e) {
+          debugPrint('[EcampusService] caTimetableStream error (non-fatal): $e');
         });
   }
 }

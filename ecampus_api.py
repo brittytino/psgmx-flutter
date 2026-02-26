@@ -12,6 +12,7 @@ Required env vars:
 import os
 import math
 import logging
+import re
 from datetime import datetime, date
 
 import requests
@@ -121,6 +122,7 @@ ATT_URL     = BASE_URL + "AttWfPercView.aspx"
 COURSE_URL  = BASE_URL + "AttWfStudTimtab.aspx"
 RESULT_URL  = BASE_URL + "FrmEpsStudResult.aspx"
 CA_URL      = BASE_URL + "FrmCaStudMarkView.aspx"
+CA_TIMETABLE_URL = "https://ecampus.psgtech.ac.in/studzone/ContinuousAssessment/CATestTimeTable"
 
 HEADERS = {
     "User-Agent": (
@@ -504,6 +506,80 @@ def _read_cgpa(rollno: str) -> dict | None:
     return result.data
 
 
+def _fetch_ca_timetable(session: requests.Session) -> list[list[str]]:
+    """Scrape CA test timetable rows from PSG eCampus."""
+    page = session.get(CA_TIMETABLE_URL, headers=HEADERS, timeout=20)
+    soup = BeautifulSoup(page.text, "html.parser")
+
+    table = (
+        soup.find("table", {"id": "GvCATimeTable"})
+        or soup.find("table", {"id": "gvCATimeTable"})
+        or soup.find("table", {"id": "DgCATimeTable"})
+        or soup.find("table", {"id": "CATestTimeTable"})
+        or soup.find("table", {"class": "cssbody"})
+    )
+
+    if not table:
+        # Fallback: pick the first table that looks like a timetable
+        for t in soup.find_all("table"):
+            header = " ".join(
+                th.get_text(" ", strip=True) for th in t.find_all("th")
+            ).lower()
+            if any(k in header for k in ("date", "time", "course", "subject", "test", "venue", "session")):
+                table = t
+                break
+
+    if not table:
+        return []  # timetable not published yet
+
+    rows: list[list[str]] = []
+    for tr in table.find_all("tr"):
+        cols = [c.get_text(" ", strip=True) for c in tr.find_all(["th", "td"])]
+        cols = [c for c in cols if c]
+        if cols:
+            rows.append(cols)
+    return rows
+
+
+def _parse_ca_timetable(rows: list[list[str]]) -> dict:
+    """Parse CA timetable rows into a structured JSON payload.
+
+    Returns:
+      {"headers": [...], "rows": [{"col_name": "..."}, ...]}
+    """
+    if not rows:
+        return {"headers": [], "rows": [], "note": "CA timetable not published yet"}
+
+    header_row = rows[0]
+    header_text = " ".join(header_row).lower()
+    has_header = any(
+        k in header_text
+        for k in ("date", "time", "course", "subject", "test", "venue", "session")
+    )
+
+    if not has_header:
+        header_row = [f"Col {i + 1}" for i in range(len(rows[0]))]
+        data_rows = rows
+    else:
+        data_rows = rows[1:]
+
+    def _norm(h: str) -> str:
+        key = re.sub(r"[^a-z0-9]+", "_", h.strip().lower()).strip("_")
+        return key or "col"
+
+    norm_headers = [_norm(h) for h in header_row]
+    parsed_rows: list[dict] = []
+    for row in data_rows:
+        if not row:
+            continue
+        item = {}
+        for i, key in enumerate(norm_headers):
+            item[key] = row[i] if i < len(row) else ""
+        parsed_rows.append(item)
+
+    return {"headers": header_row, "rows": parsed_rows}
+
+
 def _fetch_ca_marks(session: requests.Session) -> list[list[str]]:
     """Scrape CA (Continuous Assessment) internal marks table."""
     page = session.get(CA_URL, headers=HEADERS, timeout=20)
@@ -667,8 +743,30 @@ def _read_ca_marks(rollno: str) -> dict | None:
     return result.data
 
 
-def _sync_single_rollno(rollno: str, password: str) -> tuple[dict, dict, dict]:
-    """Sync one student end-to-end and return (attendance, cgpa, ca_marks) payloads.
+def _upsert_ca_timetable(rollno: str, data: dict) -> None:
+    _get_supabase().table("ecampus_ca_timetable").upsert(
+        {
+            "reg_no": rollno,
+            "data": data,
+            "synced_at": datetime.utcnow().isoformat(),
+        },
+        on_conflict="reg_no",
+    ).execute()
+
+
+def _read_ca_timetable(rollno: str) -> dict | None:
+    result = (
+        _get_supabase().table("ecampus_ca_timetable")
+        .select("data, synced_at")
+        .eq("reg_no", rollno)
+        .maybe_single()
+        .execute()
+    )
+    return result.data
+
+
+def _sync_single_rollno(rollno: str, password: str) -> tuple[dict, dict, dict, dict]:
+    """Sync one student end-to-end and return (attendance, cgpa, ca_marks, ca_timetable) payloads.
 
     Args:
         rollno:   Student roll number (e.g. "25MX354").
@@ -688,11 +786,20 @@ def _sync_single_rollno(rollno: str, password: str) -> tuple[dict, dict, dict]:
     except Exception as exc:
         log.warning(f"[sync] {rollno} – CA marks unavailable: {exc}")
         ca_data = {"subjects": [], "note": "CA marks page unavailable"}
+
+    # CA timetable – non-fatal as well
+    try:
+        tt_rows = _fetch_ca_timetable(session)
+        tt_data = _parse_ca_timetable(tt_rows)
+    except Exception as exc:
+        log.warning(f"[sync] {rollno} – CA timetable unavailable: {exc}")
+        tt_data = {"headers": [], "rows": [], "note": "CA timetable page unavailable"}
     _upsert_attendance(rollno, att_data)
     _upsert_cgpa(rollno, cgpa_data)
     _upsert_bunked(rollno, att_data.get("subjects", []))
     _upsert_ca_marks(rollno, ca_data)
-    return att_data, cgpa_data, ca_data
+    _upsert_ca_timetable(rollno, tt_data)
+    return att_data, cgpa_data, ca_data, tt_data
 
 
 def _get_whitelist_students_with_dob() -> list[dict]:
@@ -801,7 +908,7 @@ def sync_user(
 
     # 2. Sync + persist
     try:
-        att_data, cgpa_data, ca_data = _sync_single_rollno(rollno, password)
+        att_data, cgpa_data, ca_data, tt_data = _sync_single_rollno(rollno, password)
     except Exception as exc:
         log.error(f"[sync] Login/sync failed for {rollno}: {exc}")
         raise HTTPException(status_code=502, detail=f"eCampus sync failed: {exc}")
@@ -816,6 +923,7 @@ def sync_user(
         "attendance_summary": att_data["summary"],
         "cgpa": cgpa_data.get("cgpa"),
         "ca_subjects_count": len(ca_data.get("subjects", [])),
+        "ca_timetable_rows": len(tt_data.get("rows", [])),
     }
 
 
@@ -866,6 +974,24 @@ def get_ca_marks(
         raise HTTPException(
             status_code=404,
             detail="No CA marks data found. Please sync first.",
+        )
+    return {"ok": True, "rollno": rollno, **row}
+
+
+@app.get("/api/ecampus/ca-timetable")
+def get_ca_timetable(
+    rollno: str = Query(...),
+    x_api_secret: str | None = Header(None),
+):
+    """Returns the latest cached CA timetable data from Supabase.
+    If timetable has not been published yet, rows may be empty.
+    """
+    _check_secret(x_api_secret)
+    row = _read_ca_timetable(rollno)
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail="No CA timetable data found. Please sync first.",
         )
     return {"ok": True, "rollno": rollno, **row}
 

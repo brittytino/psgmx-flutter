@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/ecampus_attendance.dart';
 import '../models/ecampus_ca_marks.dart';
+import '../models/ecampus_ca_timetable.dart';
 import '../models/ecampus_cgpa.dart';
 import '../services/ecampus_service.dart';
 
@@ -18,6 +19,7 @@ class EcampusProvider extends ChangeNotifier {
   EcampusAttendance? _attendance;
   EcampusCgpa? _cgpa;
   EcampusCaMarks? _caMarks;
+  EcampusCaTimetable? _caTimetable;
   String? _errorMessage;
   String? _currentRollno;
   DateTime? _lastSyncedAt;
@@ -25,18 +27,20 @@ class EcampusProvider extends ChangeNotifier {
   StreamSubscription<EcampusAttendance?>? _attSub;
   StreamSubscription<EcampusCgpa?>? _cgpaSub;
   StreamSubscription<EcampusCaMarks?>? _caSub;
+  StreamSubscription<EcampusCaTimetable?>? _caTtSub;
 
   // ─── Getters ───────────────────────────────────────────────────────────────
   EcampusStatus get status => _status;
   EcampusAttendance? get attendance => _attendance;
   EcampusCgpa? get cgpa => _cgpa;
   EcampusCaMarks? get caMarks => _caMarks;
+  EcampusCaTimetable? get caTimetable => _caTimetable;
   String? get errorMessage => _errorMessage;
   DateTime? get lastSyncedAt => _lastSyncedAt;
   bool get isLoading => _status == EcampusStatus.loading;
   bool get isSyncing => _status == EcampusStatus.syncing;
   bool get hasData =>
-      _attendance != null || _cgpa != null || _caMarks != null;
+      _attendance != null || _cgpa != null || _caMarks != null || _caTimetable != null;
 
   // ─── Initialise & load cached data ────────────────────────────────────────
 
@@ -53,11 +57,13 @@ class EcampusProvider extends ChangeNotifier {
         _service.getAttendance(rollno),
         _service.getCgpa(rollno),
         _service.getCaMarks(rollno),
+        _service.getCaTimetable(rollno),
       ]);
 
       _attendance = results[0] as EcampusAttendance?;
       _cgpa = results[1] as EcampusCgpa?;
       _caMarks = results[2] as EcampusCaMarks?;
+      _caTimetable = results[3] as EcampusCaTimetable?;
       _lastSyncedAt = _attendance?.syncedAt ?? _cgpa?.syncedAt;
       _setStatus(EcampusStatus.loaded);
 
@@ -83,6 +89,16 @@ class EcampusProvider extends ChangeNotifier {
         },
         cancelOnError: false,
       );
+      _caTtSub = _service.caTimetableStream(rollno).listen(
+        (tt) {
+          _caTimetable = tt;
+          notifyListeners();
+        },
+        onError: (Object e) {
+          debugPrint('[EcampusProvider] caTimetableStream error (non-fatal): $e');
+        },
+        cancelOnError: false,
+      );
     } catch (e) {
       _setError('Failed to load data: $e');
     }
@@ -105,10 +121,12 @@ class EcampusProvider extends ChangeNotifier {
         _service.getAttendance(_currentRollno!),
         _service.getCgpa(_currentRollno!),
         _service.getCaMarks(_currentRollno!),
+        _service.getCaTimetable(_currentRollno!),
       ]);
       _attendance = results[0] as EcampusAttendance?;
       _cgpa = results[1] as EcampusCgpa?;
       _caMarks = results[2] as EcampusCaMarks?;
+      _caTimetable = results[3] as EcampusCaTimetable?;
       _lastSyncedAt = _attendance?.syncedAt ?? _cgpa?.syncedAt;
       _setStatus(EcampusStatus.loaded);
     } catch (e) {
@@ -154,6 +172,7 @@ class EcampusProvider extends ChangeNotifier {
     _attSub?.cancel();
     _cgpaSub?.cancel();
     _caSub?.cancel();
+    _caTtSub?.cancel();
   }
 
   @override
@@ -168,6 +187,7 @@ class EcampusProvider extends ChangeNotifier {
     _attendance = null;
     _cgpa = null;
     _caMarks = null;
+    _caTimetable = null;
     _errorMessage = null;
     _currentRollno = null;
     _lastSyncedAt = null;

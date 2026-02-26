@@ -8,6 +8,7 @@ import '../../providers/user_provider.dart';
 import '../../models/ecampus_attendance.dart';
 import '../../models/ecampus_cgpa.dart';
 import '../../models/ecampus_ca_marks.dart';
+import '../../models/ecampus_ca_timetable.dart';
 import '../../services/ecampus_service.dart';
 import 'widgets/subject_attendance_card.dart';
 
@@ -2145,15 +2146,17 @@ class _CaTestTab extends StatelessWidget {
         }
 
         final ca = prov.caMarks;
+        final tt = prov.caTimetable;
+        final hasTimetable = tt != null && tt.hasData;
 
-        if (ca == null) {
+        if (ca == null && !hasTimetable) {
           return const _EmptyView(
             message:
-                'CA marks data is not available yet.\nYour placement representative will refresh and publish updates.',
+                'CA data is not available yet.\nYour placement representative will refresh and publish updates.',
           );
         }
 
-        if (!ca.hasData) {
+        if (ca != null && !ca.hasData && !hasTimetable) {
           return _EmptyView(
             icon: Icons.assignment_outlined,
             message: ca.note?.isNotEmpty == true
@@ -2165,15 +2168,34 @@ class _CaTestTab extends StatelessWidget {
         return CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
-            SliverToBoxAdapter(
-              child: _CaHeaderCard(ca: ca),
-            ),
+            if (ca != null)
+              SliverToBoxAdapter(
+                child: _CaHeaderCard(ca: ca),
+              ),
+            if (ca != null && !ca.hasData && (ca.note?.isNotEmpty ?? false))
+              SliverToBoxAdapter(
+                child: _CaInfoBanner(
+                  icon: Icons.assignment_outlined,
+                  note: ca.note!,
+                ),
+              ),
+            if (tt != null && tt.hasData)
+              SliverToBoxAdapter(
+                child: _CaTimetableSection(timetable: tt),
+              )
+            else if (tt != null && (tt.note?.isNotEmpty ?? false))
+              SliverToBoxAdapter(
+                child: _CaInfoBanner(
+                  icon: Icons.schedule_outlined,
+                  note: tt.note!,
+                ),
+              ),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
-                  (context, i) => _CaSubjectCard(subject: ca.subjects[i]),
-                  childCount: ca.subjects.length,
+                  (context, i) => _CaSubjectCard(subject: ca!.subjects[i]),
+                  childCount: ca?.subjects.length ?? 0,
                 ),
               ),
             ),
@@ -2497,6 +2519,206 @@ class _CaPendingChip extends StatelessWidget {
             style: GoogleFonts.inter(
                 fontSize: 10,
                 color: isDark ? Colors.white24 : Colors.black26),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CaTimetableSection extends StatelessWidget {
+  final EcampusCaTimetable timetable;
+  const _CaTimetableSection({required this.timetable});
+
+  String _norm(String h) {
+    final lower = h.toLowerCase();
+    final cleaned = lower.replaceAll(RegExp(r'[^a-z0-9]+'), '_');
+    return cleaned.replaceAll(RegExp(r'^_+|_+$'), '');
+  }
+
+  String? _pickField(Map<String, String> row, List<String> keys) {
+    for (final k in keys) {
+      final v = row[k];
+      if (v != null && v.trim().isNotEmpty) return v.trim();
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final headers = timetable.headers;
+    final normHeaders = headers.map(_norm).toList();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'CA TIMETABLE',
+            style: GoogleFonts.inter(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.2,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
+            ),
+          ),
+          const SizedBox(height: 10),
+          ...timetable.rows.map((row) {
+            final title = _pickField(row, const [
+                  'course_title',
+                  'subject',
+                  'paper',
+                  'course',
+                  'title',
+                ]) ??
+                _pickField(row, const ['course_code', 'subject_code', 'code']) ??
+                'CA Test';
+
+            final subtitle = _pickField(row, const [
+                  'course_code',
+                  'subject_code',
+                  'code',
+                ]) ??
+                '';
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E1E2E) : Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.07)
+                      : Colors.black.withValues(alpha: 0.07),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.06),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                  if (subtitle.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        color: isDark ? Colors.white54 : Colors.black45,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      for (int i = 0; i < normHeaders.length; i++)
+                        _CaTimetableChip(
+                          label: headers[i],
+                          value: row[normHeaders[i]] ?? '',
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+class _CaTimetableChip extends StatelessWidget {
+  final String label;
+  final String value;
+  const _CaTimetableChip({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    if (value.trim().isEmpty) return const SizedBox.shrink();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.06)
+            : Colors.black.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.black.withValues(alpha: 0.08),
+        ),
+      ),
+      child: RichText(
+        text: TextSpan(
+          style: GoogleFonts.inter(
+            fontSize: 10,
+            color: isDark ? Colors.white70 : Colors.black54,
+          ),
+          children: [
+            TextSpan(
+              text: '${label.trim()}: ',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            TextSpan(text: value.trim()),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CaInfoBanner extends StatelessWidget {
+  final String note;
+  final IconData icon;
+  const _CaInfoBanner({required this.note, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A1A2B) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.black.withValues(alpha: 0.08),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: isDark ? Colors.white54 : Colors.black45),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              note,
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                color: isDark ? Colors.white60 : Colors.black54,
+              ),
+            ),
           ),
         ],
       ),
