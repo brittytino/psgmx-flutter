@@ -22,8 +22,9 @@ class EcampusProvider extends ChangeNotifier {
   EcampusCaTimetable? _caTimetable;
   String? _errorMessage;
   String? _currentRollno;
-  DateTime? _lastSyncedAt;
-
+  DateTime? _lastSyncedAt;  /// True when the last error was specifically an eCampus login failure,
+  /// meaning the student's stored password (DOB-derived or custom) was rejected.
+  bool _isLoginFailed = false;
   StreamSubscription<EcampusAttendance?>? _attSub;
   StreamSubscription<EcampusCgpa?>? _cgpaSub;
   StreamSubscription<EcampusCaMarks?>? _caSub;
@@ -39,6 +40,9 @@ class EcampusProvider extends ChangeNotifier {
   DateTime? get lastSyncedAt => _lastSyncedAt;
   bool get isLoading => _status == EcampusStatus.loading;
   bool get isSyncing => _status == EcampusStatus.syncing;
+  /// Whether the last error was caused by an eCampus portal login failure.
+  /// When true, the UI should prompt the student to update their password.
+  bool get isLoginFailed => _isLoginFailed;
   bool get hasData =>
       _attendance != null || _cgpa != null || _caMarks != null || _caTimetable != null;
 
@@ -57,7 +61,7 @@ class EcampusProvider extends ChangeNotifier {
         _service.getAttendance(rollno),
         _service.getCgpa(rollno),
         _service.getCaMarks(rollno),
-        _service.getCaTimetable(rollno),
+        _service.getGlobalCaTimetable(), // shared timetable – same for all students
       ]);
 
       _attendance = results[0] as EcampusAttendance?;
@@ -89,13 +93,13 @@ class EcampusProvider extends ChangeNotifier {
         },
         cancelOnError: false,
       );
-      _caTtSub = _service.caTimetableStream(rollno).listen(
+      _caTtSub = _service.globalCaTimetableStream().listen(
         (tt) {
           _caTimetable = tt;
           notifyListeners();
         },
         onError: (Object e) {
-          debugPrint('[EcampusProvider] caTimetableStream error (non-fatal): $e');
+          debugPrint('[EcampusProvider] globalCaTimetableStream error (non-fatal): $e');
         },
         cancelOnError: false,
       );
@@ -121,7 +125,7 @@ class EcampusProvider extends ChangeNotifier {
         _service.getAttendance(_currentRollno!),
         _service.getCgpa(_currentRollno!),
         _service.getCaMarks(_currentRollno!),
-        _service.getCaTimetable(_currentRollno!),
+        _service.getGlobalCaTimetable(), // shared timetable – same for all students
       ]);
       _attendance = results[0] as EcampusAttendance?;
       _cgpa = results[1] as EcampusCgpa?;
@@ -138,13 +142,26 @@ class EcampusProvider extends ChangeNotifier {
 
   void _setStatus(EcampusStatus s) {
     _status = s;
+    // Clear the login-failed flag when we begin a new load/sync attempt.
+    if (s == EcampusStatus.loading || s == EcampusStatus.syncing) {
+      _isLoginFailed = false;
+    }
     notifyListeners();
   }
 
   void _setError(String msg) {
     _errorMessage = _toUserFriendlyError(msg);
     _status = EcampusStatus.error;
-    debugPrint('[EcampusProvider] $msg');
+    // Detect login failures so the UI can prompt for a password update.
+    final lower = msg.toLowerCase();
+    _isLoginFailed = lower.contains('login') ||
+        lower.contains('attendance table not found') ||
+        lower.contains('login may have failed') ||
+        lower.contains('login failed') ||
+        lower.contains('password') ||
+        lower.contains('unauthorized') ||
+        lower.contains('401');
+    debugPrint('[EcampusProvider] $msg (loginFailed=$_isLoginFailed)');
     notifyListeners();
   }
 
@@ -191,6 +208,7 @@ class EcampusProvider extends ChangeNotifier {
     _errorMessage = null;
     _currentRollno = null;
     _lastSyncedAt = null;
+    _isLoginFailed = false;
     _status = EcampusStatus.initial;
     notifyListeners();
   }

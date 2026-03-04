@@ -6,6 +6,7 @@ import '../../services/update_service.dart';
 import 'emergency_block_screen.dart';
 import 'force_update_screen.dart';
 import 'optional_update_sheet.dart';
+import 'new_version_dialog.dart';
 
 /// Update Gate Widget
 /// 
@@ -16,7 +17,8 @@ import 'optional_update_sheet.dart';
 /// 1. If emergency_block → Show EmergencyBlockScreen (full block)
 /// 2. If force_update required → Show ForceUpdateScreen (cannot proceed)
 /// 3. If optional_update available → Show bottom sheet once per session
-/// 4. Otherwise → Show child (normal app)
+/// 4. Check if app was updated → Show NewVersionDialog
+/// 5. Otherwise → Show child (normal app)
 class UpdateGate extends StatefulWidget {
   final Widget child;
   
@@ -74,7 +76,19 @@ class _UpdateGateState extends State<UpdateGate> with WidgetsBindingObserver {
       
       // Show optional update if applicable (delayed to avoid blocking)
       _maybeShowOptionalUpdate();
+      
+      // Check if app was updated and show welcome dialog
+      _checkForNewVersion();
     }
+  }
+
+  void _checkForNewVersion() {
+    // Delay to ensure navigation is ready and update checks are complete
+    Future.delayed(const Duration(seconds: 1), () {
+      if (mounted && Navigator.maybeOf(context) != null) {
+        NewVersionDialog.checkAndShowIfNeeded(context);
+      }
+    });
   }
 
   Future<void> _recheckOnResume() async {

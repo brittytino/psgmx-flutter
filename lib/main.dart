@@ -30,6 +30,7 @@ import 'services/supabase_db_service.dart';
 import 'services/quote_service.dart';
 import 'services/notification_service.dart';
 import 'services/birthday_notification_service.dart';
+import 'services/ca_exam_notification_service.dart';
 import 'services/leetcode_auto_refresh_service.dart';
 import 'services/update_service.dart';
 
@@ -63,6 +64,10 @@ void main() async {
     debugPrint('[APP] Initializing BirthdayNotificationService...');
     await BirthdayNotificationService().init();
     debugPrint('[APP] BirthdayNotificationService initialized successfully');
+
+    debugPrint('[APP] Initializing CaExamNotificationService...');
+    await CaExamNotificationService().init();
+    debugPrint('[APP] CaExamNotificationService initialized successfully');
 
     debugPrint('[APP] Initializing UpdateService...');
     await UpdateService().initialize();

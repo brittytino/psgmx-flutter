@@ -26,6 +26,9 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
   late TabController _tabController;
   bool _syncAllInProgress = false;
   bool _dobDialogShown = false;
+  /// Prevents double-showing the custom-password dialog when the provider
+  /// emits multiple [isLoginFailed] notifications in quick succession.
+  bool _pwDialogShown = false;
   bool _isPlacementRep = false;
   bool _isLoadingAllStudents = false;
   String? _allStudentsError;
@@ -61,6 +64,26 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
       }
 
     });
+
+    // Watch EcampusProvider for login failures and surface the password dialog.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<EcampusProvider>().addListener(_onEcampusProviderUpdate);
+    });
+  }
+
+  /// Called every time [EcampusProvider] notifies listeners.
+  /// Detects login failures and auto-shows the custom-password dialog so
+  /// students who changed their eCampus password don’t have to hunt for the
+  /// option themselves.
+  void _onEcampusProviderUpdate() {
+    if (!mounted) return;
+    final prov = context.read<EcampusProvider>();
+    if (prov.isLoginFailed && !_pwDialogShown) {
+      _showCustomPasswordDialog(
+        context.read<UserProvider>(),
+        isAutoPrompt: true,
+      );
+    }
   }
 
   double? _asDouble(dynamic value) {
@@ -191,6 +214,12 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
 
   @override
   void dispose() {
+    // Remove the provider listener we registered in initState.
+    if (mounted) {
+      try {
+        context.read<EcampusProvider>().removeListener(_onEcampusProviderUpdate);
+      } catch (_) {}
+    }
     _tabController.dispose();
     super.dispose();
   }
@@ -271,8 +300,16 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
   /// Quick-access dialog for students who changed their eCampus password.
   /// Mirrors the same flow as in profile_screen.dart but surfaces it inline
   /// so the student doesn't have to navigate away from the academics screen.
-  Future<void> _showCustomPasswordDialog(UserProvider userProvider) async {
-    if (!mounted) return;
+  /// Quick-access dialog for students who changed their eCampus password.
+  /// When [isAutoPrompt] is true the dialog was triggered automatically because
+  /// a sync attempt failed with a login error — extra context is shown.
+  Future<void> _showCustomPasswordDialog(
+    UserProvider userProvider, {
+    bool isAutoPrompt = false,
+  }) async {
+    if (_pwDialogShown || !mounted) return;
+    _pwDialogShown = true;
+
     final theme = Theme.of(context);
     final controller = TextEditingController();
     bool obscure = true;
@@ -282,24 +319,48 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Row(
             children: [
-              Icon(Icons.vpn_key_outlined, color: theme.colorScheme.primary),
+              Icon(Icons.vpn_key_rounded, color: theme.colorScheme.primary),
               const SizedBox(width: 8),
-              const Text('Custom eCampus Password'),
+              const Expanded(
+                child: Text('Update eCampus Password',
+                    style: TextStyle(fontSize: 17)),
+              ),
             ],
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Enter the password you use to log in to the eCampus portal. '
-                'Only needed if you changed it from the default DOB-based format '
-                '(e.g. 08jul04).',
-                style: theme.textTheme.bodySmall,
-              ),
-              const SizedBox(height: 16),
+              if (isAutoPrompt) ...[
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                        color: Colors.orange.withValues(alpha: 0.4)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline,
+                          color: Colors.orange, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Your eCampus password has changed. '
+                          'Enter your current portal password to load your data.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                              color: Colors.orange.shade800),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ],
               TextField(
                 controller: controller,
                 obscureText: obscure,
@@ -316,12 +377,43 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
                   ),
                 ),
               ),
+              const SizedBox(height: 14),
+              // ── Trust-building statement ──────────────────────────────────
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.green.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border:
+                      Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.shield_outlined,
+                        color: Colors.green, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '\ud83d\udd12 Your passwords are used only once to connect to '
+                        'the eCampus portal \u2014 not stored anywhere. '
+                        'So don\'t fear, your account is completely safe.\n\n'
+                        '\u2014 PSGMX Team',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.green.shade800,
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(null),
-              child: const Text('Cancel'),
+              child: const Text('Skip for now'),
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(ctx).pop(controller.text),
@@ -333,6 +425,8 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
     );
 
     controller.dispose();
+    _pwDialogShown = false;
+
     if (result == null || result.trim().isEmpty) return;
 
     try {
@@ -340,12 +434,14 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
       final rollno = userProvider.currentUser?.regNo;
       if (rollno != null && rollno.isNotEmpty && mounted) {
         context.read<EcampusProvider>().init(rollno);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Password saved. Loading your data\u2026'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Password updated. Loading your data\u2026'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (!mounted) return;
@@ -2530,14 +2626,66 @@ class _CaTimetableSection extends StatelessWidget {
   final EcampusCaTimetable timetable;
   const _CaTimetableSection({required this.timetable});
 
-  String _norm(String h) {
-    final lower = h.toLowerCase();
-    final cleaned = lower.replaceAll(RegExp(r'[^a-z0-9]+'), '_');
-    return cleaned.replaceAll(RegExp(r'^_+|_+$'), '');
+  // ── Date parsing ──────────────────────────────────────────────────────────
+  // Handles formats: "06/MAR/26", "06/Mar/26", "06/03/2026", "06-03-26", etc.
+  static final _monthAbbr = {
+    'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
+    'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12,
+  };
+
+  DateTime? _parseCaDate(String raw) {
+    if (raw.trim().isEmpty) return null;
+    final s = raw.trim();
+    // Try DD/MMM/YY(YY)  e.g. "06/Mar/26" or "06/MAR/2026"
+    final alphaMatch = RegExp(
+      r'^(\d{1,2})[/\-]([A-Za-z]{3,9})[/\-](\d{2,4})$',
+    ).firstMatch(s);
+    if (alphaMatch != null) {
+      final day = int.tryParse(alphaMatch.group(1)!) ?? 0;
+      final monthStr = alphaMatch.group(2)!.toLowerCase().substring(0, 3);
+      final yearRaw = int.tryParse(alphaMatch.group(3)!) ?? 0;
+      final year = yearRaw < 100 ? 2000 + yearRaw : yearRaw;
+      final month = _monthAbbr[monthStr];
+      if (month != null && day > 0) {
+        return DateTime(year, month, day);
+      }
+    }
+    // Try DD/MM/YYYY or DD-MM-YYYY
+    final numMatch = RegExp(
+      r'^(\d{1,2})[/\-](\d{1,2})[/\-](\d{2,4})$',
+    ).firstMatch(s);
+    if (numMatch != null) {
+      final day = int.tryParse(numMatch.group(1)!) ?? 0;
+      final month = int.tryParse(numMatch.group(2)!) ?? 0;
+      final yearRaw = int.tryParse(numMatch.group(3)!) ?? 0;
+      final year = yearRaw < 100 ? 2000 + yearRaw : yearRaw;
+      if (day > 0 && month > 0) {
+        return DateTime(year, month, day);
+      }
+    }
+    // ISO fallback
+    return DateTime.tryParse(s);
   }
 
-  String? _pickField(Map<String, String> row, List<String> keys) {
-    for (final k in keys) {
+  int? _daysLeft(DateTime? examDate) {
+    if (examDate == null) return null;
+    final today = DateTime.now();
+    final todayOnly = DateTime(today.year, today.month, today.day);
+    final examOnly = DateTime(examDate.year, examDate.month, examDate.day);
+    return examOnly.difference(todayOnly).inDays;
+  }
+
+  (Color, Color, String) _badgeStyle(int? days, bool isDark) {
+    if (days == null) return (Colors.grey, Colors.grey.shade700, '');
+    if (days < 0) return (Colors.grey, Colors.grey.shade700, 'Completed');
+    if (days == 0) return (const Color(0xFFEF5350), const Color(0xFFB71C1C), 'Today!');
+    if (days == 1) return (const Color(0xFFFF7043), const Color(0xFFBF360C), 'Tomorrow');
+    if (days <= 3) return (const Color(0xFFFF9800), const Color(0xFFE65100), '$days Days Left');
+    return (const Color(0xFF4CAF50), const Color(0xFF1B5E20), '$days Days Left');
+  }
+
+  String? _pickField(Map<String, String> row, List<String> candidates) {
+    for (final k in candidates) {
       final v = row[k];
       if (v != null && v.trim().isNotEmpty) return v.trim();
     }
@@ -2548,99 +2696,343 @@ class _CaTimetableSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final headers = timetable.headers;
-    final normHeaders = headers.map(_norm).toList();
+
+    // Sort rows by date so upcoming exams appear first
+    final sortedRows = [...timetable.rows]..sort((a, b) {
+        final da = _parseCaDate(
+          _pickField(a, const ['test_date', 'date', 'exam_date']) ?? '',
+        );
+        final db = _parseCaDate(
+          _pickField(b, const ['test_date', 'date', 'exam_date']) ?? '',
+        );
+        if (da == null && db == null) return 0;
+        if (da == null) return 1;
+        if (db == null) return -1;
+        return da.compareTo(db);
+      });
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'CA TIMETABLE',
-            style: GoogleFonts.inter(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.2,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
-            ),
-          ),
-          const SizedBox(height: 10),
-          ...timetable.rows.map((row) {
-            final title = _pickField(row, const [
-                  'course_title',
-                  'subject',
-                  'paper',
-                  'course',
-                  'title',
-                ]) ??
-                _pickField(row, const ['course_code', 'subject_code', 'code']) ??
-                'CA Test';
-
-            final subtitle = _pickField(row, const [
-                  'course_code',
-                  'subject_code',
-                  'code',
-                ]) ??
-                '';
-
-            return Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E1E2E) : Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.07)
-                      : Colors.black.withValues(alpha: 0.07),
+          Row(
+            children: [
+              Container(
+                width: 3,
+                height: 16,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF9800),
+                  borderRadius: BorderRadius.circular(2),
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.06),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: isDark ? Colors.white : Colors.black87,
+              const SizedBox(width: 8),
+              Text(
+                'CA EXAM SCHEDULE',
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.2,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ...sortedRows.map((row) => _CaExamCard(
+                row: row,
+                parseCaDate: _parseCaDate,
+                daysLeft: _daysLeft,
+                badgeStyle: _badgeStyle,
+                pickField: _pickField,
+                isDark: isDark,
+              )),
+        ],
+      ),
+    );
+  }
+}
+
+class _CaExamCard extends StatelessWidget {
+  final Map<String, String> row;
+  final DateTime? Function(String) parseCaDate;
+  final int? Function(DateTime?) daysLeft;
+  final (Color, Color, String) Function(int?, bool) badgeStyle;
+  final String? Function(Map<String, String>, List<String>) pickField;
+  final bool isDark;
+
+  const _CaExamCard({
+    required this.row,
+    required this.parseCaDate,
+    required this.daysLeft,
+    required this.badgeStyle,
+    required this.pickField,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final courseCode = pickField(row, const ['course_code', 'code', 'subject_code']) ?? '';
+    final courseName = pickField(row, const [
+          'course_name',
+          'course_title',
+          'subject',
+          'title',
+          'paper',
+        ]) ??
+        courseCode;
+    final testDateRaw =
+        pickField(row, const ['test_date', 'date', 'exam_date']) ?? '';
+    final slotNo = pickField(row, const ['slot_no', 'slot', 'slot_number']) ?? '';
+    final session = pickField(row, const ['session', 'time', 'timings']) ?? '';
+
+    final examDate = parseCaDate(testDateRaw);
+    final days = daysLeft(examDate);
+    final (badgeColor, badgeDark, badgeText) = badgeStyle(days, isDark);
+    final showBadge = badgeText.isNotEmpty;
+    final isPast = days != null && days < 0;
+
+    // Format display date: "06 Mar 2026"
+    String displayDate = testDateRaw;
+    if (examDate != null) {
+      displayDate = DateFormat('dd MMM yyyy').format(examDate);
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E2E) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isPast
+              ? (isDark
+                  ? Colors.white.withValues(alpha: 0.04)
+                  : Colors.black.withValues(alpha: 0.04))
+              : (showBadge
+                  ? badgeColor.withValues(alpha: isDark ? 0.25 : 0.18)
+                  : (isDark
+                      ? Colors.white.withValues(alpha: 0.07)
+                      : Colors.black.withValues(alpha: 0.07))),
+          width: isPast ? 1 : (showBadge ? 1.5 : 1),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isPast
+                ? Colors.black.withValues(alpha: isDark ? 0.15 : 0.03)
+                : (showBadge
+                    ? badgeColor.withValues(alpha: isDark ? 0.15 : 0.08)
+                    : Colors.black.withValues(alpha: isDark ? 0.25 : 0.05)),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Course header ──
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (courseCode.isNotEmpty)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: isPast
+                          ? Colors.grey.withValues(alpha: isDark ? 0.15 : 0.1)
+                          : const Color(0xFFFF9800).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
                     ),
-                  ),
-                  if (subtitle.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: GoogleFonts.inter(
+                    child: Text(
+                      courseCode,
+                      style: GoogleFonts.jetBrainsMono(
                         fontSize: 11,
-                        color: isDark ? Colors.white54 : Colors.black45,
+                        fontWeight: FontWeight.w600,
+                        color: isPast
+                            ? (isDark ? Colors.white38 : Colors.black38)
+                            : const Color(0xFFFF9800),
                       ),
                     ),
-                  ],
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    children: [
-                      for (int i = 0; i < normHeaders.length; i++)
-                        _CaTimetableChip(
-                          label: headers[i],
-                          value: row[normHeaders[i]] ?? '',
-                        ),
-                    ],
                   ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    courseName,
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: isPast
+                          ? (isDark ? Colors.white38 : Colors.black38)
+                          : (isDark ? Colors.white : Colors.black87),
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // ── Date + Session row ──
+            Row(
+              children: [
+                // Date pill
+                if (displayDate.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: isPast
+                          ? Colors.grey.withValues(alpha: 0.07)
+                          : (isDark
+                              ? Colors.white.withValues(alpha: 0.06)
+                              : Colors.black.withValues(alpha: 0.04)),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: isPast
+                            ? Colors.grey.withValues(alpha: 0.2)
+                            : (isDark
+                                ? Colors.white.withValues(alpha: 0.1)
+                                : Colors.black.withValues(alpha: 0.08)),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.calendar_today_rounded,
+                          size: 12,
+                          color: isPast
+                              ? (isDark ? Colors.white30 : Colors.black38)
+                              : const Color(0xFFFF9800),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          displayDate,
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isPast
+                                ? (isDark ? Colors.white38 : Colors.black38)
+                                : (isDark ? Colors.white : Colors.black87),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                const SizedBox(width: 8),
+                // Session / time pill
+                if (session.isNotEmpty)
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isPast
+                            ? Colors.grey.withValues(alpha: 0.07)
+                            : (isDark
+                                ? Colors.white.withValues(alpha: 0.06)
+                                : Colors.black.withValues(alpha: 0.04)),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isPast
+                              ? Colors.grey.withValues(alpha: 0.2)
+                              : (isDark
+                                  ? Colors.white.withValues(alpha: 0.1)
+                                  : Colors.black.withValues(alpha: 0.08)),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.access_time_rounded,
+                            size: 12,
+                            color: isPast
+                                ? (isDark ? Colors.white30 : Colors.black38)
+                                : const Color(0xFFFF9800),
+                          ),
+                          const SizedBox(width: 5),
+                          Flexible(
+                            child: Text(
+                              session,
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: isPast
+                                    ? (isDark ? Colors.white38 : Colors.black38)
+                                    : (isDark
+                                        ? Colors.white70
+                                        : Colors.black54),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            // ── Slot + Days-left row ──
+            if (slotNo.isNotEmpty || showBadge) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  if (slotNo.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.05)
+                            : Colors.black.withValues(alpha: 0.04),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'Slot $slotNo',
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color:
+                              isDark ? Colors.white54 : Colors.black45,
+                        ),
+                      ),
+                    ),
+                  const Spacer(),
+                  if (showBadge)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: badgeColor.withValues(
+                            alpha: isPast
+                                ? (isDark ? 0.08 : 0.06)
+                                : (isDark ? 0.18 : 0.12)),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: badgeColor.withValues(alpha: isPast ? 0.2 : 0.5),
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        badgeText,
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: isPast
+                              ? (isDark ? Colors.white38 : Colors.black38)
+                              : badgeColor,
+                        ),
+                      ),
+                    ),
                 ],
               ),
-            );
-          }),
-        ],
+            ],
+          ],
+        ),
       ),
     );
   }

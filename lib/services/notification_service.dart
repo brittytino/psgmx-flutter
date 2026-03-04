@@ -107,6 +107,16 @@ class NotificationService extends ChangeNotifier {
       enableVibration: true,
     );
 
+    const AndroidNotificationChannel caExamChannel =
+        AndroidNotificationChannel(
+      'psgmx_ca_exam',
+      'CA Exam Reminders',
+      description: '"All the best" notifications on your CA exam days',
+      importance: Importance.max,
+      playSound: true,
+      enableVibration: true,
+    );
+
     // Register channels
     final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
@@ -114,6 +124,7 @@ class NotificationService extends ChangeNotifier {
     await androidPlugin?.createNotificationChannel(leetcodeChannel);
     await androidPlugin?.createNotificationChannel(birthdayChannel);
     await androidPlugin?.createNotificationChannel(attendanceChannel);
+    await androidPlugin?.createNotificationChannel(caExamChannel);
 
     // Initialize settings
     const androidSettings =
@@ -726,6 +737,193 @@ class NotificationService extends ChangeNotifier {
     if (kIsWeb) return;
     await _notifications.cancel(100);
     await _notifications.cancel(101);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // CA EXAM "ALL THE BEST" NOTIFICATIONS
+  // IDs 500-598 are reserved for CA exam day notifications.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /// Cancel all previously scheduled CA exam notifications (IDs 500–598).
+  Future<void> cancelCaExamNotifications() async {
+    if (kIsWeb) return;
+    for (int i = 500; i <= 598; i++) {
+      await _notifications.cancel(i);
+    }
+    debugPrint('[CaExam] All scheduled CA exam notifications cancelled');
+  }
+
+  /// Parse a PSG eCampus exam date string  (e.g. "06/MAR/26", "06-MAR-26",
+  /// "06/03/2026", "March 6, 2026") into a [DateTime].
+  /// Returns null when the string cannot be parsed.
+  DateTime? parseCaExamDate(String raw) {
+    if (raw.isEmpty) return null;
+    raw = raw.trim();
+
+    // ── Format: 06/MAR/26, 06-MAR-26, 06/MAR/2026 ──────────────────────────
+    final alphaMonthRe =
+        RegExp(r'(\d{1,2})[/\-]([A-Za-z]{3})[/\-](\d{2,4})');
+    final m1 = alphaMonthRe.firstMatch(raw);
+    if (m1 != null) {
+      final day = int.tryParse(m1.group(1)!) ?? 0;
+      final monStr = m1.group(2)!.toUpperCase();
+      final yearRaw = int.tryParse(m1.group(3)!) ?? 0;
+      final year = yearRaw < 100 ? 2000 + yearRaw : yearRaw;
+      const monthMap = {
+        'JAN': 1, 'FEB': 2, 'MAR': 3, 'APR': 4, 'MAY': 5,  'JUN': 6,
+        'JUL': 7, 'AUG': 8, 'SEP': 9, 'OCT': 10, 'NOV': 11, 'DEC': 12,
+      };
+      final month = monthMap[monStr] ?? 0;
+      if (day > 0 && month > 0 && year > 0) return DateTime(year, month, day);
+    }
+
+    // ── Format: 06/03/2026 or 06-03-2026 ────────────────────────────────────
+    final numericRe =
+        RegExp(r'(\d{1,2})[/\-](\d{1,2})[/\-](\d{2,4})');
+    final m2 = numericRe.firstMatch(raw);
+    if (m2 != null) {
+      final day = int.tryParse(m2.group(1)!) ?? 0;
+      final month = int.tryParse(m2.group(2)!) ?? 0;
+      final yearRaw = int.tryParse(m2.group(3)!) ?? 0;
+      final year = yearRaw < 100 ? 2000 + yearRaw : yearRaw;
+      if (day > 0 && month > 0 && year > 0) return DateTime(year, month, day);
+    }
+
+    // ── ISO fallback ─────────────────────────────────────────────────────────
+    return DateTime.tryParse(raw);
+  }
+
+  /// Schedule or immediately fire an "All the best!" notification for a CA exam.
+  ///
+  /// [index]      : used to derive a stable notification ID (0-based, max 98).
+  /// [examDate]   : the exam date (must be today or in the future).
+  /// [courseName] : course title to include in the message.
+  /// [courseCode] : course code badge.
+  /// [slotNo]     : slot (e.g. Q1, Q2).
+  /// [session]    : time slot string (e.g. "10:15 AM – 11:45 AM").
+  Future<void> scheduleCaExamNotification({
+    required int index,
+    required DateTime examDate,
+    required String courseName,
+    required String courseCode,
+    String slotNo = '',
+    String session = '',
+  }) async {
+    if (kIsWeb) return;
+
+    final id = 500 + (index % 99);
+    final title = '✍️ All the best for your CA exam today!';
+    final shortCourse =
+        courseName.length > 40 ? '${courseName.substring(0, 37)}…' : courseName;
+    final slotPart = slotNo.isNotEmpty ? ' • Slot $slotNo' : '';
+    final timePart = session.isNotEmpty ? ' • $session' : '';
+    final body =
+        '$shortCourse ($courseCode)$slotPart$timePart\n💪 You\'ve prepared well — go crush it!';
+
+    final now = tz.TZDateTime.now(tz.local);
+    final examDay = tz.TZDateTime(
+      tz.local, examDate.year, examDate.month, examDate.day, 7, 30,
+    );
+
+    final notifDetails = const NotificationDetails(
+      android: AndroidNotificationDetails(
+        'psgmx_ca_exam',
+        'CA Exam Reminders',
+        channelDescription: '"All the best" notifications on your CA exam days',
+        importance: Importance.max,
+        priority: Priority.high,
+        color: Color(0xFFFF9800),
+        playSound: true,
+        enableVibration: true,
+        enableLights: true,
+        ledColor: Color(0xFFFF9800),
+        ledOnMs: 1000,
+        ledOffMs: 500,
+        icon: '@mipmap/ic_launcher',
+      ),
+      iOS: DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
+    );
+
+    final payload = 'ca_exam:${examDate.toIso8601String().split('T').first}';
+
+    if (examDay.isAfter(now)) {
+      // Schedule for 7:30 AM on the exam day.
+      await _notifications.zonedSchedule(
+        id,
+        title,
+        body,
+        examDay,
+        notifDetails,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        payload: payload,
+      );
+      debugPrint(
+          '[CaExam] Scheduled notification #$id for $courseName on ${examDate.toIso8601String().split('T').first} at 07:30');
+    } else if (examDate.year == now.year &&
+        examDate.month == now.month &&
+        examDate.day == now.day) {
+      // Exam is today and it's already past 7:30 AM — fire immediately.
+      await _notifications.show(id, title, body, notifDetails, payload: payload);
+      debugPrint('[CaExam] Fired immediate notification #$id for $courseName (exam is today)');
+    }
+    // Past exams → do nothing.
+  }
+
+  /// Reschedule ALL CA exam notifications from a list of timetable rows.
+  ///
+  /// [rows] mirrors [EcampusCaTimetable.rows] — maps with keys like
+  /// ``test_date``, ``course_name``/``course_title``, ``course_code``,
+  /// ``slot_no``, ``session``.
+  Future<void> rescheduleCaExamNotifications(
+    List<Map<String, String>> rows,
+  ) async {
+    await cancelCaExamNotifications();
+    if (rows.isEmpty) return;
+
+    String _pick(Map<String, String> row, List<String> keys) {
+      for (final k in keys) {
+        final v = row[k]?.trim();
+        if (v != null && v.isNotEmpty) return v;
+      }
+      return '';
+    }
+
+    int scheduled = 0;
+    for (int i = 0; i < rows.length; i++) {
+      final row = rows[i];
+      final raw = _pick(row, const ['test_date', 'date', 'exam_date']);
+      final examDate = parseCaExamDate(raw);
+      if (examDate == null) continue;
+
+      // Skip exams that already passed (yesterday or earlier)
+      final today = DateTime.now();
+      final todayDate = DateTime(today.year, today.month, today.day);
+      if (examDate.isBefore(todayDate)) continue;
+
+      final courseName = _pick(row, const [
+        'course_name', 'course_title', 'subject', 'title', 'paper', 'course',
+      ]);
+      final courseCode = _pick(row, const [
+        'course_code', 'code', 'subject_code',
+      ]);
+      final slotNo = _pick(row, const ['slot_no', 'slot']);
+      final session = _pick(row, const ['session', 'time', 'timing']);
+
+      await scheduleCaExamNotification(
+        index: i,
+        examDate: examDate,
+        courseName: courseName.isNotEmpty ? courseName : courseCode,
+        courseCode: courseCode,
+        slotNo: slotNo,
+        session: session,
+      );
+      scheduled++;
+    }
+    debugPrint('[CaExam] Rescheduled $scheduled upcoming CA exam notification(s)');
   }
 
   /// Schedule personal birthday notification

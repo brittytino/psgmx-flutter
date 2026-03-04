@@ -358,4 +358,58 @@ class EcampusService {
           debugPrint('[EcampusService] caTimetableStream error (non-fatal): $e');
         });
   }
+
+  /// Reads the shared CA exam timetable (common for all students) directly
+  /// from the [ca_timetable_global] Supabase table.
+  Future<EcampusCaTimetable?> getGlobalCaTimetable() async {
+    try {
+      final result = await _supabase
+          .from('ca_timetable_global')
+          .select('data, synced_at')
+          .eq('id', 1)
+          .maybeSingle();
+
+      if (result == null) return null;
+      // Wrap into the same model format expected by the UI (reg_no = 'GLOBAL')
+      return EcampusCaTimetable.fromSupabase({
+        'reg_no': 'GLOBAL',
+        'data': result['data'],
+        'synced_at': result['synced_at'],
+      });
+    } catch (e) {
+      debugPrint('[EcampusService] getGlobalCaTimetable error (non-fatal): $e');
+      return null;
+    }
+  }
+
+  /// Stream that emits whenever the shared CA timetable is updated
+  /// (e.g. after placement rep triggers a sync).
+  Stream<EcampusCaTimetable?> globalCaTimetableStream() {
+    return _supabase
+        .from('ca_timetable_global')
+        .stream(primaryKey: ['id'])
+        .eq('id', 1)
+        .map((rows) {
+          if (rows.isEmpty) return null;
+          return EcampusCaTimetable.fromSupabase({
+            'reg_no': 'GLOBAL',
+            'data': rows.first['data'],
+            'synced_at': rows.first['synced_at'],
+          });
+        })
+        .handleError((Object e) {
+          debugPrint('[EcampusService] globalCaTimetableStream error (non-fatal): $e');
+        });
+  }
+
+  /// Triggers the backend to fetch and store the global CA exam timetable
+  /// using the placement representative's credentials.
+  Future<Map<String, dynamic>> syncCaTimetable() async {
+    final url = Uri.parse('${EcampusConfig.apiUrl}/api/ecampus/sync-ca-timetable');
+    final response = await http.post(url, headers: _authHeaders);
+    if (response.statusCode != 200) {
+      throw Exception('CA timetable sync failed (${response.statusCode}): ${response.body}');
+    }
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
 }

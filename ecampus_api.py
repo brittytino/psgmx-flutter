@@ -816,6 +816,91 @@ def _read_ca_timetable(rollno: str) -> dict | None:
     return result.data
 
 
+# ─── Global CA timetable ──────────────────────────────────────────────────────
+
+def _upsert_global_ca_timetable(data: dict, synced_by: str = "") -> None:
+    """Upsert the shared CA timetable (one row, id=1) in ca_timetable_global."""
+    _get_supabase().table("ca_timetable_global").upsert(
+        {
+            "id": 1,
+            "data": data,
+            "synced_at": datetime.utcnow().isoformat(),
+            "synced_by": synced_by,
+        },
+        on_conflict="id",
+    ).execute()
+
+
+def _read_global_ca_timetable() -> dict | None:
+    result = (
+        _get_supabase().table("ca_timetable_global")
+        .select("data, synced_at, synced_by")
+        .eq("id", 1)
+        .maybe_single()
+        .execute()
+    )
+    return result.data
+
+
+def _get_placement_rep_rollno() -> tuple[str, str]:
+    """Find the first placement rep's roll number and resolved password.
+
+    Queries the ``users`` table for any user whose ``roles->>'isPlacementRep'``
+    is ``true``.  Returns ``(rollno, password)``.  Raises HTTPException 404 if
+    none is configured.
+    """
+    sb = _get_supabase()
+    rows = (
+        sb.table("users")
+        .select("reg_no, dob, ecampus_password")
+        .not_.is_("reg_no", "null")
+        .execute()
+    ).data or []
+
+    for row in rows:
+        # roles is stored as JSONB; read it via a direct filter isn't possible
+        # with the Python SDK easily, so we fetch all and filter in Python.
+        # For a large user-base, add .filter("roles->>'isPlacementRep'", "eq", "true")
+        pass
+
+    # Re-query with explicit role filter (Supabase RPC approach via PostgREST)
+    role_rows = (
+        sb.table("users")
+        .select("reg_no, dob, ecampus_password, roles")
+        .not_.is_("reg_no", "null")
+        .execute()
+    ).data or []
+
+    for row in role_rows:
+        roles = row.get("roles") or {}
+        if isinstance(roles, dict) and roles.get("isPlacementRep"):
+            reg_no = row.get("reg_no", "").strip()
+            if not reg_no:
+                continue
+            custom_pwd = (row.get("ecampus_password") or "").strip()
+            if custom_pwd:
+                return reg_no, custom_pwd
+            dob_raw = row.get("dob")
+            if dob_raw:
+                try:
+                    dob = _parse_dob_value(dob_raw)
+                    return reg_no, _dob_to_password(dob)
+                except Exception:
+                    pass
+            # Fallback: try whitelist DOB
+            try:
+                dob = _get_user_dob(reg_no)
+                return reg_no, _dob_to_password(dob)
+            except Exception:
+                continue
+
+    raise HTTPException(
+        status_code=404,
+        detail="No placement representative found with valid credentials. "
+               "Ensure a user with isPlacementRep=true role and DOB is configured.",
+    )
+
+
 def _sync_single_rollno(rollno: str, password: str) -> tuple[dict, dict, dict, dict]:
     """Sync one student end-to-end and return (attendance, cgpa, ca_marks, ca_timetable) payloads.
 
@@ -1054,6 +1139,72 @@ def get_ca_timetable(
     return {"ok": True, "rollno": rollno, **row}
 
 
+@app.get("/api/ecampus/ca-timetable/global")
+def get_global_ca_timetable(
+    x_api_secret: str | None = Header(None),
+):
+    """Returns the shared CA exam timetable (common for all students).
+    Populated by POST /api/ecampus/sync-ca-timetable.
+    """
+    _check_secret(x_api_secret)
+    try:
+        row = _read_global_ca_timetable()
+    except Exception as exc:
+        log.error(f"[ca-timetable-global] read failed: {exc}")
+        raise HTTPException(
+            status_code=502,
+            detail="Unable to read global CA timetable. Please try again later.",
+        )
+    if not row:
+        return {
+            "ok": True,
+            "data": {"headers": [], "rows": [], "note": "CA timetable not synced yet"},
+            "synced_at": None,
+            "synced_by": None,
+        }
+    return {"ok": True, **row}
+
+
+@app.post("/api/ecampus/sync-ca-timetable")
+def sync_ca_timetable(
+    x_api_secret: str | None = Header(None),
+):
+    """Fetch the CA test timetable from eCampus using the placement rep's
+    credentials and store it in the shared ``ca_timetable_global`` table.
+
+    This endpoint is intended to be called by the placement representative
+    (or a cron job) whenever the timetable is updated on the portal.
+    Requires X-Api-Secret header.
+    """
+    _check_secret(x_api_secret)
+
+    # Resolve placement rep credentials
+    rollno, password = _get_placement_rep_rollno()
+    log.info(f"[sync-ca-timetable] Using placement rep: {rollno}")
+
+    try:
+        session = _ecampus_session(rollno, password)
+        tt_rows = _fetch_ca_timetable(session)
+        tt_data = _parse_ca_timetable(tt_rows)
+    except Exception as exc:
+        log.error(f"[sync-ca-timetable] Failed to fetch timetable: {exc}")
+        raise HTTPException(
+            status_code=502,
+            detail=f"Failed to fetch CA timetable from eCampus: {exc}",
+        )
+
+    _upsert_global_ca_timetable(tt_data, synced_by=rollno)
+    log.info(f"[sync-ca-timetable] Stored {len(tt_data.get('rows', []))} exam entries")
+
+    return {
+        "ok": True,
+        "synced_by": rollno,
+        "exam_count": len(tt_data.get("rows", [])),
+        "note": tt_data.get("note"),
+        "synced_at": datetime.utcnow().isoformat(),
+    }
+
+
 @app.post("/api/ecampus/sync-all")
 def sync_all_users(
     x_api_secret: str | None = Header(None),
@@ -1101,6 +1252,20 @@ def sync_all_users(
                 error_type = "other"
             failed.append({"rollno": rollno, "error": error_msg, "error_type": error_type})
             log.error(f"[sync-all] ✗ {rollno} [{error_type}]: {exc}")
+
+    # ── Refresh the shared CA timetable using the placement rep's session ──
+    try:
+        rep_rollno, rep_password = _get_placement_rep_rollno()
+        rep_session = _ecampus_session(rep_rollno, rep_password)
+        tt_rows = _fetch_ca_timetable(rep_session)
+        tt_data = _parse_ca_timetable(tt_rows)
+        _upsert_global_ca_timetable(tt_data, synced_by=rep_rollno)
+        log.info(
+            f"[sync-all] global CA timetable updated: "
+            f"{len(tt_data.get('rows', []))} entries (via {rep_rollno})"
+        )
+    except Exception as exc:
+        log.warning(f"[sync-all] global CA timetable update failed (non-fatal): {exc}")
 
     return {
         "ok": True,
