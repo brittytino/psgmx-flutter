@@ -126,7 +126,7 @@ class _NewVersionDialogWidgetState extends State<_NewVersionDialogWidget>
             borderRadius: BorderRadius.circular(32),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.3),
+                color: Colors.black.withValues(alpha: 0.3),
                 blurRadius: 40,
                 spreadRadius: 5,
               ),
@@ -147,7 +147,7 @@ class _NewVersionDialogWidgetState extends State<_NewVersionDialogWidget>
                         borderRadius: BorderRadius.circular(24),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.blue.withOpacity(0.3),
+                            color: Colors.blue.withValues(alpha: 0.3),
                             blurRadius: 20,
                             spreadRadius: 2,
                           ),
@@ -169,14 +169,14 @@ class _NewVersionDialogWidgetState extends State<_NewVersionDialogWidget>
                 // Celebration Icon
                 Container(
                   padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     gradient: LinearGradient(
                       colors: [Colors.orange, Colors.deepOrange],
                     ),
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.orange.withOpacity(0.4),
+                        color: Color.fromARGB(102, 255, 152, 0),
                         blurRadius: 12,
                         spreadRadius: 2,
                       ),
@@ -192,7 +192,7 @@ class _NewVersionDialogWidgetState extends State<_NewVersionDialogWidget>
 
                 // Title
                 ShaderMask(
-                  shaderCallback: (bounds) => LinearGradient(
+                  shaderCallback: (bounds) => const LinearGradient(
                     colors: [Colors.orange, Colors.deepOrange],
                   ).createShader(bounds),
                   child: Text(
@@ -213,13 +213,13 @@ class _NewVersionDialogWidgetState extends State<_NewVersionDialogWidget>
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        Colors.green.withOpacity(0.2),
-                        Colors.blue.withOpacity(0.2),
+                        Colors.green.withValues(alpha: 0.2),
+                        Colors.blue.withValues(alpha: 0.2),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(24),
                     border: Border.all(
-                      color: Colors.green.withOpacity(0.4),
+                      color: Colors.green.withValues(alpha: 0.4),
                       width: 1.5,
                     ),
                   ),
@@ -288,7 +288,7 @@ class _NewVersionDialogWidgetState extends State<_NewVersionDialogWidget>
                         borderRadius: BorderRadius.circular(16),
                       ),
                       elevation: 4,
-                      shadowColor: Colors.orange.withOpacity(0.5),
+                      shadowColor: Colors.orange.withValues(alpha: 0.5),
                     ),
                   ),
                 ),

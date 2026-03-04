@@ -64,8 +64,8 @@ ${errorDetails.stack}
     await Clipboard.setData(ClipboardData(text: errorText));
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Row(
+        const SnackBar(
+          content: Row(
             children: [
               Icon(Icons.check_circle, color: Colors.white),
               SizedBox(width: 8),
@@ -98,9 +98,9 @@ ${errorDetails.stack}
                   child: Container(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
+                      boxShadow: const [
                         BoxShadow(
-                          color: Colors.orange.withOpacity(0.3),
+                          color: Color.fromARGB(76, 255, 152, 0),
                           blurRadius: 20,
                           spreadRadius: 2,
                         ),
@@ -199,7 +199,7 @@ ${errorDetails.stack}
                           ),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: Colors.orange,
-                            side: BorderSide(color: Colors.orange.withOpacity(0.5), width: 1.5),
+                            side: BorderSide(color: Colors.orange.withValues(alpha: 0.5), width: 1.5),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
                             ),

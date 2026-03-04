@@ -137,7 +137,7 @@ class CaExamNotificationService {
 
     final rawRows = (data['rows'] as List<dynamic>? ?? []);
     return rawRows.whereType<Map>().map((r) {
-      return (r as Map).map(
+      return r.map(
         (k, v) => MapEntry(k.toString(), (v ?? '').toString()),
       );
     }).toList();

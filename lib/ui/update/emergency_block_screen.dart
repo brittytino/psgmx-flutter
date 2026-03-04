@@ -57,7 +57,9 @@ class _EmergencyBlockScreenState extends State<EmergencyBlockScreen>
     super.dispose();
   }
 
-  Future<void> _handleUpdate(BuildContext context) async {
+  Future<void> _handleUpdate() async {
+    if (!mounted) return;
+    
     setState(() => _isDownloading = true);
     
     final updateService = context.read<UpdateService>();
@@ -67,11 +69,13 @@ class _EmergencyBlockScreenState extends State<EmergencyBlockScreen>
     
     final success = await updateService.openUpdateUrl();
     
-    if (!success && mounted) {
+    if (!mounted) return;
+    
+    if (!success) {
       setState(() => _isDownloading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Row(
+        const SnackBar(
+          content: Row(
             children: [
               Icon(Icons.error_outline, color: Colors.white),
               SizedBox(width: 12),
@@ -80,7 +84,9 @@ class _EmergencyBlockScreenState extends State<EmergencyBlockScreen>
           ),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(12)),
+          ),
         ),
       );
     }
@@ -98,14 +104,14 @@ class _EmergencyBlockScreenState extends State<EmergencyBlockScreen>
       child: Scaffold(
         backgroundColor: const Color(0xFF0A0A12),
         body: Container(
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                const Color(0xFF1A0000),
-                const Color(0xFF0A0A12),
-                const Color(0xFF000000),
+                Color(0xFF1A0000),
+                Color(0xFF0A0A12),
+                Color(0xFF000000),
               ],
             ),
           ),
@@ -133,7 +139,7 @@ class _EmergencyBlockScreenState extends State<EmergencyBlockScreen>
                           borderRadius: BorderRadius.circular(28),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.red.withOpacity(0.5),
+                              color: Colors.red.withValues(alpha: 0.5),
                               blurRadius: 40,
                               spreadRadius: 10,
                             ),
@@ -180,10 +186,10 @@ class _EmergencyBlockScreenState extends State<EmergencyBlockScreen>
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.1),
+                      color: Colors.red.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: Colors.red.withOpacity(0.3),
+                        color: Colors.red.withValues(alpha: 0.3),
                         width: 2,
                       ),
                     ),
@@ -216,7 +222,7 @@ class _EmergencyBlockScreenState extends State<EmergencyBlockScreen>
                       color: Colors.grey[850],
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(
-                        color: Colors.red.withOpacity(0.3),
+                        color: Colors.red.withValues(alpha: 0.3),
                       ),
                     ),
                     child: Row(
@@ -243,16 +249,16 @@ class _EmergencyBlockScreenState extends State<EmergencyBlockScreen>
                     width: double.infinity,
                     height: 60,
                     child: ElevatedButton(
-                      onPressed: _isDownloading ? null : () => _handleUpdate(context),
+                      onPressed: _isDownloading ? null : _handleUpdate,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.orange,
                         foregroundColor: Colors.white,
-                        disabledBackgroundColor: Colors.orange.withOpacity(0.6),
+                        disabledBackgroundColor: Colors.orange.withValues(alpha: 0.6),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(18),
                         ),
                         elevation: 8,
-                        shadowColor: Colors.orange.withOpacity(0.6),
+                        shadowColor: Colors.orange.withValues(alpha: 0.6),
                       ),
                       child: _isDownloading
                           ? Row(
@@ -312,7 +318,7 @@ class _EmergencyBlockScreenState extends State<EmergencyBlockScreen>
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.05),
+                      color: Colors.red.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(

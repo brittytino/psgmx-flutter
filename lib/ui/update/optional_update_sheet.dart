@@ -93,7 +93,7 @@ class _OptionalUpdateSheetState extends State<OptionalUpdateSheet>
         borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withValues(alpha: 0.2),
             blurRadius: 30,
             offset: const Offset(0, -10),
           ),
@@ -126,7 +126,7 @@ class _OptionalUpdateSheetState extends State<OptionalUpdateSheet>
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.orange.withOpacity(0.3),
+                          color: Colors.orange.withValues(alpha: 0.3),
                           blurRadius: 20,
                           spreadRadius: 2,
                         ),
@@ -200,13 +200,13 @@ class _OptionalUpdateSheetState extends State<OptionalUpdateSheet>
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        Colors.green.withOpacity(0.1),
-                        Colors.blue.withOpacity(0.1),
+                        Colors.green.withValues(alpha: 0.1),
+                        Colors.blue.withValues(alpha: 0.1),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(24),
                     border: Border.all(
-                      color: Colors.green.withOpacity(0.3),
+                      color: Colors.green.withValues(alpha: 0.3),
                       width: 1.5,
                     ),
                   ),

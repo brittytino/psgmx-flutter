@@ -42,7 +42,9 @@ class _ForceUpdateScreenState extends State<ForceUpdateScreen>
     super.dispose();
   }
 
-  Future<void> _handleUpdate(BuildContext context) async {
+  Future<void> _handleUpdate() async {
+    if (!mounted) return;
+    
     setState(() => _preparingDownload = true);
     
     final updateService = context.read<UpdateService>();
@@ -54,11 +56,13 @@ class _ForceUpdateScreenState extends State<ForceUpdateScreen>
     
     final success = await updateService.openUpdateUrl();
     
-    if (!success && mounted) {
+    if (!mounted) return;
+    
+    if (!success) {
       setState(() => _preparingDownload = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Row(
+        const SnackBar(
+          content: Row(
             children: [
               Icon(Icons.error_outline, color: Colors.white),
               SizedBox(width: 12),
@@ -67,7 +71,9 @@ class _ForceUpdateScreenState extends State<ForceUpdateScreen>
           ),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(12)),
+          ),
         ),
       );
     }
@@ -102,7 +108,7 @@ class _ForceUpdateScreenState extends State<ForceUpdateScreen>
                         borderRadius: BorderRadius.circular(28),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.orange.withOpacity(0.4),
+                            color: Colors.orange.withValues(alpha: 0.4),
                             blurRadius: 30,
                             spreadRadius: 5,
                           ),
@@ -123,7 +129,7 @@ class _ForceUpdateScreenState extends State<ForceUpdateScreen>
 
                 // Title with gradient effect
                 ShaderMask(
-                  shaderCallback: (bounds) => LinearGradient(
+                  shaderCallback: (bounds) => const LinearGradient(
                     colors: [Colors.orange, Colors.deepOrange],
                   ).createShader(bounds),
                   child: Text(
@@ -154,13 +160,13 @@ class _ForceUpdateScreenState extends State<ForceUpdateScreen>
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     color: isDark 
-                        ? Colors.white.withOpacity(0.05)
+                        ? Colors.white.withValues(alpha: 0.05)
                         : Colors.white,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
                       color: isDark 
-                          ? Colors.white.withOpacity(0.1)
-                          : Colors.grey.withOpacity(0.2),
+                          ? Colors.white.withValues(alpha: 0.1)
+                          : Colors.grey.withValues(alpha: 0.2),
                     ),
                   ),
                   child: Text(
@@ -184,17 +190,17 @@ class _ForceUpdateScreenState extends State<ForceUpdateScreen>
                       end: Alignment.bottomRight,
                       colors: isDark
                           ? [
-                              Colors.orange.withOpacity(0.1),
-                              Colors.deepOrange.withOpacity(0.05),
+                              Colors.orange.withValues(alpha: 0.1),
+                              Colors.deepOrange.withValues(alpha: 0.05),
                             ]
                           : [
-                              Colors.orange.withOpacity(0.08),
-                              Colors.deepOrange.withOpacity(0.04),
+                              Colors.orange.withValues(alpha: 0.08),
+                              Colors.deepOrange.withValues(alpha: 0.04),
                             ],
                     ),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: Colors.orange.withOpacity(0.3),
+                      color: Colors.orange.withValues(alpha: 0.3),
                       width: 1.5,
                     ),
                   ),
@@ -210,8 +216,8 @@ class _ForceUpdateScreenState extends State<ForceUpdateScreen>
                       ),
                       
                       // Arrow with animation
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 20),
                         child: Icon(
                           Icons.trending_up_rounded,
                           color: Colors.orange,
@@ -239,16 +245,16 @@ class _ForceUpdateScreenState extends State<ForceUpdateScreen>
                     width: double.infinity,
                     height: 60,
                     child: ElevatedButton(
-                      onPressed: _preparingDownload ? null : () => _handleUpdate(context),
+                      onPressed: _preparingDownload ? null : _handleUpdate,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.orange,
                         foregroundColor: Colors.white,
-                        disabledBackgroundColor: Colors.orange.withOpacity(0.6),
+                        disabledBackgroundColor: Colors.orange.withValues(alpha: 0.6),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(18),
                         ),
                         elevation: 8,
-                        shadowColor: Colors.orange.withOpacity(0.5),
+                        shadowColor: Colors.orange.withValues(alpha: 0.5),
                       ),
                       child: _preparingDownload
                           ? Row(
@@ -350,10 +356,10 @@ class _ForceUpdateScreenState extends State<ForceUpdateScreen>
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.15),
+            color: color.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: color.withOpacity(0.4),
+              color: color.withValues(alpha: 0.4),
               width: 1.5,
             ),
           ),
@@ -383,7 +389,7 @@ class _ForceUpdateScreenState extends State<ForceUpdateScreen>
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
+                color: Colors.orange.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(Icons.security_rounded, color: Colors.orange, size: 24),

@@ -12,7 +12,8 @@
 -- ============================================================
 
 -- Drop and recreate the view based on whitelist as source of truth
-CREATE OR REPLACE VIEW student_attendance_summary AS
+CREATE OR REPLACE VIEW student_attendance_summary 
+WITH (security_invoker = true) AS
 SELECT
     u.id                                         AS student_id,
     u.id                                         AS user_id,

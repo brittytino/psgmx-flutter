@@ -99,7 +99,8 @@ CREATE POLICY "admins_read_all_cgpa"
 -- (No client-side write policies – writes go through the FastAPI service)
 
 -- ─── Helper view: flat attendance summary per student ───────────────────────
-CREATE OR REPLACE VIEW v_ecampus_attendance_summary AS
+CREATE OR REPLACE VIEW v_ecampus_attendance_summary 
+WITH (security_invoker = true) AS
 SELECT
     ea.reg_no,
     u.name,
@@ -113,7 +114,8 @@ FROM ecampus_attendance ea
 JOIN users u ON u.reg_no = ea.reg_no;
 
 -- ─── Helper view: CGPA per student ──────────────────────────────────────────
-CREATE OR REPLACE VIEW v_ecampus_cgpa_summary AS
+CREATE OR REPLACE VIEW v_ecampus_cgpa_summary 
+WITH (security_invoker = true) AS
 SELECT
     ec.reg_no,
     u.name,

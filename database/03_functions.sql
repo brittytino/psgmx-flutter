@@ -25,7 +25,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Student attendance summary view used by reports and attendance services
 -- Source of truth: whitelist (all 123 students), LEFT JOIN users for UUID/login
-CREATE OR REPLACE VIEW student_attendance_summary AS
+CREATE OR REPLACE VIEW student_attendance_summary 
+WITH (security_invoker = true) AS
 SELECT
     u.id                                         AS student_id,
     u.id                                         AS user_id,

@@ -812,7 +812,7 @@ class NotificationService extends ChangeNotifier {
     if (kIsWeb) return;
 
     final id = 500 + (index % 99);
-    final title = '✍️ All the best for your CA exam today!';
+    const title = '✍️ All the best for your CA exam today!';
     final shortCourse =
         courseName.length > 40 ? '${courseName.substring(0, 37)}…' : courseName;
     final slotPart = slotNo.isNotEmpty ? ' • Slot $slotNo' : '';
@@ -825,7 +825,7 @@ class NotificationService extends ChangeNotifier {
       tz.local, examDate.year, examDate.month, examDate.day, 7, 30,
     );
 
-    final notifDetails = const NotificationDetails(
+    const notifDetails = NotificationDetails(
       android: AndroidNotificationDetails(
         'psgmx_ca_exam',
         'CA Exam Reminders',
@@ -884,7 +884,7 @@ class NotificationService extends ChangeNotifier {
     await cancelCaExamNotifications();
     if (rows.isEmpty) return;
 
-    String _pick(Map<String, String> row, List<String> keys) {
+    String pickValue(Map<String, String> row, List<String> keys) {
       for (final k in keys) {
         final v = row[k]?.trim();
         if (v != null && v.isNotEmpty) return v;
@@ -895,7 +895,7 @@ class NotificationService extends ChangeNotifier {
     int scheduled = 0;
     for (int i = 0; i < rows.length; i++) {
       final row = rows[i];
-      final raw = _pick(row, const ['test_date', 'date', 'exam_date']);
+      final raw = pickValue(row, const ['test_date', 'date', 'exam_date']);
       final examDate = parseCaExamDate(raw);
       if (examDate == null) continue;
 
@@ -904,14 +904,14 @@ class NotificationService extends ChangeNotifier {
       final todayDate = DateTime(today.year, today.month, today.day);
       if (examDate.isBefore(todayDate)) continue;
 
-      final courseName = _pick(row, const [
+      final courseName = pickValue(row, const [
         'course_name', 'course_title', 'subject', 'title', 'paper', 'course',
       ]);
-      final courseCode = _pick(row, const [
+      final courseCode = pickValue(row, const [
         'course_code', 'code', 'subject_code',
       ]);
-      final slotNo = _pick(row, const ['slot_no', 'slot']);
-      final session = _pick(row, const ['session', 'time', 'timing']);
+      final slotNo = pickValue(row, const ['slot_no', 'slot']);
+      final session = pickValue(row, const ['session', 'time', 'timing']);
 
       await scheduleCaExamNotification(
         index: i,

@@ -114,7 +114,8 @@ CREATE INDEX IF NOT EXISTS idx_defaulter_detected_at ON defaulter_flags(detected
 
 -- Compatibility view expected by attendance/report screens
 -- Fixed: use whitelist as source of truth so all 123 students appear (not just logged-in ~94)
-CREATE OR REPLACE VIEW student_attendance_summary AS
+CREATE OR REPLACE VIEW student_attendance_summary 
+WITH (security_invoker = true) AS
 SELECT
     u.id                                         AS student_id,
     u.id                                         AS user_id,

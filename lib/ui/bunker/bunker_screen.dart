@@ -3038,47 +3038,6 @@ class _CaExamCard extends StatelessWidget {
   }
 }
 
-class _CaTimetableChip extends StatelessWidget {
-  final String label;
-  final String value;
-  const _CaTimetableChip({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    if (value.trim().isEmpty) return const SizedBox.shrink();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withValues(alpha: 0.06)
-            : Colors.black.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.08)
-              : Colors.black.withValues(alpha: 0.08),
-        ),
-      ),
-      child: RichText(
-        text: TextSpan(
-          style: GoogleFonts.inter(
-            fontSize: 10,
-            color: isDark ? Colors.white70 : Colors.black54,
-          ),
-          children: [
-            TextSpan(
-              text: '${label.trim()}: ',
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            TextSpan(text: value.trim()),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _CaInfoBanner extends StatelessWidget {
   final String note;
   final IconData icon;

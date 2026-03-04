@@ -2,6 +2,33 @@
 
 All notable changes to PSG MCA Placement Prep App will be documented in this file.
 
+## [2.2.9] - 2026-03-04
+
+### 🔒 Security
+- **CRITICAL FIX**: Resolved 3 Supabase SECURITY DEFINER view vulnerabilities
+  - Fixed `v_ecampus_attendance_summary` to respect Row Level Security
+  - Fixed `v_ecampus_cgpa_summary` to respect Row Level Security  
+  - Fixed `student_attendance_summary` to respect Row Level Security
+- All database views now use `SECURITY INVOKER` to enforce proper authorization
+- Closed potential unauthorized data access vulnerability flagged by Supabase Security Advisor
+
+### 📁 Database
+- **NEW**: `database/15_fix_security_definer_views.sql` — Security patch for database views
+- Updated all view definitions to include `WITH (security_invoker = true)`
+- No breaking changes — all existing queries continue to work
+
+### 📚 Documentation
+- Added `database/SECURITY_FIX.md` — Complete security fix documentation
+- Added `database/QUICK_FIX_GUIDE.md` — 5-minute deployment guide
+- Added `database/SECURITY_FIX_SUMMARY.md` — Executive summary
+- Added `database/DEPLOYMENT_CHECKLIST.md` — Environment tracking checklist
+- Updated `database/README.md` with security patch instructions
+
+### ✅ Verification
+- Flutter app requires NO code changes
+- All 54 Flutter analyze warnings/errors resolved (0 issues found)
+- Production-ready with zero breaking changes
+
 ## [2.2.1] - 2026-02-05
 
 ### 🔧 Fixes
