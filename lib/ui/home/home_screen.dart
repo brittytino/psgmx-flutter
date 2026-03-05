@@ -181,14 +181,11 @@ class _HomeScreenState extends State<HomeScreen> with UpdateCheckMixin {
       final supabase = Supabase.instance.client;
       final todayStr = DateFormat('yyyy-MM-dd').format(now);
 
-      // 1. Get total number of students in the team from whitelist/users
-      final membersResponse = await supabase
-          .from('users')
-          .select('id')
-          .eq('team_id', teamId)
-          .eq('roles->>isStudent', 'true');
-      
-      final totalMembers = (membersResponse as List).length;
+      // 1. Get total number of students in the team from whitelist (source of truth)
+      final totalMembers = await supabase
+          .from('whitelist')
+          .count(CountOption.exact)
+          .eq('team_id', teamId);
 
       // 2. Get number of attendance records marked today for this team
       final attendanceResponse = await supabase

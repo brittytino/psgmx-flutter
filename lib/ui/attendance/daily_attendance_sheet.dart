@@ -42,6 +42,9 @@ class _DailyAttendanceSheetState extends State<DailyAttendanceSheet> {
   /// Keyed by student UUID. Values: 'PRESENT' | 'ABSENT'
   final Map<String, String> _statusMap = {};
 
+  /// Reference to the AttendanceProvider for safe disposal
+  AttendanceProvider? _provider;
+
   /// Whether the Placement Rep toggle is showing all students.
   bool _showAllStudents = false;
 
@@ -65,7 +68,8 @@ class _DailyAttendanceSheetState extends State<DailyAttendanceSheet> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AttendanceProvider>().addListener(_onProviderChanged);
+      _provider = context.read<AttendanceProvider>();
+      _provider!.addListener(_onProviderChanged);
       _initialise();
     });
   }
@@ -73,7 +77,7 @@ class _DailyAttendanceSheetState extends State<DailyAttendanceSheet> {
   @override
   void dispose() {
     // Safe remove: provider outlives the bottom sheet.
-    context.read<AttendanceProvider>().removeListener(_onProviderChanged);
+    _provider?.removeListener(_onProviderChanged);
     super.dispose();
   }
 
@@ -782,7 +786,6 @@ class _DailyAttendanceSheetState extends State<DailyAttendanceSheet> {
                     final member = provider.teamMembers[index];
                     final isPresent =
                         _statusMap[member.uid] == 'PRESENT';
-                    final isUnregistered = member.uid.contains('@');
 
                     return Container(
                       margin: const EdgeInsets.only(bottom: 8),
@@ -823,22 +826,11 @@ class _DailyAttendanceSheetState extends State<DailyAttendanceSheet> {
                           style: GoogleFonts.inter(
                               fontWeight: FontWeight.w600),
                         ),
-                        subtitle: Row(
-                          children: [
-                            Text(
-                              member.regNo,
-                              style: TextStyle(
-                                  color: theme
-                                      .colorScheme.onSurfaceVariant),
-                            ),
-                            if (isUnregistered) ...[
-                              const SizedBox(width: 8),
-                              _badge(
-                                  'UNREGISTERED',
-                                  Colors.amber.withValues(alpha: 0.15),
-                                  Colors.amber),
-                            ],
-                          ],
+                        subtitle: Text(
+                          member.regNo,
+                          style: TextStyle(
+                              color: theme
+                                  .colorScheme.onSurfaceVariant),
                         ),
                         trailing: Switch(
                           value: isPresent,
@@ -959,18 +951,6 @@ class _DailyAttendanceSheetState extends State<DailyAttendanceSheet> {
       ),
     );
   }
-
-  Widget _badge(String text, Color bg, Color fg) => Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        decoration: BoxDecoration(
-            color: bg, borderRadius: BorderRadius.circular(4)),
-        child: Text(
-          text,
-          style: TextStyle(
-              color: fg, fontSize: 9, fontWeight: FontWeight.bold),
-        ),
-      );
 
   Widget _statItem(
       BuildContext ctx, String label, int count, Color color) {

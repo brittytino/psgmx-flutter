@@ -30,11 +30,10 @@ class _TeamAnalysisScreenState extends State<TeamAnalysisScreen> {
   Future<void> _loadTeams() async {
     setState(() => _isLoading = true);
     try {
-      // Get all unique teams from users table
+      // Get all unique teams from whitelist (source of truth – all 123 students)
       final response = await _supabase
-          .from('users')
+          .from('whitelist')
           .select('team_id')
-          .eq('roles->>isStudent', 'true')
           .not('team_id', 'is', null);
 
       final userList = response as List;

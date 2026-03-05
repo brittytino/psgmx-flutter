@@ -7,7 +7,6 @@ import '../../providers/ecampus_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../models/ecampus_attendance.dart';
 import '../../models/ecampus_cgpa.dart';
-import '../../models/ecampus_ca_marks.dart';
 import '../../models/ecampus_ca_timetable.dart';
 import '../../services/ecampus_service.dart';
 import 'widgets/subject_attendance_card.dart';
@@ -730,41 +729,18 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
             floating: true,
             snap: true,
             pinned: true,
-            expandedHeight: 130,
+            expandedHeight: 120,
             flexibleSpace: FlexibleSpaceBar(
               titlePadding:
-                  const EdgeInsets.only(left: 16, bottom: 56),
-              title: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Academic Insights',
-                    style: GoogleFonts.inter(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      color: isDark ? Colors.white : Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Consumer<EcampusProvider>(
-                    builder: (_, prov, __) {
-                      final ts = prov.lastSyncedAt;
-                      final label = ts != null
-                          ? 'Last synced ${DateFormat('dd MMM, hh:mm a').format(ts.toLocal())}'
-                          : 'Not synced yet – pull to refresh';
-                      return Text(
-                        label,
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          color: isDark
-                              ? Colors.white54
-                              : Colors.black45,
-                        ),
-                      );
-                    },
-                  ),
-                ],
+                  const EdgeInsets.only(left: 16, bottom: 16),
+              title: Text(
+                'Academic Insights',
+                style: GoogleFonts.inter(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                  color: isDark ? Colors.white : Colors.black87,
+                  letterSpacing: -0.5,
+                ),
               ),
             ),
             actions: [
@@ -799,13 +775,13 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
                   ? const [
                       Tab(text: 'Attendance'),
                       Tab(text: 'CGPA'),
-                      Tab(text: 'CA Tests'),
+                      Tab(text: 'CA Timetable'),
                       Tab(text: 'All Students'),
                     ]
                   : const [
                       Tab(text: 'Attendance'),
                       Tab(text: 'CGPA'),
-                      Tab(text: 'CA Tests'),
+                      Tab(text: 'CA Timetable'),
                     ],
             ),
           ),
@@ -2024,76 +2000,151 @@ class _CourseResultsSection extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           ...grouped.entries.map((entry) {
+            // Format semester label: "1" becomes "Semester 1"
+            final semesterLabel = entry.key.toLowerCase().contains('semester')
+                ? entry.key
+                : 'Semester ${entry.key}';
+            final courseCount = entry.value.length;
+            
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Semester header
-                Padding(
-                  padding: const EdgeInsets.only(top: 10, bottom: 8),
+                // Modern semester header with course count
+                Container(
+                  margin: const EdgeInsets.only(top: 16, bottom: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: isDark
+                          ? [
+                              theme.colorScheme.primary.withValues(alpha: 0.15),
+                              theme.colorScheme.primary.withValues(alpha: 0.08),
+                            ]
+                          : [
+                              theme.colorScheme.primary.withValues(alpha: 0.08),
+                              theme.colorScheme.primary.withValues(alpha: 0.04),
+                            ],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.2),
+                      width: 1,
+                    ),
+                  ),
                   child: Row(
                     children: [
+                      // Semester icon badge
                       Container(
-                        width: 4,
-                        height: 14,
+                        padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
+                          color: theme.colorScheme.primary.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.school_rounded,
+                          size: 16,
                           color: theme.colorScheme.primary,
-                          borderRadius: BorderRadius.circular(2),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        entry.key,
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: theme.colorScheme.primary,
-                          letterSpacing: 0.3,
+                      const SizedBox(width: 12),
+                      // Semester label and count
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Text(
+                              semesterLabel,
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: theme.colorScheme.primary,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primary.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '$courseCount ${courseCount == 1 ? 'course' : 'courses'}',
+                                style: GoogleFonts.inter(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: theme.colorScheme.primary,
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
                 ),
-                // Course cards
+                // Course cards with improved spacing
                 ...entry.value.map((course) {
                   final gradeColor = _gradeColor(course.grade);
                   return Container(
-                    margin: const EdgeInsets.only(bottom: 7),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 11),
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: isDark
                           ? const Color(0xFF1C1C2E)
                           : Colors.white,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(14),
                       border: Border.all(
                         color: theme.colorScheme.onSurface
-                            .withValues(alpha: 0.06),
+                            .withValues(alpha: isDark ? 0.08 : 0.06),
+                        width: 1,
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: Row(
                       children: [
-                        // Grade badge on left
+                        // Modern grade badge with gradient
                         Container(
-                          width: 42,
-                          height: 42,
+                          width: 50,
+                          height: 50,
                           decoration: BoxDecoration(
-                            color:
-                                gradeColor.withValues(alpha: isDark ? 0.15 : 0.1),
-                            borderRadius: BorderRadius.circular(10),
+                            gradient: LinearGradient(
+                              colors: [
+                                gradeColor.withValues(alpha: isDark ? 0.25 : 0.15),
+                                gradeColor.withValues(alpha: isDark ? 0.15 : 0.08),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: gradeColor.withValues(alpha: 0.3),
+                              width: 1.5,
+                            ),
                           ),
                           child: Center(
                             child: Text(
                               course.grade.isEmpty ? '–' : course.grade,
                               style: GoogleFonts.inter(
-                                fontSize: 14,
+                                fontSize: 16,
                                 fontWeight: FontWeight.w900,
                                 color: gradeColor,
+                                letterSpacing: -0.5,
                               ),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        // Course info
+                        const SizedBox(width: 14),
+                        // Course info with improved hierarchy
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -2101,20 +2152,57 @@ class _CourseResultsSection extends StatelessWidget {
                               Text(
                                 course.title,
                                 style: GoogleFonts.inter(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w500,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
                                   color: theme.colorScheme.onSurface,
-                                  height: 1.3,
+                                  height: 1.35,
+                                  letterSpacing: 0.1,
                                 ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              const SizedBox(height: 3),
-                              Text(
-                                '${course.code}  •  ${course.credits} credits',
-                                style: GoogleFonts.inter(
-                                  fontSize: 10,
-                                  color: theme.colorScheme.onSurface
-                                      .withValues(alpha: 0.45),
-                                ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  // Course code badge
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: theme.colorScheme.onSurface
+                                          .withValues(alpha: 0.06),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      course.code,
+                                      style: GoogleFonts.jetBrainsMono(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        color: theme.colorScheme.onSurface
+                                            .withValues(alpha: 0.6),
+                                        letterSpacing: 0.3,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  // Credits indicator
+                                  Icon(
+                                    Icons.bookmark_outline_rounded,
+                                    size: 12,
+                                    color: theme.colorScheme.onSurface
+                                        .withValues(alpha: 0.4),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${course.credits} ${course.credits == 1 ? 'credit' : 'credits'}',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w500,
+                                      color: theme.colorScheme.onSurface
+                                          .withValues(alpha: 0.5),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -2241,383 +2329,34 @@ class _CaTestTab extends StatelessWidget {
           );
         }
 
-        final ca = prov.caMarks;
         final tt = prov.caTimetable;
-        final hasTimetable = tt != null && tt.hasData;
 
-        if (ca == null && !hasTimetable) {
+        if (tt == null) {
           return const _EmptyView(
+            icon: Icons.schedule_outlined,
             message:
-                'CA data is not available yet.\nYour placement representative will refresh and publish updates.',
+                'CA exam timetable is not available yet.\nYour placement representative will publish the schedule soon.',
           );
         }
 
-        if (ca != null && !ca.hasData && !hasTimetable) {
+        if (!tt.hasData) {
           return _EmptyView(
-            icon: Icons.assignment_outlined,
-            message: ca.note?.isNotEmpty == true
-                ? ca.note!
-                : 'CA marks have not been published on the academic portal yet.',
+            icon: Icons.schedule_outlined,
+            message: tt.note?.isNotEmpty == true
+                ? tt.note!
+                : 'CA exam timetable has not been published yet.',
           );
         }
 
         return CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
-            if (ca != null)
-              SliverToBoxAdapter(
-                child: _CaHeaderCard(ca: ca),
-              ),
-            if (ca != null && !ca.hasData && (ca.note?.isNotEmpty ?? false))
-              SliverToBoxAdapter(
-                child: _CaInfoBanner(
-                  icon: Icons.assignment_outlined,
-                  note: ca.note!,
-                ),
-              ),
-            if (tt != null && tt.hasData)
-              SliverToBoxAdapter(
-                child: _CaTimetableSection(timetable: tt),
-              )
-            else if (tt != null && (tt.note?.isNotEmpty ?? false))
-              SliverToBoxAdapter(
-                child: _CaInfoBanner(
-                  icon: Icons.schedule_outlined,
-                  note: tt.note!,
-                ),
-              ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, i) => _CaSubjectCard(subject: ca!.subjects[i]),
-                  childCount: ca?.subjects.length ?? 0,
-                ),
-              ),
+            SliverToBoxAdapter(
+              child: _CaTimetableSection(timetable: tt),
             ),
           ],
         );
       },
-    );
-  }
-}
-
-class _CaHeaderCard extends StatelessWidget {
-  final EcampusCaMarks ca;
-  const _CaHeaderCard({required this.ca});
-
-  @override
-  Widget build(BuildContext context) {
-    final subjectsWithBothCa =
-        ca.subjects.where((s) => s.ca2 != null).length;
-    final totalSubjects = ca.subjects.length;
-    final hasAnyGoodMarks =
-        ca.subjects.any((s) => s.ca1?.status == CaMarkStatus.good);
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1A1A3E), Color(0xFF2D2B55)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-            color: const Color(0xFF6C63FF).withValues(alpha: 0.4), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-              color: const Color(0xFF6C63FF).withValues(alpha: 0.18),
-              blurRadius: 16,
-              offset: const Offset(0, 4)),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: const Color(0xFF6C63FF).withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Icon(Icons.assignment_turned_in_rounded,
-                color: Color(0xFF9D97FF), size: 26),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Continuous Assessment',
-                  style: GoogleFonts.inter(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '$totalSubjects subject${totalSubjects == 1 ? '' : 's'}'
-                  '${subjectsWithBothCa > 0 ? ' • CA2 available for $subjectsWithBothCa' : ''}',
-                  style: GoogleFonts.inter(
-                      fontSize: 12, color: Colors.white60),
-                ),
-              ],
-            ),
-          ),
-          if (hasAnyGoodMarks)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: Colors.green.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                    color: Colors.green.withValues(alpha: 0.5), width: 1),
-              ),
-              child: Text('On Track',
-                  style: GoogleFonts.inter(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.greenAccent)),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CaSubjectCard extends StatelessWidget {
-  final CaSubject subject;
-  const _CaSubjectCard({required this.subject});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final ca1 = subject.ca1;
-    final ca2 = subject.ca2;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E2E) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.07)
-              : Colors.black.withValues(alpha: 0.07),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.06),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Course header
-            Row(
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF6C63FF).withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    subject.courseCode,
-                    style: GoogleFonts.jetBrainsMono(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF9D97FF),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    subject.courseTitle,
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: isDark ? Colors.white : Colors.black87,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            // CA chips row
-            Row(
-              children: [
-                if (ca1 != null) ...[
-                  Expanded(child: _CaChip(result: ca1, label: 'CA 1')),
-                  const SizedBox(width: 10),
-                ],
-                if (ca2 != null)
-                  Expanded(child: _CaChip(result: ca2, label: 'CA 2'))
-                else if (ca1 != null)
-                  const Expanded(child: _CaPendingChip(label: 'CA 2')),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CaChip extends StatelessWidget {
-  final CaTestResult result;
-  final String label;
-  const _CaChip({required this.result, required this.label});
-
-  Color _statusColor(CaMarkStatus s) {
-    switch (s) {
-      case CaMarkStatus.good:
-        return const Color(0xFF4CAF50);
-      case CaMarkStatus.average:
-        return const Color(0xFFFF9800);
-      case CaMarkStatus.poor:
-        return const Color(0xFFEF5350);
-      case CaMarkStatus.pending:
-        return Colors.grey;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final c = _statusColor(result.status);
-    final marks = result.marks;
-    final max = result.maxMarks;
-    final pct = result.percentage;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: c.withValues(alpha: isDark ? 0.12 : 0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: c.withValues(alpha: 0.4), width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: GoogleFonts.inter(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.8,
-              color: c,
-            ),
-          ),
-          const SizedBox(height: 4),
-          if (marks != null && max != null)
-            Text(
-              '${_fmt(marks)} / ${_fmt(max)}',
-              style: GoogleFonts.inter(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: isDark ? Colors.white : Colors.black87,
-              ),
-            )
-          else
-            Text(
-              result.status == CaMarkStatus.pending ? 'Pending' : '—',
-              style: GoogleFonts.inter(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? Colors.white54 : Colors.black38),
-            ),
-          if (pct != null) ...[
-            const SizedBox(height: 2),
-            Row(
-              children: [
-                Text(
-                  '${pct.toStringAsFixed(1)}%',
-                  style: GoogleFonts.inter(fontSize: 11, color: c),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: (pct / 100).clamp(0.0, 1.0),
-                      minHeight: 4,
-                      backgroundColor: c.withValues(alpha: 0.15),
-                      valueColor: AlwaysStoppedAnimation<Color>(c),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  String _fmt(double v) =>
-      v == v.truncateToDouble() ? v.toInt().toString() : v.toStringAsFixed(1);
-}
-
-class _CaPendingChip extends StatelessWidget {
-  final String label;
-  const _CaPendingChip({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.grey.withValues(alpha: isDark ? 0.1 : 0.07),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-            color: Colors.grey.withValues(alpha: 0.3), width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: GoogleFonts.inter(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.8,
-              color: Colors.grey,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Not Published',
-            style: GoogleFonts.inter(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: isDark ? Colors.white38 : Colors.black38,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            'Available after CA 1',
-            style: GoogleFonts.inter(
-                fontSize: 10,
-                color: isDark ? Colors.white24 : Colors.black26),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -2697,8 +2436,17 @@ class _CaTimetableSection extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    // Sort rows by date so upcoming exams appear first
-    final sortedRows = [...timetable.rows]..sort((a, b) {
+    // Filter and sort rows: hide completed exams, show upcoming first
+    final sortedRows = timetable.rows
+        .where((row) {
+          final dateRaw = _pickField(row, const ['test_date', 'date', 'exam_date']) ?? '';
+          final date = _parseCaDate(dateRaw);
+          final days = _daysLeft(date);
+          // Hide exams that are in the past (completed)
+          return days == null || days >= 0;
+        })
+        .toList()
+      ..sort((a, b) {
         final da = _parseCaDate(
           _pickField(a, const ['test_date', 'date', 'exam_date']) ?? '',
         );
@@ -2711,6 +2459,60 @@ class _CaTimetableSection extends StatelessWidget {
         return da.compareTo(db);
       });
 
+    // If all exams are completed, show "CA 2 will be published soon" message
+    if (sortedRows.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(24),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFF4CAF50).withValues(alpha: 0.15),
+                      const Color(0xFF4CAF50).withValues(alpha: 0.05),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                child: const Icon(
+                  Icons.check_circle_outline_rounded,
+                  size: 42,
+                  color: Color(0xFF4CAF50),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'All CA 1 Exams Completed! 🎉',
+                style: GoogleFonts.inter(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: theme.colorScheme.onSurface,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'CA 2 will be published soon.\nStay tuned for updates!',
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  height: 1.5,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       child: Column(
@@ -2720,33 +2522,70 @@ class _CaTimetableSection extends StatelessWidget {
             children: [
               Container(
                 width: 3,
-                height: 16,
+                height: 18,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFF9800),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFFF9800), Color(0xFFFF5722)],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               Text(
                 'CA EXAM SCHEDULE',
                 style: GoogleFonts.inter(
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: FontWeight.w700,
-                  letterSpacing: 1.2,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
+                  letterSpacing: 1.3,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF9800).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '${sortedRows.length} ${sortedRows.length == 1 ? 'Exam' : 'Exams'}',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFFFF9800),
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          ...sortedRows.map((row) => _CaExamCard(
-                row: row,
+          const SizedBox(height: 14),
+          ...sortedRows.asMap().entries.map((entry) {
+            final index = entry.key;
+            return TweenAnimationBuilder<double>(
+              duration: Duration(milliseconds: 300 + (index * 80)),
+              tween: Tween(begin: 0.0, end: 1.0),
+              curve: Curves.easeOutCubic,
+              builder: (context, value, child) {
+                return Transform.translate(
+                  offset: Offset(0, 20 * (1 - value)),
+                  child: Opacity(
+                    opacity: value,
+                    child: child,
+                  ),
+                );
+              },
+              child: _CaExamCard(
+                row: entry.value,
                 parseCaDate: _parseCaDate,
                 daysLeft: _daysLeft,
                 badgeStyle: _badgeStyle,
                 pickField: _pickField,
                 isDark: isDark,
-              )),
+              ),
+            );
+          }),
         ],
       ),
     );
@@ -2790,7 +2629,6 @@ class _CaExamCard extends StatelessWidget {
     final days = daysLeft(examDate);
     final (badgeColor, badgeDark, badgeText) = badgeStyle(days, isDark);
     final showBadge = badgeText.isNotEmpty;
-    final isPast = days != null && days < 0;
 
     // Format display date: "06 Mar 2026"
     String displayDate = testDateRaw;
@@ -2799,279 +2637,288 @@ class _CaExamCard extends StatelessWidget {
     }
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E2E) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          colors: isDark
+              ? [
+                  const Color(0xFF1E1E2E),
+                  const Color(0xFF1A1A28),
+                ]
+              : [
+                  Colors.white,
+                  const Color(0xFFFAFAFA),
+                ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: isPast
-              ? (isDark
-                  ? Colors.white.withValues(alpha: 0.04)
-                  : Colors.black.withValues(alpha: 0.04))
-              : (showBadge
-                  ? badgeColor.withValues(alpha: isDark ? 0.25 : 0.18)
-                  : (isDark
-                      ? Colors.white.withValues(alpha: 0.07)
-                      : Colors.black.withValues(alpha: 0.07))),
-          width: isPast ? 1 : (showBadge ? 1.5 : 1),
+          color: showBadge
+              ? badgeColor.withValues(alpha: isDark ? 0.3 : 0.2)
+              : (isDark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.black.withValues(alpha: 0.06)),
+          width: showBadge ? 1.5 : 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: isPast
-                ? Colors.black.withValues(alpha: isDark ? 0.15 : 0.03)
-                : (showBadge
-                    ? badgeColor.withValues(alpha: isDark ? 0.15 : 0.08)
-                    : Colors.black.withValues(alpha: isDark ? 0.25 : 0.05)),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+            color: showBadge
+                ? badgeColor.withValues(alpha: isDark ? 0.2 : 0.12)
+                : Colors.black.withValues(alpha: isDark ? 0.3 : 0.06),
+            blurRadius: showBadge ? 16 : 12,
+            offset: const Offset(0, 4),
+            spreadRadius: showBadge ? 1 : 0,
           ),
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Stack(
           children: [
-            // ── Course header ──
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (courseCode.isNotEmpty)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: isPast
-                          ? Colors.grey.withValues(alpha: isDark ? 0.15 : 0.1)
-                          : const Color(0xFFFF9800).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      courseCode,
-                      style: GoogleFonts.jetBrainsMono(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: isPast
-                            ? (isDark ? Colors.white38 : Colors.black38)
-                            : const Color(0xFFFF9800),
-                      ),
-                    ),
-                  ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    courseName,
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: isPast
-                          ? (isDark ? Colors.white38 : Colors.black38)
-                          : (isDark ? Colors.white : Colors.black87),
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+            // Gradient accent line on left
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              child: Container(
+                width: 4,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      badgeColor,
+                      badgeColor.withValues(alpha: 0.5),
+                    ],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
                   ),
                 ),
-              ],
+              ),
             ),
-            const SizedBox(height: 12),
-            // ── Date + Session row ──
-            Row(
-              children: [
-                // Date pill
-                if (displayDate.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: isPast
-                          ? Colors.grey.withValues(alpha: 0.07)
-                          : (isDark
-                              ? Colors.white.withValues(alpha: 0.06)
-                              : Colors.black.withValues(alpha: 0.04)),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: isPast
-                            ? Colors.grey.withValues(alpha: 0.2)
-                            : (isDark
-                                ? Colors.white.withValues(alpha: 0.1)
-                                : Colors.black.withValues(alpha: 0.08)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 16, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Course header ──
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (courseCode.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                const Color(0xFFFF9800).withValues(alpha: 0.18),
+                                const Color(0xFFFF9800).withValues(alpha: 0.12),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(7),
+                            border: Border.all(
+                              color: const Color(0xFFFF9800).withValues(alpha: 0.25),
+                              width: 1,
+                            ),
+                          ),
+                          child: Text(
+                            courseCode,
+                            style: GoogleFonts.jetBrainsMono(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFFFF9800),
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          courseName,
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: isDark
+                                ? Colors.white
+                                : Colors.black.withValues(alpha: 0.87),
+                            height: 1.3,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  // ── Date + Session row ──
+                  Row(
+                    children: [
+                      // Date pill
+                      if (displayDate.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.08)
+                                : Colors.black.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(9),
+                            border: Border.all(
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.12)
+                                  : Colors.black.withValues(alpha: 0.1),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.calendar_today_rounded,
+                                size: 13,
+                                color: Color(0xFFFF9800),
+                              ),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  displayDate,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark
+                                        ? Colors.white.withValues(alpha: 0.87)
+                                        : Colors.black.withValues(alpha: 0.87),
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      const SizedBox(width: 10),
+                      // Session / time pill
+                      if (session.isNotEmpty)
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 7),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.08)
+                                  : Colors.black.withValues(alpha: 0.05),
+                              borderRadius: BorderRadius.circular(9),
+                              border: Border.all(
+                                color: isDark
+                                    ? Colors.white.withValues(alpha: 0.12)
+                                    : Colors.black.withValues(alpha: 0.1),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.schedule_rounded,
+                                  size: 13,
+                                  color: isDark
+                                      ? Colors.white70
+                                      : Colors.black54,
+                                ),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    session,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: isDark
+                                          ? Colors.white70
+                                          : Colors.black54,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  if (slotNo.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Row(
                       children: [
                         Icon(
-                          Icons.calendar_today_rounded,
-                          size: 12,
-                          color: isPast
-                              ? (isDark ? Colors.white30 : Colors.black38)
-                              : const Color(0xFFFF9800),
+                          Icons.room_outlined,
+                          size: 14,
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.4)
+                              : Colors.black.withValues(alpha: 0.4),
                         ),
-                        const SizedBox(width: 5),
+                        const SizedBox(width: 6),
                         Text(
-                          displayDate,
+                          'Slot $slotNo',
                           style: GoogleFonts.inter(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: isPast
-                                ? (isDark ? Colors.white38 : Colors.black38)
-                                : (isDark ? Colors.white : Colors.black87),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.5)
+                                : Colors.black.withValues(alpha: 0.5),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                const SizedBox(width: 8),
-                // Session / time pill
-                if (session.isNotEmpty)
-                  Expanded(
-                    child: Container(
+                  ],
+                  // ── Urgency badge ──
+                  if (showBadge) ...[
+                    const SizedBox(height: 12),
+                    Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
+                          horizontal: 14, vertical: 8),
                       decoration: BoxDecoration(
-                        color: isPast
-                            ? Colors.grey.withValues(alpha: 0.07)
-                            : (isDark
-                                ? Colors.white.withValues(alpha: 0.06)
-                                : Colors.black.withValues(alpha: 0.04)),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: isPast
-                              ? Colors.grey.withValues(alpha: 0.2)
-                              : (isDark
-                                  ? Colors.white.withValues(alpha: 0.1)
-                                  : Colors.black.withValues(alpha: 0.08)),
+                        gradient: LinearGradient(
+                          colors: [badgeColor, badgeDark],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: [
+                          BoxShadow(
+                            color: badgeColor.withValues(alpha: 0.4),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            Icons.access_time_rounded,
-                            size: 12,
-                            color: isPast
-                                ? (isDark ? Colors.white30 : Colors.black38)
-                                : const Color(0xFFFF9800),
+                            days == 0
+                                ? Icons.warning_rounded
+                                : days == 1
+                                    ? Icons.access_time_filled_rounded
+                                    : Icons.event_available_rounded,
+                            size: 15,
+                            color: Colors.white,
                           ),
-                          const SizedBox(width: 5),
-                          Flexible(
-                            child: Text(
-                              session,
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                                color: isPast
-                                    ? (isDark ? Colors.white38 : Colors.black38)
-                                    : (isDark
-                                        ? Colors.white70
-                                        : Colors.black54),
-                              ),
-                              overflow: TextOverflow.ellipsis,
+                          const SizedBox(width: 7),
+                          Text(
+                            badgeText,
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              letterSpacing: 0.3,
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ),
-              ],
-            ),
-            // ── Slot + Days-left row ──
-            if (slotNo.isNotEmpty || showBadge) ...[
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  if (slotNo.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: isDark
-                            ? Colors.white.withValues(alpha: 0.05)
-                            : Colors.black.withValues(alpha: 0.04),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        'Slot $slotNo',
-                        style: GoogleFonts.inter(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color:
-                              isDark ? Colors.white54 : Colors.black45,
-                        ),
-                      ),
-                    ),
-                  const Spacer(),
-                  if (showBadge)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: badgeColor.withValues(
-                            alpha: isPast
-                                ? (isDark ? 0.08 : 0.06)
-                                : (isDark ? 0.18 : 0.12)),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: badgeColor.withValues(alpha: isPast ? 0.2 : 0.5),
-                          width: 1,
-                        ),
-                      ),
-                      child: Text(
-                        badgeText,
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: isPast
-                              ? (isDark ? Colors.white38 : Colors.black38)
-                              : badgeColor,
-                        ),
-                      ),
-                    ),
+                  ],
                 ],
               ),
-            ],
+            ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _CaInfoBanner extends StatelessWidget {
-  final String note;
-  final IconData icon;
-  const _CaInfoBanner({required this.note, required this.icon});
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1A1A2B) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.08)
-              : Colors.black.withValues(alpha: 0.08),
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: isDark ? Colors.white54 : Colors.black45),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              note,
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                color: isDark ? Colors.white60 : Colors.black54,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

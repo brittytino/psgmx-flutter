@@ -200,12 +200,9 @@ class TaskCompletionService {
     try {
       final dateString = date.toIso8601String().split('T')[0];
 
-      // Count total students
-      final totalResponse = await _supabase
-          .from('users')
-          .select()
-          .eq('roles->>isStudent', 'true');
-      final totalCount = (totalResponse as List).length;
+      // Count total students from whitelist (source of truth – all 123 students)
+      final totalCount =
+          await _supabase.from('whitelist').count(CountOption.exact);
 
       // Count completed
       final completedResponse = await _supabase
@@ -230,66 +227,62 @@ class TaskCompletionService {
   }
 
   /// Get all students' completion status for a date
+  /// Uses whitelist as source of truth so all 123 students are always included.
   Future<List<UserTaskStatus>> getAllStudentCompletions(DateTime date) async {
     try {
       final dateString = date.toIso8601String().split('T')[0];
 
-      // Get all students with their task completions for today
-      final response = await _supabase
-          .from('users')
-          .select('''
-            id,
-            name,
-            reg_no,
-            team_id,
-            task_completions!task_completions_user_id_fkey!left(
-              id,
-              completed, 
-              completed_at, 
-              task_date, 
-              verified_by, 
-              verified_at
-            )
-          ''')
-          .contains('roles', {'isStudent': true})
+      // 1. All whitelist students (source of truth – 123 students)
+      final whitelistResponse = await _supabase
+          .from('whitelist')
+          .select('reg_no, name, team_id, email')
           .order('team_id')
           .order('reg_no');
 
-      final results = <UserTaskStatus>[];
-      for (var row in response as List) {
-        final completions = row['task_completions'] as List? ?? [];
-        final todayCompletion = completions.firstWhere(
-          (c) => c['task_date'] == dateString,
-          orElse: () => null,
-        );
+      // 2. Registered users map keyed by reg_no (only those who signed in)
+      final usersResponse = await _supabase
+          .from('users')
+          .select('id, reg_no, name, team_id')
+          .not('reg_no', 'is', null);
 
-        // Get verified by name if exists
-        String? verifiedByName;
-        if (todayCompletion?['verified_by'] != null) {
-          try {
-            final verifierResponse = await _supabase
-                .from('users')
-                .select('name')
-                .eq('id', todayCompletion['verified_by'])
-                .single();
-            verifiedByName = verifierResponse['name'];
-          } catch (e) {
-            debugPrint('[TaskCompletionService] Error getting verifier name: $e');
-          }
-        }
+      final Map<String, Map<String, dynamic>> usersByRegNo = {
+        for (var u in usersResponse as List)
+          if (u['reg_no'] != null) u['reg_no'] as String: Map<String, dynamic>.from(u)
+      };
+
+      // 3. Today's completions keyed by user_id
+      final completionsResponse = await _supabase
+          .from('task_completions')
+          .select('user_id, completed, completed_at, verified_by, verified_at')
+          .eq('task_date', dateString)
+          .eq('completed', true);
+
+      final Map<String, Map<String, dynamic>> completionsByUserId = {
+        for (var c in completionsResponse as List)
+          c['user_id'] as String: Map<String, dynamic>.from(c)
+      };
+
+      // 4. Build result including every whitelist student
+      final results = <UserTaskStatus>[];
+      for (var row in whitelistResponse as List) {
+        final regNo = row['reg_no'] as String? ?? '';
+        final userRecord = usersByRegNo[regNo];
+        final userId = userRecord?['id'] as String? ?? '';
+        final completion =
+            userId.isNotEmpty ? completionsByUserId[userId] : null;
 
         results.add(UserTaskStatus(
-          odId: row['id'] ?? '',
-          name: row['name'] ?? '',
-          regNo: row['reg_no'] ?? '',
+          odId: userId,
+          name: userRecord?['name'] as String? ?? row['name'] as String? ?? '',
+          regNo: regNo,
           teamId: row['team_id'],
-          completed: todayCompletion?['completed'] ?? false,
-          completedAt: todayCompletion?['completed_at'] != null
-              ? DateTime.parse(todayCompletion['completed_at'])
+          completed: completion?['completed'] == true,
+          completedAt: completion?['completed_at'] != null
+              ? DateTime.parse(completion!['completed_at'] as String)
               : null,
-          verifiedByName: verifiedByName,
-          verifiedAt: todayCompletion?['verified_at'] != null
-              ? DateTime.parse(todayCompletion['verified_at'])
+          verifiedByName: null,
+          verifiedAt: completion?['verified_at'] != null
+              ? DateTime.parse(completion!['verified_at'] as String)
               : null,
         ));
       }

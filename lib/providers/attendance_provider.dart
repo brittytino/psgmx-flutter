@@ -23,7 +23,7 @@ class AttendanceProvider extends ChangeNotifier {
     try {
       var query = _supabaseService.client
           .from('attendance_records')
-          .select('user_id, status, student_id, student_email, student_name')
+          .select('user_id, status')
           .eq('date', dateStr);
 
       if (teamId != null) {
@@ -34,7 +34,7 @@ class AttendanceProvider extends ChangeNotifier {
 
       _statusMap.clear();
       for (var record in response as List) {
-        final key = record['user_id'] ?? record['student_id'] ?? record['student_email'];
+        final key = record['user_id'];
         if (key != null) {
           _statusMap[key] = record['status'];
         }
@@ -183,7 +183,6 @@ class AttendanceProvider extends ChangeNotifier {
     if (user == null) throw Exception('User not authenticated');
 
     final List<Map<String, dynamic>> rows = [];
-    final List<String> unregisteredStudents = [];
 
     // UUID regex pattern
     final uuidRegex = RegExp(
@@ -193,22 +192,24 @@ class AttendanceProvider extends ChangeNotifier {
       final studentIdOrEmail = entry.key;
       final status = entry.value;
 
-      if (uuidRegex.hasMatch(studentIdOrEmail)) {
-        // Resolve the correct team_id for analytics accuracy
-        final student = _teamMembers.firstWhere(
-          (m) => m.uid == studentIdOrEmail,
-          orElse: () => AppUser(
-            uid: studentIdOrEmail,
-            email: '',
-            regNo: '',
-            name: '',
-            teamId: teamId,
-            batch: '',
-            roles: const UserRoles(),
-          ),
-        );
-        final studentTeamId = student.teamId ?? teamId ?? 'ALL';
+      // Find student in team members (works for both registered and unregistered)
+      final student = _teamMembers.firstWhere(
+        (m) => m.uid == studentIdOrEmail,
+        orElse: () => AppUser(
+          uid: studentIdOrEmail,
+          email: studentIdOrEmail,
+          regNo: '',
+          name: '',
+          teamId: teamId,
+          batch: '',
+          roles: const UserRoles(),
+        ),
+      );
+      final studentTeamId = student.teamId ?? teamId ?? 'ALL';
 
+      // Accept both UUIDs (registered) and emails (unregistered from whitelist)
+      if (uuidRegex.hasMatch(studentIdOrEmail)) {
+        // Registered user with proper UUID
         rows.add({
           'date': dateStr,
           'user_id': studentIdOrEmail,
@@ -216,31 +217,33 @@ class AttendanceProvider extends ChangeNotifier {
           'status': status,
           'marked_by': user.id,
         });
-      } else {
-        unregisteredStudents.add(studentIdOrEmail);
+      } else if (studentIdOrEmail.contains('@')) {
+        // Unregistered student from whitelist - use email as identifier
+        // The database will handle this via the attendance view which joins with whitelist
+        rows.add({
+          'date': dateStr,
+          'user_id': studentIdOrEmail, // Email as fallback identifier
+          'team_id': studentTeamId,
+          'status': status,
+          'marked_by': user.id,
+        });
       }
     }
 
-    if (rows.isEmpty && unregisteredStudents.isNotEmpty) {
-      throw Exception("Specified students have not signed up for the app yet. Attendance can only be marked for registered users who have logged in at least once.");
+    if (rows.isEmpty) {
+      throw Exception("No valid students to mark attendance for.");
     }
 
-    if (rows.isNotEmpty) {
-      // Upsert on (date, user_id) conflict — safe for both first-mark and updates
-      await _supabaseService.client
-          .from('attendance_records')
-          .upsert(rows, onConflict: 'date,user_id');
+    // Upsert on (date, user_id) conflict — safe for both first-mark and updates
+    await _supabaseService.client
+        .from('attendance_records')
+        .upsert(rows, onConflict: 'date,user_id');
 
-      if (!isRep && teamId != null) {
-        _hasSubmittedToday = true;
-      }
-      notifyListeners();
-
-      if (unregisteredStudents.isNotEmpty) {
-        debugPrint(
-            '[Attendance] Skipping unregistered students (not signed up): '
-            '${unregisteredStudents.join(', ')}');
-      }
+    if (!isRep && teamId != null) {
+      _hasSubmittedToday = true;
     }
+    notifyListeners();
+
+    debugPrint('[Attendance] Successfully marked attendance for ${rows.length} students');
   }
 }
