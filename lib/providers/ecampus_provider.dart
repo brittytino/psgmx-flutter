@@ -56,18 +56,28 @@ class EcampusProvider extends ChangeNotifier {
     _currentRollno = rollno;
     _setStatus(EcampusStatus.loading);
 
+    // Load the global CA timetable immediately and independently.
+    // It is the same for every student and must always be visible, even when
+    // the user's eCampus credentials are invalid or the attendance fetch fails.
+    _service.getGlobalCaTimetable().then((tt) {
+      if (tt != null) {
+        _caTimetable = tt;
+        notifyListeners();
+      }
+    }).catchError((Object e) {
+      debugPrint('[EcampusProvider] getGlobalCaTimetable (non-fatal): $e');
+    });
+
     try {
       final results = await Future.wait([
         _service.getAttendance(rollno),
         _service.getCgpa(rollno),
         _service.getCaMarks(rollno),
-        _service.getGlobalCaTimetable(), // shared timetable – same for all students
       ]);
 
       _attendance = results[0] as EcampusAttendance?;
       _cgpa = results[1] as EcampusCgpa?;
       _caMarks = results[2] as EcampusCaMarks?;
-      _caTimetable = results[3] as EcampusCaTimetable?;
       _lastSyncedAt = _attendance?.syncedAt ?? _cgpa?.syncedAt;
       _setStatus(EcampusStatus.loaded);
 

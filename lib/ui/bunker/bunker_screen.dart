@@ -716,11 +716,19 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
         backgroundColor:
             isDark ? const Color(0xFF0F0F1A) : const Color(0xFFF5F5F5),
         body: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 40),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final hPad =
+                  (constraints.maxWidth * 0.07).clamp(20.0, 44.0);
+              return SingleChildScrollView(
+                padding: EdgeInsets.symmetric(
+                    horizontal: hPad, vertical: 32),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 480),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
                 const SizedBox(height: 24),
                 // ── Icon + heading ────────────────────────────────────────────
                 Center(
@@ -913,6 +921,10 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
           ),
         ),
       );
+          },
+        ),
+      ),
+    );
     }
 
     return Scaffold(
@@ -926,7 +938,8 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
             floating: true,
             snap: true,
             pinned: true,
-            expandedHeight: 120,
+            expandedHeight:
+                MediaQuery.sizeOf(context).height < 680 ? 90.0 : 116.0,
             flexibleSpace: FlexibleSpaceBar(
               titlePadding:
                   const EdgeInsets.only(left: 16, bottom: 16),
@@ -962,6 +975,11 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
             ],
             bottom: TabBar(
               controller: _tabController,
+              // 4 tabs for placement rep can overflow on narrow phones
+              isScrollable: _isPlacementRep,
+              tabAlignment: _isPlacementRep
+                  ? TabAlignment.start
+                  : TabAlignment.fill,
               labelColor: theme.colorScheme.primary,
               unselectedLabelColor:
                   isDark ? Colors.white54 : Colors.black45,
@@ -1757,13 +1775,17 @@ class _AttendanceSummaryCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      '${summary.overallPercentage.toStringAsFixed(1)}%',
-                      style: GoogleFonts.inter(
-                        fontSize: 52,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                        height: 1,
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        '${summary.overallPercentage.toStringAsFixed(1)}%',
+                        style: GoogleFonts.inter(
+                          fontSize: 52,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          height: 1,
+                        ),
                       ),
                     ),
                   ],
@@ -1999,13 +2021,17 @@ class _CgpaSummaryCard extends StatelessWidget {
                     style: GoogleFonts.inter(
                         fontSize: 13, color: Colors.white60)),
                 const SizedBox(height: 4),
-                Text(
-                  cgpa.cgpa.toStringAsFixed(2),
-                  style: GoogleFonts.inter(
-                    fontSize: 52,
-                    fontWeight: FontWeight.w900,
-                    color: c,
-                    height: 1,
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    cgpa.cgpa.toStringAsFixed(2),
+                    style: GoogleFonts.inter(
+                      fontSize: 52,
+                      fontWeight: FontWeight.w900,
+                      color: c,
+                      height: 1,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -2513,21 +2539,38 @@ class _CaTestTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<EcampusProvider>(
       builder: (context, prov, _) {
+        final tt = prov.caTimetable;
+
+        // ── Always show the timetable when it's available ─────────────────
+        // The CA schedule is global (same for all students) and must be
+        // visible regardless of the user's eCampus login status or any
+        // attendance-fetch error.
+        if (tt != null && tt.hasData) {
+          return CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverToBoxAdapter(
+                child: _CaTimetableSection(timetable: tt),
+              ),
+            ],
+          );
+        }
+
+        // ── Loading the user's data ───────────────────────────────────────
         if (prov.isLoading) {
           return const Center(child: CircularProgressIndicator());
         }
 
+        // ── Attendance/CGPA error (but timetable also unavailable) ────────
         if (prov.status == EcampusStatus.error) {
-          return _ErrorView(
-            message: prov.errorMessage ?? 'Something went wrong',
-            onRetry: () => context
-                .read<EcampusProvider>()
-                .init(context.read<UserProvider>().currentUser?.regNo ?? ''),
+          return const _EmptyView(
+            icon: Icons.schedule_outlined,
+            message:
+                'CA exam timetable is not available yet.\nYour placement representative will publish the schedule soon.',
           );
         }
 
-        final tt = prov.caTimetable;
-
+        // ── No timetable published yet ────────────────────────────────────
         if (tt == null) {
           return const _EmptyView(
             icon: Icons.schedule_outlined,
@@ -2536,22 +2579,12 @@ class _CaTestTab extends StatelessWidget {
           );
         }
 
-        if (!tt.hasData) {
-          return _EmptyView(
-            icon: Icons.schedule_outlined,
-            message: tt.note?.isNotEmpty == true
-                ? tt.note!
-                : 'CA exam timetable has not been published yet.',
-          );
-        }
-
-        return CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            SliverToBoxAdapter(
-              child: _CaTimetableSection(timetable: tt),
-            ),
-          ],
+        // tt.hasData == false (published but empty / has note)
+        return _EmptyView(
+          icon: Icons.schedule_outlined,
+          message: tt.note?.isNotEmpty == true
+              ? tt.note!
+              : 'CA exam timetable has not been published yet.',
         );
       },
     );
