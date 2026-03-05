@@ -138,6 +138,17 @@ class EcampusProvider extends ChangeNotifier {
     }
   }
 
+  /// Call this immediately after the student updates their eCampus password
+  /// (custom password saved or DOB set). Resets the login-failed flag and
+  /// runs a full scrape so the data is fresh with the new credentials.
+  Future<void> syncAfterCredentialUpdate(String rollno) async {
+    _isLoginFailed = false;
+    _currentRollno = rollno;
+    _errorMessage = null;
+    notifyListeners();
+    await sync();
+  }
+
   // ─── Helpers ───────────────────────────────────────────────────────────────
 
   void _setStatus(EcampusStatus s) {

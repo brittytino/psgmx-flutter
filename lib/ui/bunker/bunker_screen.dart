@@ -29,6 +29,14 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
   /// emits multiple [isLoginFailed] notifications in quick succession.
   bool _pwDialogShown = false;
   bool _isPlacementRep = false;
+
+  // ── Safe listener reference (avoids context.read in dispose) ──────────────
+  EcampusProvider? _ecampusProv;
+
+  // ── Inline credentials form state (no-credentials blocked screen) ─────────
+  final TextEditingController _credPassCtrl = TextEditingController();
+  bool _credObscure = true;
+  bool _credSaving = false;
   bool _isLoadingAllStudents = false;
   String? _allStudentsError;
   List<_StudentAcademicEntry> _allStudents = [];
@@ -57,7 +65,8 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
         return;
       }
 
-      if (user.dob == null) {
+      // Only prompt for DOB if user also hasn't set a custom eCampus password.
+      if (user.dob == null && !user.ecampusPasswordSet) {
         _showDobRequiredDialog(userProvider);
         return;
       }
@@ -65,8 +74,11 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
     });
 
     // Watch EcampusProvider for login failures and surface the password dialog.
+    // Store reference for safe removal in dispose() — never call context.read() in dispose.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<EcampusProvider>().addListener(_onEcampusProviderUpdate);
+      if (!mounted) return;
+      _ecampusProv = context.read<EcampusProvider>();
+      _ecampusProv!.addListener(_onEcampusProviderUpdate);
     });
   }
 
@@ -213,12 +225,9 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
 
   @override
   void dispose() {
-    // Remove the provider listener we registered in initState.
-    if (mounted) {
-      try {
-        context.read<EcampusProvider>().removeListener(_onEcampusProviderUpdate);
-      } catch (_) {}
-    }
+    // Use stored reference — context.read() is NOT safe inside dispose().
+    _ecampusProv?.removeListener(_onEcampusProviderUpdate);
+    _credPassCtrl.dispose();
     _tabController.dispose();
     super.dispose();
   }
@@ -296,10 +305,50 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
     _dobDialogShown = false;
   }
 
-  /// Quick-access dialog for students who changed their eCampus password.
-  /// Mirrors the same flow as in profile_screen.dart but surfaces it inline
-  /// so the student doesn't have to navigate away from the academics screen.
-  /// Quick-access dialog for students who changed their eCampus password.
+  /// Handles the inline "Connect to eCampus" button on the credentials-blocked
+  /// screen. Saves the entered password to the DB and immediately syncs.
+  Future<void> _connectWithInlinePassword(UserProvider userProvider) async {
+    final pw = _credPassCtrl.text.trim();
+    if (pw.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter your eCampus password.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    setState(() => _credSaving = true);
+    try {
+      await userProvider.updateEcampusPassword(pw);
+      final rollno = userProvider.currentUser?.regNo;
+      if (rollno != null && rollno.isNotEmpty && mounted) {
+        _credPassCtrl.clear();
+        context.read<EcampusProvider>().syncAfterCredentialUpdate(rollno);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Password saved. Syncing your academic data…'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save password: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _credSaving = false);
+    }
+  }
+
+  /// Quick-access dialog for students whose sync failed due to a wrong password.
   /// When [isAutoPrompt] is true the dialog was triggered automatically because
   /// a sync attempt failed with a login error — extra context is shown.
   Future<void> _showCustomPasswordDialog(
@@ -394,9 +443,9 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        '\ud83d\udd12 Your passwords are used only once to connect to '
-                        'the eCampus portal \u2014 not stored anywhere. '
-                        'So don\'t fear, your account is completely safe.\n\n'
+                        '\ud83d\udd12 Your password is stored securely on our server '
+                        'and is only used to connect to the eCampus portal. '
+                        'It is never exposed to other users or shown in the app.\n\n'
                         '\u2014 PSGMX Team',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: Colors.green.shade800,
@@ -432,11 +481,12 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
       await userProvider.updateEcampusPassword(result.trim());
       final rollno = userProvider.currentUser?.regNo;
       if (rollno != null && rollno.isNotEmpty && mounted) {
-        context.read<EcampusProvider>().init(rollno);
+        // Use syncAfterCredentialUpdate so fresh data is fetched with the new password.
+        context.read<EcampusProvider>().syncAfterCredentialUpdate(rollno);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Password updated. Loading your data\u2026'),
+              content: Text('Password saved. Syncing your data\u2026'),
               behavior: SnackBarBehavior.floating,
             ),
           );
@@ -665,51 +715,198 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
       return Scaffold(
         backgroundColor:
             isDark ? const Color(0xFF0F0F1A) : const Color(0xFFF5F5F5),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(28),
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 40),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Icon(Icons.lock_person_outlined,
-                    size: 64,
-                    color: theme.colorScheme.onSurface
-                        .withValues(alpha: 0.4)),
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
+                // ── Icon + heading ────────────────────────────────────────────
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.10),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.lock_person_outlined,
+                        size: 48, color: theme.colorScheme.primary),
+                  ),
+                ),
+                const SizedBox(height: 20),
                 Text(
-                  'eCampus Credentials Required',
+                  'Connect to eCampus',
                   style: GoogleFonts.inter(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
                     color: theme.colorScheme.onSurface,
+                    letterSpacing: -0.5,
                   ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'To load your attendance and academic data, set your date '  
-                  'of birth (used to generate your eCampus password), or '   
-                  'enter a custom password if you changed it on the portal.',
+                  'Enter your eCampus portal password to load your attendance and CGPA data.',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
                     fontSize: 13,
                     height: 1.5,
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.60),
+                  ),
+                ),
+                const SizedBox(height: 32),
+
+                // ── Custom/changed-password field ─────────────────────────────
+                Text(
+                  'eCampus Password',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.75),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                StatefulBuilder(
+                  builder: (ctx, setLocal) => TextField(
+                    controller: _credPassCtrl,
+                    obscureText: _credObscure,
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    keyboardType: TextInputType.visiblePassword,
+                    autofillHints: const [],
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => _connectWithInlinePassword(context.read<UserProvider>()),
+                    decoration: InputDecoration(
+                      hintText: 'e.g. 08jul04 or your custom password',
+                      filled: true,
+                      fillColor: isDark
+                          ? const Color(0xFF1E1E2E)
+                          : Colors.grey.shade100,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                            color: theme.colorScheme.primary, width: 2),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _credObscure
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                          size: 20,
+                        ),
+                        onPressed: () =>
+                            setState(() => _credObscure = !_credObscure),
+                        tooltip: _credObscure ? 'Show password' : 'Hide password',
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // ── Security note ────────────────────────────────────────────
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withValues(alpha: 0.07),
+                    borderRadius: BorderRadius.circular(10),
+                    border:
+                        Border.all(color: Colors.blue.withValues(alpha: 0.25)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.shield_outlined,
+                          color: Colors.blue, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Your password is securely stored on our server and is only used to connect to eCampus portal. It is never exposed to other users or devices.',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            height: 1.5,
+                            color: isDark
+                                ? Colors.blue.shade200
+                                : Colors.blue.shade800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // ── Connect button ───────────────────────────────────────────
+                FilledButton.icon(
+                  onPressed: _credSaving
+                      ? null
+                      : () => _connectWithInlinePassword(
+                          context.read<UserProvider>()),
+                  icon: _credSaving
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white),
+                        )
+                      : const Icon(Icons.link_rounded),
+                  label: Text(_credSaving
+                      ? 'Connecting…'
+                      : 'Connect to eCampus'),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(50),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
                 const SizedBox(height: 24),
-                ElevatedButton.icon(
+
+                // ── Divider ──────────────────────────────────────────────────
+                Row(children: [
+                  const Expanded(child: Divider()),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text('OR',
+                        style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: theme.colorScheme.onSurface
+                                .withValues(alpha: 0.40))),
+                  ),
+                  const Expanded(child: Divider()),
+                ]),
+                const SizedBox(height: 20),
+
+                // ── DOB fallback ────────────────────────────────────────────
+                OutlinedButton.icon(
                   onPressed: () =>
                       _showDobRequiredDialog(context.read<UserProvider>()),
-                  icon: const Icon(Icons.edit_calendar),
-                  label: const Text('Set Date of Birth'),
+                  icon: const Icon(Icons.edit_calendar_outlined),
+                  label: const Text('Set Date of Birth instead'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(46),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
                 ),
-                const SizedBox(height: 10),
-                OutlinedButton.icon(
-                  onPressed: () => _showCustomPasswordDialog(
-                      context.read<UserProvider>()),
-                  icon: const Icon(Icons.vpn_key_outlined),
-                  label: const Text('Use Custom Password'),
+                const SizedBox(height: 8),
+                Center(
+                  child: Text(
+                    'If you never changed your eCampus password,\nyour password is your date of birth (e.g. 08jul04)',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      height: 1.5,
+                      color:
+                          theme.colorScheme.onSurface.withValues(alpha: 0.45),
+                    ),
+                  ),
                 ),
               ],
             ),
