@@ -17,7 +17,7 @@ from datetime import datetime, date
 
 import requests
 from bs4 import BeautifulSoup
-from fastapi import FastAPI, HTTPException, Header, Query
+from fastapi import FastAPI, HTTPException, Header, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
 from dotenv import load_dotenv
@@ -118,6 +118,7 @@ app.add_middleware(
 
 # ─── eCampus URLs ────────────────────────────────────────────────────────────
 BASE_URL    = "https://ecampus.psgtech.ac.in/studzone2/"
+NEW_PORTAL_URL = "https://ecampus.psgtech.ac.in/studzone"
 ATT_URL     = BASE_URL + "AttWfPercView.aspx"
 COURSE_URL  = BASE_URL + "AttWfStudTimtab.aspx"
 RESULT_URL  = BASE_URL + "FrmEpsStudResult.aspx"
@@ -169,7 +170,7 @@ def _parse_dob_value(value) -> date:
 # ─── Scraper helpers ─────────────────────────────────────────────────────────
 
 def _ecampus_session(rollno: str, password: str) -> requests.Session:
-    """Login to eCampus and return an authenticated session."""
+    """Login to eCampus (old portal - studzone2) and return an authenticated session."""
     session = requests.Session()
     r = session.get(BASE_URL, headers=HEADERS, timeout=20)
     soup = BeautifulSoup(r.text, "html.parser")
@@ -187,6 +188,30 @@ def _ecampus_session(rollno: str, password: str) -> requests.Session:
         "abcd3": "Login",
     }
     session.post(BASE_URL, data=payload, headers=HEADERS, timeout=20)
+    return session
+
+
+def _new_portal_session(rollno: str, password: str) -> requests.Session:
+    """Login to eCampus (new portal - studzone) and return an authenticated session."""
+    session = requests.Session()
+    r = session.get(NEW_PORTAL_URL, headers=HEADERS, timeout=20)
+    soup = BeautifulSoup(r.text, "html.parser")
+    
+    # Extract CSRF token
+    token_input = soup.find("input", {"name": "__RequestVerificationToken"})
+    token = token_input["value"] if token_input else ""
+    
+    payload = {
+        "__RequestVerificationToken": token,
+        "rollno": rollno,
+        "password": password,
+        "chkterms": "on",  # Terms checkbox
+    }
+    
+    # Post login
+    login_response = session.post(NEW_PORTAL_URL, data=payload, headers=HEADERS, timeout=20, allow_redirects=True)
+    log.info(f"[new_portal_login] Login response status={login_response.status_code}, final_url={login_response.url[:80]}")
+    
     return session
 
 
@@ -515,6 +540,8 @@ def _fetch_ca_timetable(session: requests.Session) -> list:
     """
     page = session.get(CA_TIMETABLE_URL, headers=HEADERS, timeout=20)
     soup = BeautifulSoup(page.text, "html.parser")
+    
+    log.info(f"[fetch_ca_timetable] Fetched page, status={page.status_code}, length={len(page.text)}")
 
     table = (
         soup.find("table", {"id": "GvCATimeTable"})
@@ -532,43 +559,55 @@ def _fetch_ca_timetable(session: requests.Session) -> list:
             ).lower()
             if any(k in header for k in ("date", "time", "course", "subject", "test", "venue", "session")):
                 table = t
+                log.info(f"[fetch_ca_timetable] Found table via fallback matching: {header[:100]}")
                 break
 
     if not table:
+        log.info("[fetch_ca_timetable] No table found, checking for card layout...")
         # Card layout (new portal UI): extract from blocks containing labels.
         cards = []
-        for el in soup.find_all(["div", "section"]):
+        for el in soup.find_all(["div", "section", "article"]):
             text = el.get_text(" ", strip=True)
             if not text:
                 continue
             lt = text.lower()
-            if "course code" in lt and "test date" in lt and "session" in lt:
+            if "course code" in lt and "test date" in lt:
                 cards.append(text)
+                log.info(f"[fetch_ca_timetable] Found card: {text[:150]}...")
 
         def _extract(text: str, pattern: str) -> str:
             m = re.search(pattern, text, re.IGNORECASE)
             return m.group(1).strip() if m else ""
 
         items: list[dict] = []
+        seen_keys: set[str] = set()  # Track unique exams
         for t in cards:
             item = {
                 "course_code": _extract(t, r"Course\s*Code\s*[:\-]?\s*([A-Z0-9]+)"),
-                "course_name": _extract(t, r"Course\s*Name\s*[:\-]?\s*([A-Za-z0-9 .,&()\-/]+)"),
+                "course_name": _extract(t, r"Course\s*Name\s*[:\-]?\s*([A-Za-z0-9 .,&()\-/]+?)\s*(?:Test Date|$)"),
                 "test_date": _extract(t, r"Test\s*Date\s*[:\-]?\s*([0-9]{1,2}/[A-Za-z]{3}/[0-9]{2,4}|[0-9]{1,2}/[0-9]{1,2}/[0-9]{2,4}|[A-Za-z]{3,9}\s+[0-9]{1,2},?\s+[0-9]{2,4})"),
                 "slot_no": _extract(t, r"Slot\s*No\s*[:\-]?\s*([A-Za-z0-9]+)"),
                 "session": _extract(t, r"Session\s*[:\-]?\s*([0-9:.\sAPMapm\-]+)"),
             }
             if any(v for v in item.values()):
-                items.append(item)
+                # Create unique key to avoid duplicates
+                key = f"{item['course_code']}|{item['test_date']}|{item['slot_no']}"
+                if key not in seen_keys:
+                    seen_keys.add(key)
+                    items.append(item)
+                    log.info(f"[fetch_ca_timetable] Parsed card item: {item}")
 
+        log.info(f"[fetch_ca_timetable] Card layout: found {len(items)} items")
         return items  # may be empty if timetable not published
 
+    log.info(f"[fetch_ca_timetable] Table layout: parsing rows...")
     rows: list[list[str]] = []
     for tr in table.find_all("tr"):
         cols = [c.get_text(" ", strip=True) for c in tr.find_all(["th", "td"])]
         cols = [c for c in cols if c]
         if cols:
             rows.append(cols)
+    log.info(f"[fetch_ca_timetable] Table layout: found {len(rows)} rows")
     return rows
 
 
@@ -1166,24 +1205,42 @@ def get_global_ca_timetable(
 
 
 @app.post("/api/ecampus/sync-ca-timetable")
-def sync_ca_timetable(
+async def sync_ca_timetable(
     x_api_secret: str | None = Header(None),
+    payload: dict | None = Body(None),
 ):
-    """Fetch the CA test timetable from eCampus using the placement rep's
-    credentials and store it in the shared ``ca_timetable_global`` table.
+    """Fetch the CA test timetable from eCampus and store it in the shared
+    ``ca_timetable_global`` table.
 
-    This endpoint is intended to be called by the placement representative
-    (or a cron job) whenever the timetable is updated on the portal.
+    Accepts optional JSON body: {"rollno": "25MX354", "password": "yourpass"}
+    If not provided, uses placement rep credentials from database.
     Requires X-Api-Secret header.
     """
     _check_secret(x_api_secret)
 
-    # Resolve placement rep credentials
-    rollno, password = _get_placement_rep_rollno()
-    log.info(f"[sync-ca-timetable] Using placement rep: {rollno}")
+    # Try to get credentials from request body, fallback to placement rep
+    if payload and isinstance(payload, dict) and payload.get("rollno"):
+        rollno = str(payload["rollno"]).strip()
+        password = str(payload.get("password") or "").strip()
+        if not password:
+            # Try to derive from DOB if available
+            dob_str = str(payload.get("dob") or "").strip()
+            if dob_str:
+                try:
+                    dob_date = datetime.strptime(dob_str, "%Y-%m-%d").date()
+                    password = _dob_to_password(dob_date)
+                except:
+                    pass
+        if not password:
+            raise HTTPException(status_code=400, detail="Password or DOB required")
+        log.info(f"[sync-ca-timetable] Using provided credentials: {rollno}")
+    else:
+        # Resolve placement rep credentials from database
+        rollno, password = _get_placement_rep_rollno()
+        log.info(f"[sync-ca-timetable] Using placement rep: {rollno}")
 
     try:
-        session = _ecampus_session(rollno, password)
+        session = _new_portal_session(rollno, password)
         tt_rows = _fetch_ca_timetable(session)
         tt_data = _parse_ca_timetable(tt_rows)
     except Exception as exc:
