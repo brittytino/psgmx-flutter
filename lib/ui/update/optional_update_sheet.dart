@@ -27,33 +27,9 @@ class OptionalUpdateSheet extends StatefulWidget {
   State<OptionalUpdateSheet> createState() => _OptionalUpdateSheetState();
 }
 
-class _OptionalUpdateSheetState extends State<OptionalUpdateSheet> 
-    with SingleTickerProviderStateMixin {
-  
-  late AnimationController _animationController;
-  late Animation<double> _scaleAnimation;
+class _OptionalUpdateSheetState extends State<OptionalUpdateSheet> {
   bool _updateCancelled = false;
   bool _preparingDownload = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
-    _scaleAnimation = CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.elasticOut,
-    );
-    _animationController.forward();
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
-  }
 
   void _handleCancel() {
     setState(() => _updateCancelled = true);
@@ -116,36 +92,15 @@ class _OptionalUpdateSheetState extends State<OptionalUpdateSheet>
               ),
               const SizedBox(height: 24),
 
-              // Animated Image based on state
-              ScaleTransition(
-                scale: _scaleAnimation,
-                child: Hero(
-                  tag: 'update_available',
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.orange.withValues(alpha: 0.3),
-                          blurRadius: 20,
-                          spreadRadius: 2,
-                        ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(24),
-                      child: Image.asset(
-                        _preparingDownload
-                            ? 'assets/images/app_update_done.png'
-                            : _updateCancelled
-                                ? 'assets/images/app_update_cancelled.png'
-                                : 'assets/images/app_update_available.png',
-                        height: 220,
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                  ),
-                ),
+              // Image — transparent PNG, no wrapper needed
+              Image.asset(
+                _preparingDownload
+                    ? 'assets/images/app_update_done.png'
+                    : _updateCancelled
+                        ? 'assets/images/app_update_cancelled.png'
+                        : 'assets/images/app_update_available.png',
+                height: 200,
+                fit: BoxFit.contain,
               ),
               const SizedBox(height: 24),
 
@@ -157,7 +112,7 @@ class _OptionalUpdateSheetState extends State<OptionalUpdateSheet>
                       ? 'Ready to Download! 🎉'
                       : _updateCancelled
                           ? 'Maybe Later! 👍'
-                          : 'Hi Chellom! 👋',
+                          : 'Update Now ! 🚀',
                   key: ValueKey(_preparingDownload ? 'ready' : _updateCancelled ? 'cancel' : 'default'),
                   style: GoogleFonts.poppins(
                     fontSize: 26,

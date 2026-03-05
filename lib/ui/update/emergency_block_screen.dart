@@ -17,45 +17,8 @@ class EmergencyBlockScreen extends StatefulWidget {
   State<EmergencyBlockScreen> createState() => _EmergencyBlockScreenState();
 }
 
-class _EmergencyBlockScreenState extends State<EmergencyBlockScreen> 
-    with SingleTickerProviderStateMixin {
-  
-  late AnimationController _shakeController;
-  late Animation<double> _shakeAnimation;
+class _EmergencyBlockScreenState extends State<EmergencyBlockScreen> {
   bool _isDownloading = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _shakeController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 500),
-    );
-    
-    _shakeAnimation = Tween<double>(begin: 0, end: 10).animate(
-      CurvedAnimation(parent: _shakeController, curve: Curves.elasticIn),
-    )..addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
-        _shakeController.reverse();
-      }
-    });
-    
-    // Start shake animation periodically
-    Future.delayed(const Duration(seconds: 2), _startPeriodicShake);
-  }
-
-  void _startPeriodicShake() {
-    if (mounted) {
-      _shakeController.forward();
-      Future.delayed(const Duration(seconds: 5), _startPeriodicShake);
-    }
-  }
-
-  @override
-  void dispose() {
-    _shakeController.dispose();
-    super.dispose();
-  }
 
   Future<void> _handleUpdate() async {
     if (!mounted) return;
@@ -123,38 +86,11 @@ class _EmergencyBlockScreenState extends State<EmergencyBlockScreen>
                 children: [
                   const Spacer(),
                   
-                  // Rajinikanth "Romba Nandri" Image with shake animation
-                  AnimatedBuilder(
-                    animation: _shakeAnimation,
-                    builder: (context, child) {
-                      return Transform.translate(
-                        offset: Offset(_shakeAnimation.value, 0),
-                        child: child,
-                      );
-                    },
-                    child: Hero(
-                      tag: 'emergency_block',
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(28),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.red.withValues(alpha: 0.5),
-                              blurRadius: 40,
-                              spreadRadius: 10,
-                            ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(28),
-                          child: Image.asset(
-                            'assets/images/app_crash.png',
-                            height: 280,
-                            fit: BoxFit.contain,
-                          ),
-                        ),
-                      ),
-                    ),
+                  // Image — transparent PNG, no wrapper needed
+                  Image.asset(
+                    'assets/images/app_crash.png',
+                    height: 240,
+                    fit: BoxFit.contain,
                   ),
                   const SizedBox(height: 40),
 

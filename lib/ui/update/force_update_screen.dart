@@ -16,31 +16,8 @@ class ForceUpdateScreen extends StatefulWidget {
   State<ForceUpdateScreen> createState() => _ForceUpdateScreenState();
 }
 
-class _ForceUpdateScreenState extends State<ForceUpdateScreen> 
-    with SingleTickerProviderStateMixin {
-  
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
+class _ForceUpdateScreenState extends State<ForceUpdateScreen> {
   bool _preparingDownload = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..repeat(reverse: true);
-    
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.1).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    super.dispose();
-  }
 
   Future<void> _handleUpdate() async {
     if (!mounted) return;
@@ -98,51 +75,12 @@ class _ForceUpdateScreenState extends State<ForceUpdateScreen>
               children: [
                 const Spacer(),
 
-                // Ajith "Vilayadathing bro" Image
-                ScaleTransition(
-                  scale: _pulseAnimation,
-                  child: Hero(
-                    tag: 'force_update',
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(28),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.orange.withValues(alpha: 0.4),
-                            blurRadius: 30,
-                            spreadRadius: 5,
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(28),
-                        child: Image.asset(
-                          'assets/images/app_update_available.png',
-                          height: 280,
-                          fit: BoxFit.contain,
-                        ),
-                      ),
-                    ),
-                  ),
+                Image.asset(
+                  'assets/images/app_update_available.png',
+                  height: 240,
+                  fit: BoxFit.contain,
                 ),
-                const SizedBox(height: 40),
-
-                // Title with gradient effect
-                ShaderMask(
-                  shaderCallback: (bounds) => const LinearGradient(
-                    colors: [Colors.orange, Colors.deepOrange],
-                  ).createShader(bounds),
-                  child: Text(
-                    'Vilayadathing Bro! 🔥',
-                    style: GoogleFonts.poppins(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 32),
 
                 Text(
                   'Update Required',

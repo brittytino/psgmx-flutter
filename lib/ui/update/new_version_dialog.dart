@@ -69,7 +69,6 @@ class _NewVersionDialogWidget extends StatefulWidget {
 class _NewVersionDialogWidgetState extends State<_NewVersionDialogWidget>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
   late Animation<double> _fadeAnimation;
 
   @override
@@ -77,12 +76,7 @@ class _NewVersionDialogWidgetState extends State<_NewVersionDialogWidget>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-
-    _scaleAnimation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.elasticOut,
+      duration: const Duration(milliseconds: 600),
     );
 
     _fadeAnimation = CurvedAnimation(
@@ -137,32 +131,11 @@ class _NewVersionDialogWidgetState extends State<_NewVersionDialogWidget>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Animated Image
-                ScaleTransition(
-                  scale: _scaleAnimation,
-                  child: Hero(
-                    tag: 'new_version',
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.blue.withValues(alpha: 0.3),
-                            blurRadius: 20,
-                            spreadRadius: 2,
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(24),
-                        child: Image.asset(
-                          'assets/images/app_new_version.png',
-                          height: 200,
-                          fit: BoxFit.contain,
-                        ),
-                      ),
-                    ),
-                  ),
+                // Image — transparent PNG, no wrapper needed
+                Image.asset(
+                  'assets/images/app_new_version.png',
+                  height: 180,
+                  fit: BoxFit.contain,
                 ),
                 const SizedBox(height: 24),
 
