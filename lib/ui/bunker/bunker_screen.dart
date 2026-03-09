@@ -37,6 +37,7 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
   final TextEditingController _credPassCtrl = TextEditingController();
   bool _credObscure = true;
   bool _credSaving = false;
+  bool _showPasswordSection = false;
   bool _isLoadingAllStudents = false;
   String? _allStudentsError;
   List<_StudentAcademicEntry> _allStudents = [];
@@ -88,12 +89,17 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
   /// option themselves.
   void _onEcampusProviderUpdate() {
     if (!mounted) return;
+    final userProv = context.read<UserProvider>();
+    final user = userProv.currentUser;
+    // Don't auto-prompt while the blocked/onboarding screen is visible —
+    // the user already sees the DOB and custom-password options there.
+    if (!_isPlacementRep &&
+        user != null &&
+        user.dob == null &&
+        !user.ecampusPasswordSet) return;
     final prov = context.read<EcampusProvider>();
     if (prov.isLoginFailed && !_pwDialogShown) {
-      _showCustomPasswordDialog(
-        context.read<UserProvider>(),
-        isAutoPrompt: true,
-      );
+      _showCustomPasswordDialog(userProv, isAutoPrompt: true);
     }
   }
 
@@ -722,120 +728,315 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
                   (constraints.maxWidth * 0.07).clamp(20.0, 44.0);
               return SingleChildScrollView(
                 padding: EdgeInsets.symmetric(
-                    horizontal: hPad, vertical: 32),
+                    horizontal: hPad, vertical: 24),
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 480),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                const SizedBox(height: 24),
-                // ── Icon + heading ────────────────────────────────────────────
+                // ── Icon + heading ──────────────────────────────────────────
                 Center(
                   child: Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.primary.withValues(alpha: 0.10),
+                      color: theme.colorScheme.primary
+                          .withValues(alpha: 0.10),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.lock_person_outlined,
+                    child: Icon(Icons.school_rounded,
                         size: 48, color: theme.colorScheme.primary),
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 18),
                 Text(
                   'Connect to eCampus',
                   style: GoogleFonts.inter(
                     fontSize: 22,
                     fontWeight: FontWeight.w800,
-                    color: theme.colorScheme.onSurface,
                     letterSpacing: -0.5,
                   ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Enter your eCampus portal password to load your attendance and CGPA data.',
+                  'Link your account to view attendance,\n'
+                  'CGPA, and CA exam schedules.',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
                     fontSize: 13,
                     height: 1.5,
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.60),
+                    color: theme.colorScheme.onSurface
+                        .withValues(alpha: 0.60),
                   ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 28),
 
-                // ── Custom/changed-password field ─────────────────────────────
-                Text(
-                  'eCampus Password',
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.75),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                StatefulBuilder(
-                  builder: (ctx, setLocal) => TextField(
-                    controller: _credPassCtrl,
-                    obscureText: _credObscure,
-                    autocorrect: false,
-                    enableSuggestions: false,
-                    keyboardType: TextInputType.visiblePassword,
-                    autofillHints: const [],
-                    textInputAction: TextInputAction.done,
-                    onSubmitted: (_) => _connectWithInlinePassword(context.read<UserProvider>()),
-                    decoration: InputDecoration(
-                      hintText: 'e.g. 08jul04 or your custom password',
-                      filled: true,
-                      fillColor: isDark
-                          ? const Color(0xFF1E1E2E)
-                          : Colors.grey.shade100,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                            color: theme.colorScheme.primary, width: 2),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _credObscure
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
-                          size: 20,
-                        ),
-                        onPressed: () =>
-                            setState(() => _credObscure = !_credObscure),
-                        tooltip: _credObscure ? 'Show password' : 'Hide password',
-                      ),
+                // ── OPTION A: DOB (recommended for most students) ──────────
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? const Color(0xFF15152A)
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: theme.colorScheme.primary
+                          .withValues(alpha: 0.35),
+                      width: 1.5,
                     ),
                   ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primary,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              'FOR MOST STUDENTS',
+                              style: GoogleFonts.inter(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          Icon(Icons.edit_calendar_outlined,
+                              size: 18,
+                              color: theme.colorScheme.primary),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Use Date of Birth',
+                        style: GoogleFonts.inter(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        "If you haven't changed your eCampus password, "
+                        'your login uses your date of birth '
+                        '(e.g.\xA008jul04). Just set it below.',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          height: 1.5,
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.60),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      FilledButton.icon(
+                        onPressed: () => _showDobRequiredDialog(
+                            context.read<UserProvider>()),
+                        icon: const Icon(
+                            Icons.edit_calendar_rounded, size: 18),
+                        label: const Text('Set My Date of Birth'),
+                        style: FilledButton.styleFrom(
+                          minimumSize:
+                              const Size(double.infinity, 44),
+                          shape: RoundedRectangleBorder(
+                              borderRadius:
+                                  BorderRadius.circular(10)),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+
                 const SizedBox(height: 16),
 
-                // ── Security note ────────────────────────────────────────────
+                // ── OR divider ─────────────────────────────────────────────
+                Row(children: [
+                  const Expanded(child: Divider()),
+                  Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14),
+                    child: Text(
+                      'OR',
+                      style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.40)),
+                    ),
+                  ),
+                  const Expanded(child: Divider()),
+                ]),
+
+                const SizedBox(height: 16),
+
+                // ── OPTION B: Custom password (changed it?) ────────────────
+                if (!_showPasswordSection)
+                  OutlinedButton.icon(
+                    onPressed: () =>
+                        setState(() => _showPasswordSection = true),
+                    icon: const Icon(Icons.vpn_key_outlined, size: 18),
+                    label: const Text(
+                        'I changed my eCampus password'),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 46),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ),
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? const Color(0xFF15152A)
+                          : Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: theme.colorScheme.onSurface
+                            .withValues(alpha: 0.12),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.vpn_key_rounded,
+                              size: 18,
+                              color: theme.colorScheme.onSurface
+                                  .withValues(alpha: 0.7),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Custom Password',
+                              style: GoogleFonts.inter(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700),
+                            ),
+                            const Spacer(),
+                            IconButton(
+                              icon: const Icon(Icons.close, size: 18),
+                              onPressed: () => setState(
+                                  () => _showPasswordSection = false),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              tooltip: 'Close',
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        StatefulBuilder(
+                          builder: (ctx, setLocal) => TextField(
+                            controller: _credPassCtrl,
+                            obscureText: _credObscure,
+                            autocorrect: false,
+                            enableSuggestions: false,
+                            keyboardType:
+                                TextInputType.visiblePassword,
+                            autofillHints: const [],
+                            textInputAction: TextInputAction.done,
+                            onSubmitted: (_) =>
+                                _connectWithInlinePassword(
+                                    context.read<UserProvider>()),
+                            decoration: InputDecoration(
+                              hintText: 'Enter your eCampus password',
+                              filled: true,
+                              fillColor: isDark
+                                  ? const Color(0xFF1E1E2E)
+                                  : Colors.grey.shade50,
+                              border: OutlineInputBorder(
+                                borderRadius:
+                                    BorderRadius.circular(10),
+                                borderSide: BorderSide.none,
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius:
+                                    BorderRadius.circular(10),
+                                borderSide: BorderSide(
+                                    color: theme.colorScheme.primary,
+                                    width: 2),
+                              ),
+                              contentPadding:
+                                  const EdgeInsets.symmetric(
+                                      horizontal: 14, vertical: 12),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _credObscure
+                                      ? Icons.visibility_outlined
+                                      : Icons
+                                          .visibility_off_outlined,
+                                  size: 18,
+                                ),
+                                onPressed: () => setState(
+                                    () => _credObscure = !_credObscure),
+                                tooltip:
+                                    _credObscure ? 'Show' : 'Hide',
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            onPressed: _credSaving
+                                ? null
+                                : () => _connectWithInlinePassword(
+                                    context.read<UserProvider>()),
+                            icon: _credSaving
+                                ? const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white),
+                                  )
+                                : const Icon(Icons.link_rounded,
+                                    size: 18),
+                            label: Text(
+                              _credSaving ? 'Connecting\u2026' : 'Connect',
+                              style: GoogleFonts.inter(
+                                  fontWeight: FontWeight.w600),
+                            ),
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size.fromHeight(44),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(10)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                const SizedBox(height: 20),
+
+                // ── Security note ──────────────────────────────────────────
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withValues(alpha: 0.07),
+                    color: Colors.blue.withValues(alpha: 0.06),
                     borderRadius: BorderRadius.circular(10),
-                    border:
-                        Border.all(color: Colors.blue.withValues(alpha: 0.25)),
+                    border: Border.all(
+                        color: Colors.blue.withValues(alpha: 0.18)),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Icon(Icons.shield_outlined,
-                          color: Colors.blue, size: 16),
+                          color: Colors.blue, size: 14),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Your password is securely stored on our server and is only used to connect to eCampus portal. It is never exposed to other users or devices.',
+                          'Your credentials are stored securely and only '
+                          'used to connect to the PSG eCampus portal. '
+                          'They are never visible to other users.',
                           style: GoogleFonts.inter(
                             fontSize: 11,
                             height: 1.5,
@@ -848,74 +1049,7 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
                     ],
                   ),
                 ),
-                const SizedBox(height: 20),
-
-                // ── Connect button ───────────────────────────────────────────
-                FilledButton.icon(
-                  onPressed: _credSaving
-                      ? null
-                      : () => _connectWithInlinePassword(
-                          context.read<UserProvider>()),
-                  icon: _credSaving
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white),
-                        )
-                      : const Icon(Icons.link_rounded),
-                  label: Text(_credSaving
-                      ? 'Connecting…'
-                      : 'Connect to eCampus'),
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(50),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
                 const SizedBox(height: 24),
-
-                // ── Divider ──────────────────────────────────────────────────
-                Row(children: [
-                  const Expanded(child: Divider()),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Text('OR',
-                        style: GoogleFonts.inter(
-                            fontSize: 11,
-                            color: theme.colorScheme.onSurface
-                                .withValues(alpha: 0.40))),
-                  ),
-                  const Expanded(child: Divider()),
-                ]),
-                const SizedBox(height: 20),
-
-                // ── DOB fallback ────────────────────────────────────────────
-                OutlinedButton.icon(
-                  onPressed: () =>
-                      _showDobRequiredDialog(context.read<UserProvider>()),
-                  icon: const Icon(Icons.edit_calendar_outlined),
-                  label: const Text('Set Date of Birth instead'),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(46),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Center(
-                  child: Text(
-                    'If you never changed your eCampus password,\nyour password is your date of birth (e.g. 08jul04)',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      height: 1.5,
-                      color:
-                          theme.colorScheme.onSurface.withValues(alpha: 0.45),
-                    ),
-                  ),
-                ),
               ],
             ),
           ),
@@ -926,7 +1060,6 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
       ),
     );
     }
-
     return Scaffold(
       backgroundColor:
           isDark ? const Color(0xFF0F0F1A) : const Color(0xFFF5F5F5),
@@ -936,22 +1069,11 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
             backgroundColor:
                 isDark ? const Color(0xFF0F0F1A) : Colors.white,
             floating: true,
-            snap: true,
             pinned: true,
-            expandedHeight:
-                MediaQuery.sizeOf(context).height < 680 ? 90.0 : 116.0,
-            flexibleSpace: FlexibleSpaceBar(
-              titlePadding:
-                  const EdgeInsets.only(left: 16, bottom: 16),
-              title: Text(
-                'Academic Insights',
-                style: GoogleFonts.inter(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w800,
-                  color: isDark ? Colors.white : Colors.black87,
-                  letterSpacing: -0.5,
-                ),
-              ),
+            forceElevated: innerBoxIsScrolled,
+            title: Text(
+              'Academic Insights',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
             ),
             actions: [
               Consumer<UserProvider>(
@@ -1005,15 +1127,27 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
           controller: _tabController,
           children: _isPlacementRep
               ? [
-                  const _AttendanceTab(),
-                  const _CgpaTab(),
+                  _AttendanceTab(
+                    onUpdatePassword: () => _showCustomPasswordDialog(
+                        context.read<UserProvider>()),
+                  ),
+                  _CgpaTab(
+                    onUpdatePassword: () => _showCustomPasswordDialog(
+                        context.read<UserProvider>()),
+                  ),
                   const _CaTestTab(),
                   _buildAllStudentsReportTab(context, isDark, theme),
                 ]
-              : const [
-                  _AttendanceTab(),
-                  _CgpaTab(),
-                  _CaTestTab(),
+              : [
+                  _AttendanceTab(
+                    onUpdatePassword: () => _showCustomPasswordDialog(
+                        context.read<UserProvider>()),
+                  ),
+                  _CgpaTab(
+                    onUpdatePassword: () => _showCustomPasswordDialog(
+                        context.read<UserProvider>()),
+                  ),
+                  const _CaTestTab(),
                 ],
         ),
       ),
@@ -1655,7 +1789,8 @@ class _BatchTile extends StatelessWidget {
 // ─── Attendance Tab ──────────────────────────────────────────────────────────
 
 class _AttendanceTab extends StatelessWidget {
-  const _AttendanceTab();
+  final VoidCallback? onUpdatePassword;
+  const _AttendanceTab({this.onUpdatePassword});
 
   @override
   Widget build(BuildContext context) {
@@ -1666,11 +1801,18 @@ class _AttendanceTab extends StatelessWidget {
         }
 
         if (prov.status == EcampusStatus.error) {
+          final rollno =
+              context.read<UserProvider>().currentUser?.regNo ?? '';
+          if (prov.isLoginFailed) {
+            return _PasswordErrorView(
+              message: prov.errorMessage ?? 'eCampus login failed.',
+              onUpdatePassword: onUpdatePassword,
+              onRetry: () => context.read<EcampusProvider>().init(rollno),
+            );
+          }
           return _ErrorView(
             message: prov.errorMessage ?? 'Something went wrong',
-            onRetry: () => context
-                .read<EcampusProvider>()
-                .init(context.read<UserProvider>().currentUser?.regNo ?? ''),
+            onRetry: () => context.read<EcampusProvider>().init(rollno),
           );
         }
 
@@ -1929,7 +2071,8 @@ class _SummaryChip extends StatelessWidget {
 // ─── CGPA Tab ─────────────────────────────────────────────────────────────────
 
 class _CgpaTab extends StatelessWidget {
-  const _CgpaTab();
+  final VoidCallback? onUpdatePassword;
+  const _CgpaTab({this.onUpdatePassword});
 
   @override
   Widget build(BuildContext context) {
@@ -1940,11 +2083,18 @@ class _CgpaTab extends StatelessWidget {
         }
 
         if (prov.status == EcampusStatus.error) {
+          final rollno =
+              context.read<UserProvider>().currentUser?.regNo ?? '';
+          if (prov.isLoginFailed) {
+            return _PasswordErrorView(
+              message: prov.errorMessage ?? 'eCampus login failed.',
+              onUpdatePassword: onUpdatePassword,
+              onRetry: () => context.read<EcampusProvider>().init(rollno),
+            );
+          }
           return _ErrorView(
             message: prov.errorMessage ?? 'Something went wrong',
-            onRetry: () =>
-                context.read<EcampusProvider>().init(
-                    context.read<UserProvider>().currentUser?.regNo ?? ''),
+            onRetry: () => context.read<EcampusProvider>().init(rollno),
           );
         }
 
@@ -2485,6 +2635,96 @@ class _EmptyView extends StatelessWidget {
   }
 }
 
+/// Shown when the error is specifically a login failure (wrong / outdated
+/// eCampus password).  Surfaces a prominent "Update Password" CTA so the
+/// student can fix the issue inline without navigating to Profile.
+class _PasswordErrorView extends StatelessWidget {
+  final String message;
+  final VoidCallback? onUpdatePassword;
+  final VoidCallback onRetry;
+
+  const _PasswordErrorView({
+    required this.message,
+    required this.onRetry,
+    this.onUpdatePassword,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color:
+                    Colors.orange.withValues(alpha: isDark ? 0.15 : 0.10),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.lock_outline_rounded,
+                  size: 48, color: Colors.orange),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'eCampus Login Failed',
+              style: GoogleFonts.inter(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: theme.colorScheme.onSurface,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                height: 1.55,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.60),
+              ),
+            ),
+            const SizedBox(height: 28),
+            if (onUpdatePassword != null)
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: onUpdatePassword,
+                  icon: const Icon(Icons.vpn_key_rounded, size: 18),
+                  label: Text(
+                    'Update eCampus Password',
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                  ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(48),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            const SizedBox(height: 10),
+            TextButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded, size: 16),
+              label: Text(
+                'Try Again',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ErrorView extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
@@ -2744,7 +2984,7 @@ class _CaTimetableSection extends StatelessWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

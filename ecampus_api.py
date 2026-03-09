@@ -1086,6 +1086,21 @@ def sync_user(
         att_data, cgpa_data, ca_data, tt_data = _sync_single_rollno(rollno, password)
     except Exception as exc:
         log.error(f"[sync] Login/sync failed for {rollno}: {exc}")
+        error_str = str(exc).lower()
+        is_login_failure = (
+            "login may have failed" in error_str
+            or "attendance table not found" in error_str
+            or "login failed" in error_str
+        )
+        if is_login_failure:
+            # Return 422 (not retryable) so the Flutter client can detect
+            # this as a credential error and prompt for a password update.
+            raise HTTPException(
+                status_code=422,
+                detail="login_failed: eCampus portal login failed. "
+                       "Your password may have changed. "
+                       "Please update your eCampus password in the app.",
+            )
         raise HTTPException(status_code=502, detail=f"eCampus sync failed: {exc}")
 
     log.info(f"[sync] {rollno} – data stored ✔")

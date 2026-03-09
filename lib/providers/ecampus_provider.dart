@@ -179,9 +179,12 @@ class EcampusProvider extends ChangeNotifier {
         lower.contains('attendance table not found') ||
         lower.contains('login may have failed') ||
         lower.contains('login failed') ||
+        lower.contains('password may have changed') ||
+        lower.contains('portal password') ||
         lower.contains('password') ||
         lower.contains('unauthorized') ||
-        lower.contains('401');
+        lower.contains('401') ||
+        lower.contains('422');
     debugPrint('[EcampusProvider] $msg (loginFailed=$_isLoginFailed)');
     notifyListeners();
   }
@@ -194,8 +197,11 @@ class EcampusProvider extends ChangeNotifier {
     if (text.contains('attendance table not found')) {
       return 'Unable to read attendance from the academic portal right now. Please try again later.';
     }
-    if (text.contains('login may have failed') || text.contains('login failed')) {
-      return 'Academic portal login failed. Verify your DOB is set correctly and try again later.';
+    if (text.contains('login may have failed') || text.contains('login failed') ||
+        text.contains('portal password may have changed')) {
+      return 'Academic portal login failed. '
+          'If you changed your eCampus password, update it via the Academic Insights screen. '
+          'Otherwise, verify your date of birth is set correctly.';
     }
     if (text.contains('failed to load data')) {
       return 'Unable to load academic data right now. Please try again.';

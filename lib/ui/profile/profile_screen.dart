@@ -452,15 +452,28 @@ class ProfileScreen extends StatelessWidget {
     if (currentlySet && result.trim().isEmpty) return;
 
     try {
-      await provider.updateEcampusPassword(
-          result.trim().isEmpty ? null : result.trim());
+      final newPassword = result.trim().isEmpty ? null : result.trim();
+      await provider.updateEcampusPassword(newPassword);
+
+      // Trigger a fresh eCampus sync so data is fetched with the updated
+      // credential immediately – no need for the user to visit Academic
+      // Insights manually.
+      if (newPassword != null && context.mounted) {
+        final rollno = provider.currentUser?.regNo;
+        if (rollno != null && rollno.isNotEmpty) {
+          context
+              .read<EcampusProvider>()
+              .syncAfterCredentialUpdate(rollno);
+        }
+      }
+
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               result.trim().isEmpty
                   ? 'eCampus password cleared. Using DOB-based default.'
-                  : 'Custom eCampus password saved.',
+                  : 'Custom eCampus password saved. Syncing data…',
             ),
             behavior: SnackBarBehavior.floating,
           ),

@@ -86,6 +86,14 @@ class EcampusService {
         ? detail
         : response.body.toString();
 
+    // 422 with 'login_failed:' prefix means the eCampus portal rejected the
+    // student's password.  Must be checked BEFORE the retryable-status block
+    // so it is never masked as a generic "server waking up" message.
+    if (response.statusCode == 422 && raw.startsWith('login_failed:')) {
+      return 'eCampus login failed – your portal password may have changed. '
+          'Please update your eCampus password in Academic Insights.';
+    }
+
     if (_isColdStartMessage(raw) || _isRetryableStatus(response.statusCode)) {
       return 'Server is waking up. Please wait a few seconds and try again.';
     }
