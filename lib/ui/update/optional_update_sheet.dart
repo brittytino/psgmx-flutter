@@ -19,7 +19,13 @@ class OptionalUpdateSheet extends StatefulWidget {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       isDismissible: true,
-      builder: (_) => const OptionalUpdateSheet(),
+      builder: (_) => const Align(
+        alignment: Alignment.bottomCenter,
+        child: FractionallySizedBox(
+          widthFactor: 0.88,
+          child: OptionalUpdateSheet(),
+        ),
+      ),
     );
   }
 
@@ -64,20 +70,22 @@ class _OptionalUpdateSheetState extends State<OptionalUpdateSheet> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
+      margin: const EdgeInsets.only(bottom: 24),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E2E) : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        borderRadius: BorderRadius.circular(32),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 30,
-            offset: const Offset(0, -10),
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 40,
+            spreadRadius: 0,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [

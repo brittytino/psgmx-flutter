@@ -96,7 +96,9 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
     if (!_isPlacementRep &&
         user != null &&
         user.dob == null &&
-        !user.ecampusPasswordSet) return;
+        !user.ecampusPasswordSet) {
+      return;
+    }
     final prov = context.read<EcampusProvider>();
     if (prov.isLoginFailed && !_pwDialogShown) {
       _showCustomPasswordDialog(userProv, isAutoPrompt: true);

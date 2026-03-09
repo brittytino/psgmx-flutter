@@ -1218,11 +1218,11 @@ class _TeamAnalysisDialogState extends State<_TeamAnalysisDialog> {
       int result;
       switch (_sortBy) {
         case 'percentage':
-          result = (a['team_attendance_percentage'] as double)
-              .compareTo(b['team_attendance_percentage'] as double);
+          result = ((a['team_attendance_percentage'] as num).toDouble())
+              .compareTo((b['team_attendance_percentage'] as num).toDouble());
           break;
         case 'size':
-          result = (a['team_size'] as int).compareTo(b['team_size'] as int);
+          result = (a['team_size'] as num).toInt().compareTo((b['team_size'] as num).toInt());
           break;
         default:
           result = (a['team_id'] as String).compareTo(b['team_id'] as String);
@@ -1245,7 +1245,7 @@ class _TeamAnalysisDialogState extends State<_TeamAnalysisDialog> {
     for (var i = 0; i < _sortedTeams.length; i++) {
       final team = _sortedTeams[i];
       final percentage =
-          (team['team_attendance_percentage'] as double).toStringAsFixed(1);
+          (team['team_attendance_percentage'] as num).toDouble().toStringAsFixed(1);
       buffer.writeln('${i + 1}. ${team['team_id']}');
       buffer.writeln('   Batch: ${team['batch']}');
       buffer.writeln('   Members: ${team['team_size']}');
@@ -1412,7 +1412,7 @@ class _TeamAnalysisDialogState extends State<_TeamAnalysisDialog> {
                       itemBuilder: (context, index) {
                         final team = _sortedTeams[index];
                         final percentage =
-                            (team['team_attendance_percentage'] as double);
+                            (team['team_attendance_percentage'] as num).toDouble();
                         final isGood = percentage >= 75;
                         final color = isGood ? Colors.green : Colors.red;
 

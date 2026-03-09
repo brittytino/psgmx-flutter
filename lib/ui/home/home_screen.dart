@@ -48,7 +48,6 @@ class _HomeScreenState extends State<HomeScreen> with UpdateCheckMixin {
       _refreshAll();
       NotificationService().init(); // Ensure notification init
       NotificationService().requestPermissions();
-      _checkAttendancePopup();
       _checkWeeklyTopPerformer(); // C1: Weekly top performer check
       _setupDailyReminders(); // Setup all scheduled reminders
     });

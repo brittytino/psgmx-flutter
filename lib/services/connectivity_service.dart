@@ -14,9 +14,12 @@ class ConnectivityService {
   Stream<bool> get connectionChange => _connectionChangeController.stream;
 
   bool _hasConnection = true;
+  bool _isInited = false;
   bool get hasConnection => _hasConnection;
 
   void init() {
+    if (_isInited) return;
+    _isInited = true;
     _connectivity.onConnectivityChanged.listen(_connectionChange);
     checkConnection();
   }

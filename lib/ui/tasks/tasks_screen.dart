@@ -1879,7 +1879,9 @@ class _TeamVerificationViewState extends State<_TeamVerificationView> {
                                             ? Colors.green.withValues(alpha: 0.1)
                                             : Colors.grey.withValues(alpha: 0.1),
                                         child: Text(
-                                          (member['name'] as String)[0].toUpperCase(),
+                                          ((member['name'] as String?) ?? '?').isNotEmpty
+                                              ? ((member['name'] as String?) ?? '?')[0].toUpperCase()
+                                              : '?',
                                           style: TextStyle(
                                             color: isCompleted ? Colors.green : Colors.grey,
                                             fontWeight: FontWeight.bold,
