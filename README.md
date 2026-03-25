@@ -8,7 +8,7 @@
   
   <br>
 
-  [![Version](https://img.shields.io/badge/version-2.2.8-blue.svg)](pubspec.yaml)
+  [![Version](https://img.shields.io/badge/version-3.1.5-blue.svg)](pubspec.yaml)
   [![Flutter](https://img.shields.io/badge/Flutter-3.27+-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
   [![Supabase](https://img.shields.io/badge/Supabase-Production-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com)
   [![Firebase](https://img.shields.io/badge/Hosting-Firebase-FFCA28?logo=firebase&logoColor=white)](https://firebase.google.com)
