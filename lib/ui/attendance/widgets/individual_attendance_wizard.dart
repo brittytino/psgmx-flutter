@@ -5,6 +5,14 @@ import 'package:intl/intl.dart';
 import '../../../core/theme/app_dimens.dart';
 import '../../../models/attendance.dart';
 import '../../../services/attendance_service.dart';
+import '../../../services/attendance_schedule_service.dart';
+
+enum _DateQuickFilter {
+  all,
+  recent30,
+  recent90,
+  thisYear,
+}
 
 class IndividualAttendanceWizard extends StatefulWidget {
   final List<AttendanceSummary> allStudents;
@@ -24,6 +32,7 @@ class IndividualAttendanceWizard extends StatefulWidget {
 class _IndividualAttendanceWizardState
     extends State<IndividualAttendanceWizard> {
   final AttendanceService _attendanceService = AttendanceService();
+  final AttendanceScheduleService _scheduleService = AttendanceScheduleService();
   final TextEditingController _searchController = TextEditingController();
 
   final Set<String> _selectedStudentIds = <String>{};
@@ -36,6 +45,7 @@ class _IndividualAttendanceWizardState
   bool _isSaving = false;
   bool _isLoadingDates = true;
   String? _errorMessage;
+  _DateQuickFilter _dateQuickFilter = _DateQuickFilter.all;
 
   late final Map<String, String?> _studentTeamMap = {
     for (final student in widget.allStudents) student.studentId: student.teamId,
@@ -49,17 +59,16 @@ class _IndividualAttendanceWizardState
 
   Future<void> _loadAvailableDates() async {
     try {
-      final now = DateTime.now();
-      final startDate = now.subtract(const Duration(days: 30));
-
-      final days = await _attendanceService.getWorkingDaysWithinRange(
-        startDate: startDate,
-        endDate: now,
-      );
+      final scheduledDates = await _scheduleService.getScheduledDates();
+      final days = scheduledDates
+          .map((date) => DateTime(date.date.year, date.date.month, date.date.day))
+          .toSet()
+          .toList()
+        ..sort((a, b) => b.compareTo(a));
 
       if (mounted) {
         setState(() {
-          _availableClassDays = days.reversed.toList(); // Newest first
+          _availableClassDays = days;
           _isLoadingDates = false;
         });
         
@@ -382,6 +391,13 @@ class _IndividualAttendanceWizardState
   }
 
   Widget _buildDateRangeStep() {
+    final visibleDays = _visibleClassDays;
+    final selectedVisibleCount = visibleDays
+        .where((date) => _selectedDates.any((d) => _isSameDay(d, date)))
+        .length;
+    final allVisibleSelected =
+        visibleDays.isNotEmpty && selectedVisibleCount == visibleDays.length;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -427,7 +443,7 @@ class _IndividualAttendanceWizardState
                       ),
                     ),
                     Text(
-                      'Tap items to select',
+                      '${visibleDays.length} visible • ${_availableClassDays.length} total scheduled',
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         color: Colors.grey[600],
@@ -451,6 +467,19 @@ class _IndividualAttendanceWizardState
 
         const SizedBox(height: AppSpacing.lg),
 
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _buildDateFilterChip(_DateQuickFilter.all, 'All'),
+            _buildDateFilterChip(_DateQuickFilter.recent30, 'Last 30d'),
+            _buildDateFilterChip(_DateQuickFilter.recent90, 'Last 90d'),
+            _buildDateFilterChip(_DateQuickFilter.thisYear, 'This Year'),
+          ],
+        ),
+
+        const SizedBox(height: AppSpacing.md),
+
         // Header + Actions
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -465,21 +494,24 @@ class _IndividualAttendanceWizardState
             TextButton.icon(
               onPressed: () {
                 setState(() {
-                  if (_selectedDates.length == _availableClassDays.length) {
-                    _selectedDates.clear();
+                  if (allVisibleSelected) {
+                    _selectedDates.removeWhere(
+                      (selected) =>
+                          visibleDays.any((visible) => _isSameDay(visible, selected)),
+                    );
                   } else {
-                    _selectedDates.addAll(_availableClassDays);
+                    _selectedDates.addAll(visibleDays);
                   }
                 });
               },
               icon: Icon(
-                _selectedDates.length == _availableClassDays.length
+                allVisibleSelected
                     ? Icons.deselect
                     : Icons.select_all,
                 size: 18,
               ),
               label: Text(
-                _selectedDates.length == _availableClassDays.length
+                allVisibleSelected
                     ? 'Deselect All'
                     : 'Select All',
                 style: GoogleFonts.inter(fontWeight: FontWeight.w600),
@@ -511,6 +543,25 @@ class _IndividualAttendanceWizardState
               ),
             ),
           )
+        else if (visibleDays.isEmpty)
+          Expanded(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.filter_alt_off, size: 48, color: Colors.grey[300]),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No scheduled dates for this filter',
+                    style: GoogleFonts.inter(
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
         else
           Expanded(
             child: GridView.builder(
@@ -521,9 +572,9 @@ class _IndividualAttendanceWizardState
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
               ),
-              itemCount: _availableClassDays.length,
+              itemCount: visibleDays.length,
               itemBuilder: (context, index) {
-                final date = _availableClassDays[index];
+                final date = visibleDays[index];
                 final isSelected =
                     _selectedDates.any((d) => _isSameDay(d, date));
                 final isToday = _isSameDay(date, DateTime.now());
@@ -1060,6 +1111,44 @@ class _IndividualAttendanceWizardState
 
   bool _isSameDay(DateTime a, DateTime b) {
     return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  List<DateTime> get _visibleClassDays {
+    if (_availableClassDays.isEmpty) return const [];
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final DateTime? cutoff = switch (_dateQuickFilter) {
+      _DateQuickFilter.all => null,
+      _DateQuickFilter.recent30 => today.subtract(const Duration(days: 30)),
+      _DateQuickFilter.recent90 => today.subtract(const Duration(days: 90)),
+      _DateQuickFilter.thisYear => DateTime(today.year, 1, 1),
+    };
+
+    final filtered = _availableClassDays.where((day) {
+      if (cutoff == null) return true;
+      return !day.isBefore(cutoff);
+    }).toList();
+
+    filtered.sort((a, b) => b.compareTo(a));
+    return filtered;
+  }
+
+  Widget _buildDateFilterChip(_DateQuickFilter filter, String label) {
+    final isSelected = _dateQuickFilter == filter;
+    return ChoiceChip(
+      selected: isSelected,
+      label: Text(label),
+      onSelected: (_) {
+        setState(() {
+          _dateQuickFilter = filter;
+        });
+      },
+      labelStyle: GoogleFonts.inter(
+        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+      ),
+      visualDensity: VisualDensity.compact,
+    );
   }
 
   Future<void> _handleSave() async {

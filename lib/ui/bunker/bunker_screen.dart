@@ -25,6 +25,7 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
   late TabController _tabController;
   bool _syncAllInProgress = false;
   bool _dobDialogShown = false;
+  bool _setupReminderShown = false;
   /// Prevents double-showing the custom-password dialog when the provider
   /// emits multiple [isLoginFailed] notifications in quick succession.
   bool _pwDialogShown = false;
@@ -72,6 +73,17 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
         return;
       }
 
+      final ecampusProv = context.read<EcampusProvider>();
+      final shouldRemindDob = user.dob == null;
+      final shouldRemindPassword = ecampusProv.isLoginFailed;
+      if (shouldRemindDob || shouldRemindPassword) {
+        _showAcademicSetupReminder(
+          userProvider,
+          missingDob: shouldRemindDob,
+          loginFailed: shouldRemindPassword,
+        );
+      }
+
     });
 
     // Watch EcampusProvider for login failures and surface the password dialog.
@@ -100,9 +112,196 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
       return;
     }
     final prov = context.read<EcampusProvider>();
+    if (user != null && (user.dob == null || prov.isLoginFailed)) {
+      _showAcademicSetupReminder(
+        userProv,
+        missingDob: user.dob == null,
+        loginFailed: prov.isLoginFailed,
+      );
+    }
     if (prov.isLoginFailed && !_pwDialogShown) {
       _showCustomPasswordDialog(userProv, isAutoPrompt: true);
     }
+  }
+
+  Future<void> _showAcademicSetupReminder(
+    UserProvider userProvider, {
+    required bool missingDob,
+    required bool loginFailed,
+  }) async {
+    if (!mounted || _setupReminderShown || _isPlacementRep) return;
+    _setupReminderShown = true;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        final isDark = theme.brightness == Brightness.dark;
+        return Container(
+          margin: const EdgeInsets.all(12),
+          padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.12),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.outline.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.tips_and_updates_outlined,
+                      size: 18,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Academic Setup Reminder',
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Complete the items below for smooth attendance and CGPA sync.',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                ),
+              ),
+              const SizedBox(height: 14),
+              if (missingDob)
+                _buildReminderTile(
+                  ctx,
+                  icon: Icons.cake_outlined,
+                  title: 'Date of birth not set',
+                  subtitle: 'Required for default eCampus login format.',
+                  buttonText: 'Set DOB',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showDobRequiredDialog(userProvider);
+                  },
+                ),
+              if (missingDob && loginFailed) const SizedBox(height: 10),
+              if (loginFailed)
+                _buildReminderTile(
+                  ctx,
+                  icon: Icons.vpn_key_outlined,
+                  title: 'eCampus password update needed',
+                  subtitle: 'We could not login with your current credentials.',
+                  buttonText: 'Update Password',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showCustomPasswordDialog(userProvider, isAutoPrompt: true);
+                  },
+                ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Remind me later'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    _setupReminderShown = false;
+  }
+
+  Widget _buildReminderTile(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required String buttonText,
+    required VoidCallback onTap,
+  }) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: theme.colorScheme.outline.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: theme.colorScheme.primary, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          FilledButton(
+            onPressed: onTap,
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              visualDensity: VisualDensity.compact,
+            ),
+            child: Text(buttonText),
+          ),
+        ],
+      ),
+    );
   }
 
   double? _asDouble(dynamic value) {
@@ -1102,25 +1301,30 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
               // 4 tabs for placement rep can overflow on narrow phones
               isScrollable: _isPlacementRep,
               tabAlignment: _isPlacementRep
-                  ? TabAlignment.start
+                  ? TabAlignment.center
                   : TabAlignment.fill,
               labelColor: theme.colorScheme.primary,
               unselectedLabelColor:
                   isDark ? Colors.white54 : Colors.black45,
               indicatorColor: theme.colorScheme.primary,
+              indicatorWeight: 2.8,
+              labelPadding: EdgeInsets.symmetric(
+                horizontal: _isPlacementRep ? 10 : 6,
+              ),
               labelStyle: GoogleFonts.inter(
                   fontWeight: FontWeight.w600, fontSize: 13),
+              dividerColor: Colors.transparent,
               tabs: _isPlacementRep
-                  ? const [
-                      Tab(text: 'Attendance'),
-                      Tab(text: 'CGPA'),
-                      Tab(text: 'CA Timetable'),
-                      Tab(text: 'All Students'),
+                  ? [
+                      _buildHeaderTab(Icons.auto_graph_rounded, 'Academics'),
+                      _buildHeaderTab(Icons.workspace_premium_outlined, 'CGPA'),
+                      _buildHeaderTab(Icons.event_note_rounded, 'CA Timetable'),
+                      _buildHeaderTab(Icons.groups_2_outlined, 'All Students'),
                     ]
-                  : const [
-                      Tab(text: 'Attendance'),
-                      Tab(text: 'CGPA'),
-                      Tab(text: 'CA Timetable'),
+                  : [
+                      _buildHeaderTab(Icons.auto_graph_rounded, 'Academics'),
+                      _buildHeaderTab(Icons.workspace_premium_outlined, 'CGPA'),
+                      _buildHeaderTab(Icons.event_note_rounded, 'CA Timetable'),
                     ],
             ),
           ),
@@ -1152,6 +1356,20 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
                   const _CaTestTab(),
                 ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildHeaderTab(IconData icon, String label) {
+    return Tab(
+      height: 48,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 17),
+          const SizedBox(width: 6),
+          Text(label),
+        ],
       ),
     );
   }
