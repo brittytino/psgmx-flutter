@@ -1406,6 +1406,9 @@ class _OverallAttendanceTabState extends State<_OverallAttendanceTab> {
     if (result.skippedCount > 0) {
       buffer.write(' • ${result.skippedCount} already up-to-date');
     }
+    if (result.skippedInvalidCount > 0) {
+      buffer.write(' • ${result.skippedInvalidCount} skipped (not registered)');
+    }
     if (result.failures.isNotEmpty) {
       buffer.write(' • ${result.failures.length} failed');
     }

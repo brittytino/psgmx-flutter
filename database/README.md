@@ -111,15 +111,20 @@ View created: `v_ecampus_attendance_summary`
 ---
 ### Step 7 — Bulk Onboard Users (`07_bulk_onboard_users.sql`) ⚡ CRITICAL
 
-Pre-creates all 123 students in `auth.users` so they can LOGIN via OTP (not signup).
+Pre-creates all 123 students in `auth.users` and repairs missing `public.users` rows so attendance features work for every student.
 **Without this, you'll get "Signups not allowed for otp" errors.**
 
 1. Open `database/07_bulk_onboard_users.sql`
 2. Copy → paste into a **new SQL Editor tab** → click **Run**
-3. ✅ Success notice: `BULK ONBOARDING COMPLETE` — `Auth users created: 123`
+3. Success notice includes verification counts for:
+    - `Whitelist students`
+    - `auth.users matched`
+    - `public.users matched`
+    - `Missing in auth.users`
+    - `Missing in public.users`
 
-> The `handle_new_user` trigger automatically creates `public.users` rows.
-> After this, all 123 students can login via OTP immediately.
+> The script also backfills `public.users` if trigger-created rows are missing.
+> After this, all whitelist students should be fully attendance-ready.
 
 ---
 ### Step 8 — Bunked Subject Cache (`08_ecampus_bunked_schema.sql`)

@@ -12,6 +12,7 @@
   [![Flutter](https://img.shields.io/badge/Flutter-3.27+-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
   [![Supabase](https://img.shields.io/badge/Supabase-Production-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com)
   [![Firebase](https://img.shields.io/badge/Hosting-Firebase-FFCA28?logo=firebase&logoColor=white)](https://firebase.google.com)
+  [![Downloads](https://img.shields.io/github/downloads/brittytino/psgmx-flutter/total?label=Downloads&color=2ea44f)](https://github.com/brittytino/psgmx-flutter/releases)
   [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
   [![Platform](https://img.shields.io/badge/Platform-Web%20|%20Android-lightgrey)](#)
 

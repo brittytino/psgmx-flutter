@@ -6,6 +6,9 @@ import '../models/audit_log.dart';
 
 class AttendanceService {
   final SupabaseClient _supabase = Supabase.instance.client;
+  static final RegExp _uuidRegex = RegExp(
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+  );
 
   // ========================================
   // WORKING DAY MANAGEMENT
@@ -573,9 +576,22 @@ class AttendanceService {
     try {
       if (records.isEmpty) return;
 
+      final validRecords = <Map<String, dynamic>>[];
+      for (final record in records) {
+        final userId = record['user_id']?.toString();
+        if (userId == null || !_uuidRegex.hasMatch(userId)) {
+          continue;
+        }
+        validRecords.add(record);
+      }
+
+      if (validRecords.isEmpty) {
+        throw Exception('No valid registered students found in attendance selection.');
+      }
+
       // Use upsert to insert or update based on user_id + date
       await _supabase.from('attendance_records').upsert(
-            records,
+            validRecords,
             onConflict: 'user_id,date',
           );
     } catch (e) {
@@ -605,6 +621,13 @@ class AttendanceService {
     }
 
     final totalRequests = uniqueStudents.length * uniqueDates.length;
+    final validStudents = uniqueStudents.where((id) => _uuidRegex.hasMatch(id)).toList();
+    final skippedInvalidCount = (uniqueStudents.length - validStudents.length) * uniqueDates.length;
+
+    if (validStudents.isEmpty) {
+      throw Exception('No valid registered students selected.');
+    }
+
     final dateStrings = uniqueDates
         .map((date) => date.toIso8601String().split('T')[0])
         .toList();
@@ -612,7 +635,7 @@ class AttendanceService {
     final existingResponse = await _supabase
         .from('attendance_records')
         .select('user_id, date, status')
-        .inFilter('user_id', uniqueStudents)
+      .inFilter('user_id', validStudents)
         .inFilter('date', dateStrings);
 
     final existingMap = <String, String>{};
@@ -624,7 +647,7 @@ class AttendanceService {
     final candidates = <_AttendanceWriteCandidate>[];
     var skippedCount = 0;
 
-    for (final studentId in uniqueStudents) {
+    for (final studentId in validStudents) {
       final teamId = studentTeamMap[studentId] ?? '';
       for (final date in uniqueDates) {
         final dateKey = date.toIso8601String().split('T')[0];
@@ -694,6 +717,7 @@ class AttendanceService {
       totalRequests: totalRequests,
       savedCount: appliedRecords.length,
       skippedCount: skippedCount,
+      skippedInvalidCount: skippedInvalidCount,
       failures: failures,
       appliedRecords: appliedRecords,
     );
@@ -767,6 +791,7 @@ class AttendanceMarkingResult {
   final int totalRequests;
   final int savedCount;
   final int skippedCount;
+  final int skippedInvalidCount;
   final List<AttendanceFailure> failures;
   final List<AttendanceAppliedRecord> appliedRecords;
 
@@ -774,6 +799,7 @@ class AttendanceMarkingResult {
     required this.totalRequests,
     required this.savedCount,
     required this.skippedCount,
+    this.skippedInvalidCount = 0,
     required this.failures,
     required this.appliedRecords,
   });

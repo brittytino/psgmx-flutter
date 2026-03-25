@@ -4,6 +4,7 @@ import '../services/supabase_service.dart';
 
 class AttendanceProvider extends ChangeNotifier {
   final SupabaseService _supabaseService;
+  final Map<String, String> _emailToUid = {};
   
   List<AppUser> _teamMembers = [];
   List<AppUser> get teamMembers => _teamMembers;
@@ -70,6 +71,9 @@ class AttendanceProvider extends ChangeNotifier {
       final Map<String, String> emailToUid = {
         for (var u in usersResponse as List) u['email'] as String: u['id'] as String
       };
+      _emailToUid
+        ..clear()
+        ..addAll(emailToUid);
 
       // 3. Merge
       _teamMembers = whitelistStudents.map((e) {
@@ -127,6 +131,9 @@ class AttendanceProvider extends ChangeNotifier {
       final Map<String, String> emailToUid = {
         for (var u in usersResponse as List) u['email'] as String: u['id'] as String
       };
+      _emailToUid
+        ..clear()
+        ..addAll(emailToUid);
 
       // 3. Merge
       _teamMembers = whitelistStudents.map((e) {
@@ -183,6 +190,7 @@ class AttendanceProvider extends ChangeNotifier {
     if (user == null) throw Exception('User not authenticated');
 
     final List<Map<String, dynamic>> rows = [];
+    final List<String> skippedUnregistered = [];
 
     // UUID regex pattern
     final uuidRegex = RegExp(
@@ -207,31 +215,37 @@ class AttendanceProvider extends ChangeNotifier {
       );
       final studentTeamId = student.teamId ?? teamId ?? 'ALL';
 
-      // Accept both UUIDs (registered) and emails (unregistered from whitelist)
+      String? resolvedUserId;
       if (uuidRegex.hasMatch(studentIdOrEmail)) {
-        // Registered user with proper UUID
-        rows.add({
-          'date': dateStr,
-          'user_id': studentIdOrEmail,
-          'team_id': studentTeamId,
-          'status': status,
-          'marked_by': user.id,
-        });
-      } else if (studentIdOrEmail.contains('@')) {
-        // Unregistered student from whitelist - use email as identifier
-        // The database will handle this via the attendance view which joins with whitelist
-        rows.add({
-          'date': dateStr,
-          'user_id': studentIdOrEmail, // Email as fallback identifier
-          'team_id': studentTeamId,
-          'status': status,
-          'marked_by': user.id,
-        });
+        resolvedUserId = studentIdOrEmail;
+      } else {
+        resolvedUserId = _emailToUid[student.email];
       }
+
+      // Skip whitelist-only members who have not completed registration yet.
+      if (resolvedUserId == null) {
+        skippedUnregistered.add(
+          student.name.isNotEmpty ? student.name : student.email,
+        );
+        continue;
+      }
+
+      rows.add({
+        'date': dateStr,
+        'user_id': resolvedUserId,
+        'team_id': studentTeamId,
+        'status': status,
+        'marked_by': user.id,
+      });
     }
 
     if (rows.isEmpty) {
-      throw Exception("No valid students to mark attendance for.");
+      if (skippedUnregistered.isNotEmpty) {
+        throw Exception(
+          'No registered students available to mark attendance. ${skippedUnregistered.length} selected students are not registered yet.',
+        );
+      }
+      throw Exception('No valid students to mark attendance for.');
     }
 
     // Upsert on (date, user_id) conflict — safe for both first-mark and updates
@@ -245,5 +259,10 @@ class AttendanceProvider extends ChangeNotifier {
     notifyListeners();
 
     debugPrint('[Attendance] Successfully marked attendance for ${rows.length} students');
+    if (skippedUnregistered.isNotEmpty) {
+      debugPrint(
+        '[Attendance] Skipped ${skippedUnregistered.length} unregistered students during submission',
+      );
+    }
   }
 }
