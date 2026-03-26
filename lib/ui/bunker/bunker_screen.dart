@@ -26,6 +26,7 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
   bool _syncAllInProgress = false;
   bool _dobDialogShown = false;
   bool _setupReminderShown = false;
+
   /// Prevents double-showing the custom-password dialog when the provider
   /// emits multiple [isLoginFailed] notifications in quick succession.
   bool _pwDialogShown = false;
@@ -50,7 +51,8 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
   void initState() {
     super.initState();
     _isPlacementRep = context.read<UserProvider>().isActualPlacementRep;
-    _tabController = TabController(length: _isPlacementRep ? 4 : 3, vsync: this);
+    _tabController =
+        TabController(length: _isPlacementRep ? 4 : 3, vsync: this);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final userProvider = context.read<UserProvider>();
@@ -83,7 +85,6 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
           loginFailed: shouldRemindPassword,
         );
       }
-
     });
 
     // Watch EcampusProvider for login failures and surface the password dialog.
@@ -258,7 +259,8 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+        color:
+            theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: theme.colorScheme.outline.withValues(alpha: 0.2),
@@ -339,22 +341,21 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
           .select('reg_no, name, dob, batch')
           .order('reg_no');
 
-        final usersResponse =
-          await supabase.from('users').select('reg_no, dob');
+      final usersResponse = await supabase.from('users').select('reg_no, dob');
 
       final attendanceResponse = await supabase
           .from('ecampus_attendance')
           .select('reg_no, data, synced_at');
 
-      final cgpaResponse = await supabase
-          .from('ecampus_cgpa')
-          .select('reg_no, data, synced_at');
+      final cgpaResponse =
+          await supabase.from('ecampus_cgpa').select('reg_no, data, synced_at');
 
       final attendanceMap = <String, Map<String, dynamic>>{};
       for (final row in (attendanceResponse as List)) {
         final regNo = row['reg_no']?.toString();
         if (regNo == null) continue;
-        attendanceMap[regNo] = (row['data'] as Map?)?.cast<String, dynamic>() ?? {};
+        attendanceMap[regNo] =
+            (row['data'] as Map?)?.cast<String, dynamic>() ?? {};
       }
 
       final cgpaMap = <String, Map<String, dynamic>>{};
@@ -364,14 +365,16 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
         if (regNo == null) continue;
         cgpaMap[regNo] = (row['data'] as Map?)?.cast<String, dynamic>() ?? {};
         final syncedAt = DateTime.tryParse(row['synced_at']?.toString() ?? '');
-        if (syncedAt != null && (latestSynced == null || syncedAt.isAfter(latestSynced))) {
+        if (syncedAt != null &&
+            (latestSynced == null || syncedAt.isAfter(latestSynced))) {
           latestSynced = syncedAt;
         }
       }
 
       for (final row in (attendanceResponse as List)) {
         final syncedAt = DateTime.tryParse(row['synced_at']?.toString() ?? '');
-        if (syncedAt != null && (latestSynced == null || syncedAt.isAfter(latestSynced))) {
+        if (syncedAt != null &&
+            (latestSynced == null || syncedAt.isAfter(latestSynced))) {
           latestSynced = syncedAt;
         }
       }
@@ -385,13 +388,17 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
 
       final items = (whitelistResponse as List).map((row) {
         final regNo = row['reg_no']?.toString() ?? '';
-        final attendanceData = attendanceMap[regNo] ?? const <String, dynamic>{};
+        final attendanceData =
+            attendanceMap[regNo] ?? const <String, dynamic>{};
         final cgpaData = cgpaMap[regNo] ?? const <String, dynamic>{};
-        final summary = (attendanceData['summary'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
+        final summary =
+            (attendanceData['summary'] as Map?)?.cast<String, dynamic>() ??
+                const <String, dynamic>{};
 
         final dobValue = userDobMap[regNo] ?? row['dob'];
         // isSynced = true only if a row exists in ecampus_attendance OR ecampus_cgpa
-        final isSynced = attendanceMap.containsKey(regNo) || cgpaMap.containsKey(regNo);
+        final isSynced =
+            attendanceMap.containsKey(regNo) || cgpaMap.containsKey(regNo);
 
         return _StudentAcademicEntry(
           regNo: regNo,
@@ -419,7 +426,8 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _allStudentsError = 'Unable to load all students academic data right now.';
+        _allStudentsError =
+            'Unable to load all students academic data right now.';
       });
     } finally {
       if (mounted) {
@@ -534,8 +542,7 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
         context.read<EcampusProvider>().syncAfterCredentialUpdate(rollno);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(
-                'Password saved. Syncing your academic data…'),
+            content: Text('Password saved. Syncing your academic data…'),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -574,7 +581,8 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Row(
             children: [
               Icon(Icons.vpn_key_rounded, color: theme.colorScheme.primary),
@@ -595,8 +603,8 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
                   decoration: BoxDecoration(
                     color: Colors.orange.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                        color: Colors.orange.withValues(alpha: 0.4)),
+                    border:
+                        Border.all(color: Colors.orange.withValues(alpha: 0.4)),
                   ),
                   child: Row(
                     children: [
@@ -607,8 +615,8 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
                         child: Text(
                           'Your eCampus password has changed. '
                           'Enter your current portal password to load your data.',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                              color: Colors.orange.shade800),
+                          style: theme.textTheme.bodySmall
+                              ?.copyWith(color: Colors.orange.shade800),
                         ),
                       ),
                     ],
@@ -793,8 +801,7 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
           valueListenable: syncState,
           builder: (_, state, __) {
             return Dialog(
-              backgroundColor:
-                  isDark ? const Color(0xFF171728) : Colors.white,
+              backgroundColor: isDark ? const Color(0xFF171728) : Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
               ),
@@ -869,7 +876,8 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
                             itemBuilder: (_, index) {
                               final item = state.failedList[index] as Map;
                               final rollno = item['rollno'] ?? 'Unknown';
-                              final errType = (item['error_type'] ?? '') as String;
+                              final errType =
+                                  (item['error_type'] ?? '') as String;
                               final suffix = errType == 'login_failed'
                                   ? ' (wrong DOB?)'
                                   : errType == 'network_error'
@@ -918,348 +926,340 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
     final isDark = theme.brightness == Brightness.dark;
     final user = context.watch<UserProvider>().currentUser;
 
-    if (!_isPlacementRep && user != null && user.dob == null && !user.ecampusPasswordSet) {
+    if (!_isPlacementRep &&
+        user != null &&
+        user.dob == null &&
+        !user.ecampusPasswordSet) {
       return Scaffold(
         backgroundColor:
             isDark ? const Color(0xFF0F0F1A) : const Color(0xFFF5F5F5),
         body: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final hPad =
-                  (constraints.maxWidth * 0.07).clamp(20.0, 44.0);
+              final hPad = (constraints.maxWidth * 0.07).clamp(20.0, 44.0);
               return SingleChildScrollView(
-                padding: EdgeInsets.symmetric(
-                    horizontal: hPad, vertical: 24),
+                padding: EdgeInsets.symmetric(horizontal: hPad, vertical: 24),
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 480),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                // ── Icon + heading ──────────────────────────────────────────
-                Center(
-                  child: Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primary
-                          .withValues(alpha: 0.10),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(Icons.school_rounded,
-                        size: 48, color: theme.colorScheme.primary),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Text(
-                  'Connect to eCampus',
-                  style: GoogleFonts.inter(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.5,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Link your account to view attendance,\n'
-                  'CGPA, and CA exam schedules.',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    height: 1.5,
-                    color: theme.colorScheme.onSurface
-                        .withValues(alpha: 0.60),
-                  ),
-                ),
-                const SizedBox(height: 28),
-
-                // ── OPTION A: DOB (recommended for most students) ──────────
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? const Color(0xFF15152A)
-                        : Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: theme.colorScheme.primary
-                          .withValues(alpha: 0.35),
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 3),
+                        // ── Icon + heading ──────────────────────────────────────────
+                        Center(
+                          child: Container(
+                            padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
-                              color: theme.colorScheme.primary,
-                              borderRadius: BorderRadius.circular(6),
+                              color: theme.colorScheme.primary
+                                  .withValues(alpha: 0.10),
+                              shape: BoxShape.circle,
                             ),
-                            child: Text(
-                              'FOR MOST STUDENTS',
-                              style: GoogleFonts.inter(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
-                                letterSpacing: 0.8,
-                              ),
+                            child: Icon(Icons.school_rounded,
+                                size: 48, color: theme.colorScheme.primary),
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        Text(
+                          'Connect to eCampus',
+                          style: GoogleFonts.inter(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.5,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Link your account to view attendance,\n'
+                          'CGPA, and CA exam schedules.',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            height: 1.5,
+                            color: theme.colorScheme.onSurface
+                                .withValues(alpha: 0.60),
+                          ),
+                        ),
+                        const SizedBox(height: 28),
+
+                        // ── OPTION A: DOB (recommended for most students) ──────────
+                        Container(
+                          padding: const EdgeInsets.all(18),
+                          decoration: BoxDecoration(
+                            color:
+                                isDark ? const Color(0xFF15152A) : Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: theme.colorScheme.primary
+                                  .withValues(alpha: 0.35),
+                              width: 1.5,
                             ),
                           ),
-                          const Spacer(),
-                          Icon(Icons.edit_calendar_outlined,
-                              size: 18,
-                              color: theme.colorScheme.primary),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        'Use Date of Birth',
-                        style: GoogleFonts.inter(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        "If you haven't changed your eCampus password, "
-                        'your login uses your date of birth '
-                        '(e.g.\xA008jul04). Just set it below.',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          height: 1.5,
-                          color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.60),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      FilledButton.icon(
-                        onPressed: () => _showDobRequiredDialog(
-                            context.read<UserProvider>()),
-                        icon: const Icon(
-                            Icons.edit_calendar_rounded, size: 18),
-                        label: const Text('Set My Date of Birth'),
-                        style: FilledButton.styleFrom(
-                          minimumSize:
-                              const Size(double.infinity, 44),
-                          shape: RoundedRectangleBorder(
-                              borderRadius:
-                                  BorderRadius.circular(10)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // ── OR divider ─────────────────────────────────────────────
-                Row(children: [
-                  const Expanded(child: Divider()),
-                  Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14),
-                    child: Text(
-                      'OR',
-                      style: GoogleFonts.inter(
-                          fontSize: 11,
-                          color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.40)),
-                    ),
-                  ),
-                  const Expanded(child: Divider()),
-                ]),
-
-                const SizedBox(height: 16),
-
-                // ── OPTION B: Custom password (changed it?) ────────────────
-                if (!_showPasswordSection)
-                  OutlinedButton.icon(
-                    onPressed: () =>
-                        setState(() => _showPasswordSection = true),
-                    icon: const Icon(Icons.vpn_key_outlined, size: 18),
-                    label: const Text(
-                        'I changed my eCampus password'),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 46),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                    ),
-                  )
-                else
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? const Color(0xFF15152A)
-                          : Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: theme.colorScheme.onSurface
-                            .withValues(alpha: 0.12),
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.vpn_key_rounded,
-                              size: 18,
-                              color: theme.colorScheme.onSurface
-                                  .withValues(alpha: 0.7),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Custom Password',
-                              style: GoogleFonts.inter(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700),
-                            ),
-                            const Spacer(),
-                            IconButton(
-                              icon: const Icon(Icons.close, size: 18),
-                              onPressed: () => setState(
-                                  () => _showPasswordSection = false),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              tooltip: 'Close',
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        StatefulBuilder(
-                          builder: (ctx, setLocal) => TextField(
-                            controller: _credPassCtrl,
-                            obscureText: _credObscure,
-                            autocorrect: false,
-                            enableSuggestions: false,
-                            keyboardType:
-                                TextInputType.visiblePassword,
-                            autofillHints: const [],
-                            textInputAction: TextInputAction.done,
-                            onSubmitted: (_) =>
-                                _connectWithInlinePassword(
-                                    context.read<UserProvider>()),
-                            decoration: InputDecoration(
-                              hintText: 'Enter your eCampus password',
-                              filled: true,
-                              fillColor: isDark
-                                  ? const Color(0xFF1E1E2E)
-                                  : Colors.grey.shade50,
-                              border: OutlineInputBorder(
-                                borderRadius:
-                                    BorderRadius.circular(10),
-                                borderSide: BorderSide.none,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: theme.colorScheme.primary,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      'FOR MOST STUDENTS',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.white,
+                                        letterSpacing: 0.8,
+                                      ),
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Icon(Icons.edit_calendar_outlined,
+                                      size: 18,
+                                      color: theme.colorScheme.primary),
+                                ],
                               ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius:
-                                    BorderRadius.circular(10),
-                                borderSide: BorderSide(
-                                    color: theme.colorScheme.primary,
-                                    width: 2),
+                              const SizedBox(height: 10),
+                              Text(
+                                'Use Date of Birth',
+                                style: GoogleFonts.inter(
+                                    fontSize: 16, fontWeight: FontWeight.w700),
                               ),
-                              contentPadding:
-                                  const EdgeInsets.symmetric(
-                                      horizontal: 14, vertical: 12),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _credObscure
-                                      ? Icons.visibility_outlined
-                                      : Icons
-                                          .visibility_off_outlined,
-                                  size: 18,
+                              const SizedBox(height: 5),
+                              Text(
+                                "If you haven't changed your eCampus password, "
+                                'your login uses your date of birth '
+                                '(e.g.\xA008jul04). Just set it below.',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  height: 1.5,
+                                  color: theme.colorScheme.onSurface
+                                      .withValues(alpha: 0.60),
                                 ),
-                                onPressed: () => setState(
-                                    () => _credObscure = !_credObscure),
-                                tooltip:
-                                    _credObscure ? 'Show' : 'Hide',
+                              ),
+                              const SizedBox(height: 14),
+                              FilledButton.icon(
+                                onPressed: () => _showDobRequiredDialog(
+                                    context.read<UserProvider>()),
+                                icon: const Icon(Icons.edit_calendar_rounded,
+                                    size: 18),
+                                label: const Text('Set My Date of Birth'),
+                                style: FilledButton.styleFrom(
+                                  minimumSize: const Size(double.infinity, 44),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        // ── OR divider ─────────────────────────────────────────────
+                        Row(children: [
+                          const Expanded(child: Divider()),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            child: Text(
+                              'OR',
+                              style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  color: theme.colorScheme.onSurface
+                                      .withValues(alpha: 0.40)),
+                            ),
+                          ),
+                          const Expanded(child: Divider()),
+                        ]),
+
+                        const SizedBox(height: 16),
+
+                        // ── OPTION B: Custom password (changed it?) ────────────────
+                        if (!_showPasswordSection)
+                          OutlinedButton.icon(
+                            onPressed: () =>
+                                setState(() => _showPasswordSection = true),
+                            icon: const Icon(Icons.vpn_key_outlined, size: 18),
+                            label: const Text('I changed my eCampus password'),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(double.infinity, 46),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10)),
+                            ),
+                          )
+                        else
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? const Color(0xFF15152A)
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: theme.colorScheme.onSurface
+                                    .withValues(alpha: 0.12),
                               ),
                             ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.vpn_key_rounded,
+                                      size: 18,
+                                      color: theme.colorScheme.onSurface
+                                          .withValues(alpha: 0.7),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Custom Password',
+                                      style: GoogleFonts.inter(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700),
+                                    ),
+                                    const Spacer(),
+                                    IconButton(
+                                      icon: const Icon(Icons.close, size: 18),
+                                      onPressed: () => setState(
+                                          () => _showPasswordSection = false),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                      tooltip: 'Close',
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                StatefulBuilder(
+                                  builder: (ctx, setLocal) => TextField(
+                                    controller: _credPassCtrl,
+                                    obscureText: _credObscure,
+                                    autocorrect: false,
+                                    enableSuggestions: false,
+                                    keyboardType: TextInputType.visiblePassword,
+                                    autofillHints: const [],
+                                    textInputAction: TextInputAction.done,
+                                    onSubmitted: (_) =>
+                                        _connectWithInlinePassword(
+                                            context.read<UserProvider>()),
+                                    decoration: InputDecoration(
+                                      hintText: 'Enter your eCampus password',
+                                      filled: true,
+                                      fillColor: isDark
+                                          ? const Color(0xFF1E1E2E)
+                                          : Colors.grey.shade50,
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                        borderSide: BorderSide.none,
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                        borderSide: BorderSide(
+                                            color: theme.colorScheme.primary,
+                                            width: 2),
+                                      ),
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                              horizontal: 14, vertical: 12),
+                                      suffixIcon: IconButton(
+                                        icon: Icon(
+                                          _credObscure
+                                              ? Icons.visibility_outlined
+                                              : Icons.visibility_off_outlined,
+                                          size: 18,
+                                        ),
+                                        onPressed: () => setState(
+                                            () => _credObscure = !_credObscure),
+                                        tooltip: _credObscure ? 'Show' : 'Hide',
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: FilledButton.icon(
+                                    onPressed: _credSaving
+                                        ? null
+                                        : () => _connectWithInlinePassword(
+                                            context.read<UserProvider>()),
+                                    icon: _credSaving
+                                        ? const SizedBox(
+                                            width: 14,
+                                            height: 14,
+                                            child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: Colors.white),
+                                          )
+                                        : const Icon(Icons.link_rounded,
+                                            size: 18),
+                                    label: Text(
+                                      _credSaving
+                                          ? 'Connecting\u2026'
+                                          : 'Connect',
+                                      style: GoogleFonts.inter(
+                                          fontWeight: FontWeight.w600),
+                                    ),
+                                    style: FilledButton.styleFrom(
+                                      minimumSize: const Size.fromHeight(44),
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(10)),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                        const SizedBox(height: 20),
+
+                        // ── Security note ──────────────────────────────────────────
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withValues(alpha: 0.06),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                                color: Colors.blue.withValues(alpha: 0.18)),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(Icons.shield_outlined,
+                                  color: Colors.blue, size: 14),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Your credentials are stored securely and only '
+                                  'used to connect to the PSG eCampus portal. '
+                                  'They are never visible to other users.',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    height: 1.5,
+                                    color: isDark
+                                        ? Colors.blue.shade200
+                                        : Colors.blue.shade800,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton.icon(
-                            onPressed: _credSaving
-                                ? null
-                                : () => _connectWithInlinePassword(
-                                    context.read<UserProvider>()),
-                            icon: _credSaving
-                                ? const SizedBox(
-                                    width: 14,
-                                    height: 14,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white),
-                                  )
-                                : const Icon(Icons.link_rounded,
-                                    size: 18),
-                            label: Text(
-                              _credSaving ? 'Connecting\u2026' : 'Connect',
-                              style: GoogleFonts.inter(
-                                  fontWeight: FontWeight.w600),
-                            ),
-                            style: FilledButton.styleFrom(
-                              minimumSize: const Size.fromHeight(44),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(10)),
-                            ),
-                          ),
-                        ),
+                        const SizedBox(height: 24),
                       ],
                     ),
                   ),
-
-                const SizedBox(height: 20),
-
-                // ── Security note ──────────────────────────────────────────
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                        color: Colors.blue.withValues(alpha: 0.18)),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(Icons.shield_outlined,
-                          color: Colors.blue, size: 14),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Your credentials are stored securely and only '
-                          'used to connect to the PSG eCampus portal. '
-                          'They are never visible to other users.',
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            height: 1.5,
-                            color: isDark
-                                ? Colors.blue.shade200
-                                : Colors.blue.shade800,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
-                const SizedBox(height: 24),
-              ],
-            ),
+              );
+            },
           ),
         ),
       );
-          },
-        ),
-      ),
-    );
     }
     return Scaffold(
       backgroundColor:
@@ -1267,8 +1267,7 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
           SliverAppBar(
-            backgroundColor:
-                isDark ? const Color(0xFF0F0F1A) : Colors.white,
+            backgroundColor: isDark ? const Color(0xFF0F0F1A) : Colors.white,
             floating: true,
             pinned: true,
             forceElevated: innerBoxIsScrolled,
@@ -1300,19 +1299,17 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
               controller: _tabController,
               // 4 tabs for placement rep can overflow on narrow phones
               isScrollable: _isPlacementRep,
-              tabAlignment: _isPlacementRep
-                  ? TabAlignment.center
-                  : TabAlignment.fill,
+              tabAlignment:
+                  _isPlacementRep ? TabAlignment.center : TabAlignment.fill,
               labelColor: theme.colorScheme.primary,
-              unselectedLabelColor:
-                  isDark ? Colors.white54 : Colors.black45,
+              unselectedLabelColor: isDark ? Colors.white54 : Colors.black45,
               indicatorColor: theme.colorScheme.primary,
               indicatorWeight: 2.8,
               labelPadding: EdgeInsets.symmetric(
                 horizontal: _isPlacementRep ? 10 : 6,
               ),
-              labelStyle: GoogleFonts.inter(
-                  fontWeight: FontWeight.w600, fontSize: 13),
+              labelStyle:
+                  GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13),
               dividerColor: Colors.transparent,
               tabs: _isPlacementRep
                   ? [
@@ -1334,24 +1331,24 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
           children: _isPlacementRep
               ? [
                   _AttendanceTab(
-                    onUpdatePassword: () => _showCustomPasswordDialog(
-                        context.read<UserProvider>()),
+                    onUpdatePassword: () =>
+                        _showCustomPasswordDialog(context.read<UserProvider>()),
                   ),
                   _CgpaTab(
-                    onUpdatePassword: () => _showCustomPasswordDialog(
-                        context.read<UserProvider>()),
+                    onUpdatePassword: () =>
+                        _showCustomPasswordDialog(context.read<UserProvider>()),
                   ),
                   const _CaTestTab(),
                   _buildAllStudentsReportTab(context, isDark, theme),
                 ]
               : [
                   _AttendanceTab(
-                    onUpdatePassword: () => _showCustomPasswordDialog(
-                        context.read<UserProvider>()),
+                    onUpdatePassword: () =>
+                        _showCustomPasswordDialog(context.read<UserProvider>()),
                   ),
                   _CgpaTab(
-                    onUpdatePassword: () => _showCustomPasswordDialog(
-                        context.read<UserProvider>()),
+                    onUpdatePassword: () =>
+                        _showCustomPasswordDialog(context.read<UserProvider>()),
                   ),
                   const _CaTestTab(),
                 ],
@@ -1393,18 +1390,18 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
       );
     }
 
-    final g1 = _applySort(_allStudents
-      .where((item) => item.batch == 'G1')
-      .toList());
-    final g2 = _applySort(_allStudents
-      .where((item) => item.batch == 'G2')
-      .toList());
+    final g1 =
+        _applySort(_allStudents.where((item) => item.batch == 'G1').toList());
+    final g2 =
+        _applySort(_allStudents.where((item) => item.batch == 'G2').toList());
     final others = _applySort(_allStudents
-      .where((item) => item.batch != 'G1' && item.batch != 'G2')
-      .toList());
+        .where((item) => item.batch != 'G1' && item.batch != 'G2')
+        .toList());
 
-    final showG1 = _batchFilter == _BatchFilter.all || _batchFilter == _BatchFilter.g1;
-    final showG2 = _batchFilter == _BatchFilter.all || _batchFilter == _BatchFilter.g2;
+    final showG1 =
+        _batchFilter == _BatchFilter.all || _batchFilter == _BatchFilter.g1;
+    final showG2 =
+        _batchFilter == _BatchFilter.all || _batchFilter == _BatchFilter.g2;
     final showOthers = _batchFilter == _BatchFilter.all;
 
     return ListView(
@@ -1441,7 +1438,8 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
             IconButton(
               icon: const Icon(Icons.refresh_rounded),
               tooltip: 'Reload',
-              onPressed: _isLoadingAllStudents ? null : _loadAllStudentsAcademicData,
+              onPressed:
+                  _isLoadingAllStudents ? null : _loadAllStudentsAcademicData,
             ),
           ],
         ),
@@ -1486,7 +1484,8 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
             icon: const Icon(Icons.sort_rounded, size: 18),
             label: Text(
               _sortModeLabel,
-              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
+              style:
+                  GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
             ),
           ),
         ),
@@ -1497,7 +1496,8 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
             icon: const Icon(Icons.filter_alt_rounded, size: 18),
             label: Text(
               _batchFilterLabel,
-              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
+              style:
+                  GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
             ),
           ),
         ),
@@ -1576,9 +1576,13 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
         case _SortMode.rollNoDesc:
           return b.regNo.compareTo(a.regNo);
         case _SortMode.attendanceAsc:
-          return compareNullableDouble(a.attendancePercentage, b.attendancePercentage, ascending: true);
+          return compareNullableDouble(
+              a.attendancePercentage, b.attendancePercentage,
+              ascending: true);
         case _SortMode.attendanceDesc:
-          return compareNullableDouble(a.attendancePercentage, b.attendancePercentage, ascending: false);
+          return compareNullableDouble(
+              a.attendancePercentage, b.attendancePercentage,
+              ascending: false);
         case _SortMode.cgpaAsc:
           return compareNullableDouble(a.cgpa, b.cgpa, ascending: true);
         case _SortMode.cgpaDesc:
@@ -1670,7 +1674,8 @@ class _AcademicInsightsScreenState extends State<AcademicInsightsScreen>
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: Colors.orange.withValues(alpha: 0.15),
+                                      color:
+                                          Colors.orange.withValues(alpha: 0.15),
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                     child: Text(
@@ -1789,6 +1794,7 @@ class _StudentAcademicEntry {
   final String dobText;
   final double? attendancePercentage;
   final double? cgpa;
+
   /// True only when this student has a row in ecampus_attendance or ecampus_cgpa.
   final bool isSynced;
 
@@ -2021,8 +2027,7 @@ class _AttendanceTab extends StatelessWidget {
         }
 
         if (prov.status == EcampusStatus.error) {
-          final rollno =
-              context.read<UserProvider>().currentUser?.regNo ?? '';
+          final rollno = context.read<UserProvider>().currentUser?.regNo ?? '';
           if (prov.isLoginFailed) {
             return _PasswordErrorView(
               message: prov.errorMessage ?? 'eCampus login failed.',
@@ -2038,13 +2043,20 @@ class _AttendanceTab extends StatelessWidget {
 
         if (prov.attendance == null) {
           return const _EmptyView(
-            message: 'No attendance data available yet.\nYour placement representative will refresh and publish updates.',
+            message:
+                'No attendance data available yet.\nYour placement representative will refresh and publish updates.',
           );
         }
 
         return CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
+            SliverToBoxAdapter(
+              child: _ApiAttendanceDateRangeCard(
+                subjects: prov.attendance!.subjects,
+                syncedAt: prov.attendance!.syncedAt,
+              ),
+            ),
             SliverToBoxAdapter(
               child: _AttendanceSummaryCard(summary: prov.attendance!.summary),
             ),
@@ -2087,13 +2099,12 @@ class _AttendanceSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color accent = summary.isSafe
-        ? const Color(0xFF4CAF50)
-        : const Color(0xFFEF5350);
+    final Color accent =
+        summary.isSafe ? const Color(0xFF4CAF50) : const Color(0xFFEF5350);
 
     final String complianceMsg = summary.isSafe
-      ? '✅ Attendance is healthy. You can miss up to ${summary.overallCanBunk} class${summary.overallCanBunk == 1 ? '' : 'es'} and remain above 75%.'
-      : '⚠️ Attend ${summary.overallNeedAttend} more class${summary.overallNeedAttend == 1 ? '' : 'es'} to meet the 75% requirement.';
+        ? '✅ Attendance is healthy. You can miss up to ${summary.overallCanBunk} class${summary.overallCanBunk == 1 ? '' : 'es'} and remain above 75%.'
+        : '⚠️ Attend ${summary.overallNeedAttend} more class${summary.overallNeedAttend == 1 ? '' : 'es'} to meet the 75% requirement.';
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -2197,11 +2208,14 @@ class _AttendanceSummaryCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('0%',
-                    style: GoogleFonts.inter(fontSize: 9, color: Colors.white38)),
+                    style:
+                        GoogleFonts.inter(fontSize: 9, color: Colors.white38)),
                 Text('▲ 75% min',
-                    style: GoogleFonts.inter(fontSize: 9, color: Colors.white54)),
+                    style:
+                        GoogleFonts.inter(fontSize: 9, color: Colors.white54)),
                 Text('100%',
-                    style: GoogleFonts.inter(fontSize: 9, color: Colors.white38)),
+                    style:
+                        GoogleFonts.inter(fontSize: 9, color: Colors.white38)),
               ],
             ),
 
@@ -2209,8 +2223,7 @@ class _AttendanceSummaryCard extends StatelessWidget {
 
             // Attendance recommendation message
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
@@ -2244,6 +2257,92 @@ class _AttendanceSummaryCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ApiAttendanceDateRangeCard extends StatelessWidget {
+  final List<SubjectAttendance> subjects;
+  final DateTime syncedAt;
+
+  const _ApiAttendanceDateRangeCard({
+    required this.subjects,
+    required this.syncedAt,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    String from = '-';
+    String to = '-';
+
+    final fromValues = subjects
+        .map((s) => s.attendanceFrom.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+    final toValues = subjects
+        .map((s) => s.attendanceTo.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+
+    if (fromValues.isNotEmpty) {
+      from = fromValues.first;
+    }
+    if (toValues.isNotEmpty) {
+      to = toValues.first;
+    }
+
+    final theme = Theme.of(context);
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color:
+            theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: theme.colorScheme.outline.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.date_range_rounded,
+                size: 16,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'Attendance Period (API)',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'From: $from   To: $to',
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: theme.colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Synced: ${DateFormat('dd MMM yyyy, hh:mm a').format(syncedAt.toLocal())}',
+            style: GoogleFonts.inter(
+              fontSize: 11.5,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -2303,8 +2402,7 @@ class _CgpaTab extends StatelessWidget {
         }
 
         if (prov.status == EcampusStatus.error) {
-          final rollno =
-              context.read<UserProvider>().currentUser?.regNo ?? '';
+          final rollno = context.read<UserProvider>().currentUser?.regNo ?? '';
           if (prov.isLoginFailed) {
             return _PasswordErrorView(
               message: prov.errorMessage ?? 'eCampus login failed.',
@@ -2320,7 +2418,8 @@ class _CgpaTab extends StatelessWidget {
 
         if (prov.cgpa == null) {
           return const _EmptyView(
-            message: 'No CGPA data available yet.\nYour placement representative will refresh and publish updates.',
+            message:
+                'No CGPA data available yet.\nYour placement representative will refresh and publish updates.',
           );
         }
 
@@ -2388,8 +2487,8 @@ class _CgpaSummaryCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('Cumulative GPA',
-                    style: GoogleFonts.inter(
-                        fontSize: 13, color: Colors.white60)),
+                    style:
+                        GoogleFonts.inter(fontSize: 13, color: Colors.white60)),
                 const SizedBox(height: 4),
                 FittedBox(
                   fit: BoxFit.scaleDown,
@@ -2407,14 +2506,12 @@ class _CgpaSummaryCard extends StatelessWidget {
                 const SizedBox(height: 8),
                 Text(
                   'Latest semester: ${cgpa.latestSemester}',
-                  style: GoogleFonts.inter(
-                      fontSize: 12, color: Colors.white54),
+                  style: GoogleFonts.inter(fontSize: 12, color: Colors.white54),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   '${cgpa.totalSemesters} semester${cgpa.totalSemesters == 1 ? '' : 's'} • ${cgpa.totalCredits} credits',
-                  style: GoogleFonts.inter(
-                      fontSize: 12, color: Colors.white54),
+                  style: GoogleFonts.inter(fontSize: 12, color: Colors.white54),
                 ),
               ],
             ),
@@ -2435,9 +2532,7 @@ class _CgpaSummaryCard extends StatelessWidget {
               Text(
                 '${((cgpa.cgpa / 10) * 100).toStringAsFixed(0)}%',
                 style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: c),
+                    fontSize: 14, fontWeight: FontWeight.w700, color: c),
               ),
             ],
           ),
@@ -2494,8 +2589,8 @@ class _SemesterSgpaSection extends StatelessWidget {
                       style: GoogleFonts.inter(
                         fontSize: 11,
                         fontWeight: FontWeight.w500,
-                        color: theme.colorScheme.onSurface
-                            .withValues(alpha: 0.65),
+                        color:
+                            theme.colorScheme.onSurface.withValues(alpha: 0.65),
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -2506,8 +2601,8 @@ class _SemesterSgpaSection extends StatelessWidget {
                       child: LinearProgressIndicator(
                         value: fraction,
                         minHeight: 10,
-                        backgroundColor: theme.colorScheme.onSurface
-                            .withValues(alpha: 0.07),
+                        backgroundColor:
+                            theme.colorScheme.onSurface.withValues(alpha: 0.07),
                         valueColor: AlwaysStoppedAnimation<Color>(color),
                       ),
                     ),
@@ -2515,8 +2610,8 @@ class _SemesterSgpaSection extends StatelessWidget {
                   const SizedBox(width: 10),
                   Container(
                     width: 44,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                     decoration: BoxDecoration(
                       color: color.withValues(alpha: isDark ? 0.15 : 0.1),
                       borderRadius: BorderRadius.circular(8),
@@ -2598,14 +2693,15 @@ class _CourseResultsSection extends StatelessWidget {
                 ? entry.key
                 : 'Semester ${entry.key}';
             final courseCount = entry.value.length;
-            
+
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Modern semester header with course count
                 Container(
                   margin: const EdgeInsets.only(top: 16, bottom: 12),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: isDark
@@ -2632,7 +2728,8 @@ class _CourseResultsSection extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.primary.withValues(alpha: 0.15),
+                          color:
+                              theme.colorScheme.primary.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Icon(
@@ -2660,7 +2757,8 @@ class _CourseResultsSection extends StatelessWidget {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
-                                color: theme.colorScheme.primary.withValues(alpha: 0.2),
+                                color: theme.colorScheme.primary
+                                    .withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
@@ -2686,9 +2784,7 @@ class _CourseResultsSection extends StatelessWidget {
                     margin: const EdgeInsets.only(bottom: 10),
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: isDark
-                          ? const Color(0xFF1C1C2E)
-                          : Colors.white,
+                      color: isDark ? const Color(0xFF1C1C2E) : Colors.white,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
                         color: theme.colorScheme.onSurface
@@ -2697,7 +2793,8 @@ class _CourseResultsSection extends StatelessWidget {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                          color: Colors.black
+                              .withValues(alpha: isDark ? 0.2 : 0.03),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -2712,8 +2809,10 @@ class _CourseResultsSection extends StatelessWidget {
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: [
-                                gradeColor.withValues(alpha: isDark ? 0.25 : 0.15),
-                                gradeColor.withValues(alpha: isDark ? 0.15 : 0.08),
+                                gradeColor.withValues(
+                                    alpha: isDark ? 0.25 : 0.15),
+                                gradeColor.withValues(
+                                    alpha: isDark ? 0.15 : 0.08),
                               ],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
@@ -2882,8 +2981,7 @@ class _PasswordErrorView extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color:
-                    Colors.orange.withValues(alpha: isDark ? 0.15 : 0.10),
+                color: Colors.orange.withValues(alpha: isDark ? 0.15 : 0.10),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.lock_outline_rounded,
@@ -3058,8 +3156,18 @@ class _CaTimetableSection extends StatelessWidget {
   // ── Date parsing ──────────────────────────────────────────────────────────
   // Handles formats: "06/MAR/26", "06/Mar/26", "06/03/2026", "06-03-26", etc.
   static final _monthAbbr = {
-    'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
-    'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12,
+    'jan': 1,
+    'feb': 2,
+    'mar': 3,
+    'apr': 4,
+    'may': 5,
+    'jun': 6,
+    'jul': 7,
+    'aug': 8,
+    'sep': 9,
+    'oct': 10,
+    'nov': 11,
+    'dec': 12,
   };
 
   DateTime? _parseCaDate(String raw) {
@@ -3107,10 +3215,24 @@ class _CaTimetableSection extends StatelessWidget {
   (Color, Color, String) _badgeStyle(int? days, bool isDark) {
     if (days == null) return (Colors.grey, Colors.grey.shade700, '');
     if (days < 0) return (Colors.grey, Colors.grey.shade700, 'Completed');
-    if (days == 0) return (const Color(0xFFEF5350), const Color(0xFFB71C1C), 'Today!');
-    if (days == 1) return (const Color(0xFFFF7043), const Color(0xFFBF360C), 'Tomorrow');
-    if (days <= 3) return (const Color(0xFFFF9800), const Color(0xFFE65100), '$days Days Left');
-    return (const Color(0xFF4CAF50), const Color(0xFF1B5E20), '$days Days Left');
+    if (days == 0) {
+      return (const Color(0xFFEF5350), const Color(0xFFB71C1C), 'Today!');
+    }
+    if (days == 1) {
+      return (const Color(0xFFFF7043), const Color(0xFFBF360C), 'Tomorrow');
+    }
+    if (days <= 3) {
+      return (
+        const Color(0xFFFF9800),
+        const Color(0xFFE65100),
+        '$days Days Left'
+      );
+    }
+    return (
+      const Color(0xFF4CAF50),
+      const Color(0xFF1B5E20),
+      '$days Days Left'
+    );
   }
 
   String? _pickField(Map<String, String> row, List<String> candidates) {
@@ -3127,15 +3249,14 @@ class _CaTimetableSection extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     // Filter and sort rows: hide completed exams, show upcoming first
-    final sortedRows = timetable.rows
-        .where((row) {
-          final dateRaw = _pickField(row, const ['test_date', 'date', 'exam_date']) ?? '';
-          final date = _parseCaDate(dateRaw);
-          final days = _daysLeft(date);
-          // Hide exams that are in the past (completed)
-          return days == null || days >= 0;
-        })
-        .toList()
+    final sortedRows = timetable.rows.where((row) {
+      final dateRaw =
+          _pickField(row, const ['test_date', 'date', 'exam_date']) ?? '';
+      final date = _parseCaDate(dateRaw);
+      final days = _daysLeft(date);
+      // Hide exams that are in the past (completed)
+      return days == null || days >= 0;
+    }).toList()
       ..sort((a, b) {
         final da = _parseCaDate(
           _pickField(a, const ['test_date', 'date', 'exam_date']) ?? '',
@@ -3301,7 +3422,8 @@ class _CaExamCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final courseCode = pickField(row, const ['course_code', 'code', 'subject_code']) ?? '';
+    final courseCode =
+        pickField(row, const ['course_code', 'code', 'subject_code']) ?? '';
     final courseName = pickField(row, const [
           'course_name',
           'course_title',
@@ -3312,7 +3434,8 @@ class _CaExamCard extends StatelessWidget {
         courseCode;
     final testDateRaw =
         pickField(row, const ['test_date', 'date', 'exam_date']) ?? '';
-    final slotNo = pickField(row, const ['slot_no', 'slot', 'slot_number']) ?? '';
+    final slotNo =
+        pickField(row, const ['slot_no', 'slot', 'slot_number']) ?? '';
     final session = pickField(row, const ['session', 'time', 'timings']) ?? '';
 
     final examDate = parseCaDate(testDateRaw);
@@ -3407,7 +3530,8 @@ class _CaExamCard extends StatelessWidget {
                             ),
                             borderRadius: BorderRadius.circular(7),
                             border: Border.all(
-                              color: const Color(0xFFFF9800).withValues(alpha: 0.25),
+                              color: const Color(0xFFFF9800)
+                                  .withValues(alpha: 0.25),
                               width: 1,
                             ),
                           ),
@@ -3508,9 +3632,8 @@ class _CaExamCard extends StatelessWidget {
                                 Icon(
                                   Icons.schedule_rounded,
                                   size: 13,
-                                  color: isDark
-                                      ? Colors.white70
-                                      : Colors.black54,
+                                  color:
+                                      isDark ? Colors.white70 : Colors.black54,
                                 ),
                                 const SizedBox(width: 6),
                                 Flexible(

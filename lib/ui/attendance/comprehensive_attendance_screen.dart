@@ -163,8 +163,9 @@ class _MyAttendanceTab extends StatefulWidget {
 class _MyAttendanceTabState extends State<_MyAttendanceTab> {
   late AttendanceService _attendanceService;
   AttendanceSummary? _summary;
-  List<Attendance> _recentAttendance = [];
+  List<Attendance> _attendanceHistory = [];
   bool _isLoading = true;
+  _AttendanceHistoryRange _historyRange = _AttendanceHistoryRange.all;
 
   @override
   void initState() {
@@ -183,16 +184,26 @@ class _MyAttendanceTabState extends State<_MyAttendanceTab> {
         final summary = await _attendanceService.getStudentAttendanceSummary(
           studentId: userId,
         );
-        final recent = await _attendanceService.getStudentAttendanceHistory(
+        final now = DateTime.now();
+        final startDate = switch (_historyRange) {
+          _AttendanceHistoryRange.all => null,
+          _AttendanceHistoryRange.last30 =>
+            now.subtract(const Duration(days: 30)),
+          _AttendanceHistoryRange.last90 =>
+            now.subtract(const Duration(days: 90)),
+          _AttendanceHistoryRange.thisYear => DateTime(now.year, 1, 1),
+        };
+
+        final history = await _attendanceService.getStudentAttendanceHistory(
           studentId: userId,
-          endDate: DateTime.now(),
-          startDate: DateTime.now().subtract(const Duration(days: 30)),
+          endDate: now,
+          startDate: startDate,
         );
 
         if (mounted) {
           setState(() {
             _summary = summary;
-            _recentAttendance = recent;
+            _attendanceHistory = history;
             _isLoading = false;
           });
         }
@@ -226,9 +237,44 @@ class _MyAttendanceTabState extends State<_MyAttendanceTab> {
         children: [
           _buildSummaryCard(),
           const SizedBox(height: AppSpacing.lg),
-          _buildRecentAttendanceList(),
+          _buildHistoryRangeSelector(),
+          const SizedBox(height: AppSpacing.md),
+          _buildAttendanceHistoryList(),
         ],
       ),
+    );
+  }
+
+  Widget _buildHistoryRangeSelector() {
+    return PremiumCard(
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          _buildRangeChip(_AttendanceHistoryRange.all, 'All Records'),
+          _buildRangeChip(_AttendanceHistoryRange.last30, 'Last 30 Days'),
+          _buildRangeChip(_AttendanceHistoryRange.last90, 'Last 90 Days'),
+          _buildRangeChip(_AttendanceHistoryRange.thisYear, 'This Year'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRangeChip(_AttendanceHistoryRange range, String label) {
+    final selected = _historyRange == range;
+    return ChoiceChip(
+      selected: selected,
+      label: Text(label),
+      onSelected: (_) {
+        if (_historyRange == range) return;
+        setState(() => _historyRange = range);
+        _loadData();
+      },
+      labelStyle: GoogleFonts.inter(
+        fontSize: 12,
+        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+      ),
+      visualDensity: VisualDensity.compact,
     );
   }
 
@@ -313,28 +359,28 @@ class _MyAttendanceTabState extends State<_MyAttendanceTab> {
     );
   }
 
-  Widget _buildRecentAttendanceList() {
+  Widget _buildAttendanceHistoryList() {
     return PremiumCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Recent Attendance',
+            'Attendance History',
             style: GoogleFonts.poppins(
               fontSize: 16,
               fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: AppSpacing.md),
-          if (_recentAttendance.isEmpty)
+          if (_attendanceHistory.isEmpty)
             const Center(
               child: Padding(
                 padding: EdgeInsets.all(AppSpacing.lg),
-                child: Text('No recent attendance records'),
+                child: Text('No attendance records for selected range'),
               ),
             )
           else
-            ..._recentAttendance.map((attendance) {
+            ..._attendanceHistory.map((attendance) {
               final dateStr =
                   DateFormat('MMM dd, yyyy').format(attendance.date);
               final isPresent = attendance.status == AttendanceStatus.present;
@@ -370,6 +416,13 @@ class _MyAttendanceTabState extends State<_MyAttendanceTab> {
       ),
     );
   }
+}
+
+enum _AttendanceHistoryRange {
+  all,
+  last30,
+  last90,
+  thisYear,
 }
 
 // ========================================

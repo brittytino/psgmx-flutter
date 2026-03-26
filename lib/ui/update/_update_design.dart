@@ -1,6 +1,6 @@
 /// Shared design tokens and helper widgets for all update-related screens.
 /// Ensures a uniform visual language across [OptionalUpdateSheet],
-/// [ForceUpdateScreen], [EmergencyBlockScreen], and [NewVersionDialog].
+/// [ForceUpdateScreen], and [EmergencyBlockScreen].
 library;
 
 import 'package:flutter/material.dart';

@@ -32,7 +32,8 @@ class IndividualAttendanceWizard extends StatefulWidget {
 class _IndividualAttendanceWizardState
     extends State<IndividualAttendanceWizard> {
   final AttendanceService _attendanceService = AttendanceService();
-  final AttendanceScheduleService _scheduleService = AttendanceScheduleService();
+  final AttendanceScheduleService _scheduleService =
+      AttendanceScheduleService();
   final TextEditingController _searchController = TextEditingController();
 
   final Set<String> _selectedStudentIds = <String>{};
@@ -59,9 +60,13 @@ class _IndividualAttendanceWizardState
 
   Future<void> _loadAvailableDates() async {
     try {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
       final scheduledDates = await _scheduleService.getScheduledDates();
       final days = scheduledDates
-          .map((date) => DateTime(date.date.year, date.date.month, date.date.day))
+          .map((date) =>
+              DateTime(date.date.year, date.date.month, date.date.day))
+          .where((date) => !date.isAfter(today))
           .toSet()
           .toList()
         ..sort((a, b) => b.compareTo(a));
@@ -71,7 +76,7 @@ class _IndividualAttendanceWizardState
           _availableClassDays = days;
           _isLoadingDates = false;
         });
-        
+
         // After loading dates, if we have selected students, load their history
         if (_selectedStudentIds.isNotEmpty) {
           _loadExistingAttendance();
@@ -89,40 +94,39 @@ class _IndividualAttendanceWizardState
 
   Future<void> _loadExistingAttendance() async {
     if (_selectedStudentIds.isEmpty || _availableClassDays.isEmpty) return;
-    
-    // We only load for the FIRST selected student for visualization simplicity 
+
+    // We only load for the FIRST selected student for visualization simplicity
     // or we could aggregate. Let's try to load for all selected to show "Any Marked".
     // For now, let's just fetch for the first few students to avoid query explosion
     // OR fetch range for these students.
-    
+
     try {
-       // Just fetch for the first student as a reference if multiple are selected,
-       // or if we want to show accurate data, we need to be smart.
-       // Let's assume the user usually does this for 1 student as the name implies "Individual".
-       
-       final studentId = _selectedStudentIds.first; 
-       final history = await _attendanceService.getStudentAttendanceHistory(
+      // Just fetch for the first student as a reference if multiple are selected,
+      // or if we want to show accurate data, we need to be smart.
+      // Let's assume the user usually does this for 1 student as the name implies "Individual".
+
+      final studentId = _selectedStudentIds.first;
+      final history = await _attendanceService.getStudentAttendanceHistory(
           studentId: studentId,
           startDate: _availableClassDays.last,
-          endDate: _availableClassDays.first
-       );
-       
-       if (mounted) {
-         setState(() {
-           final Map<String, List<AttendanceStatus>> newMap = {};
-           
-           for (final record in history) {
-             final dateStr = record.date.toIso8601String().split('T')[0];
-             if (!newMap.containsKey(dateStr)) {
-               newMap[dateStr] = [];
-             }
-             if (record.status != AttendanceStatus.na) {
-                newMap[dateStr]!.add(record.status);
-             }
-           }
-           _existingStatusMap = newMap;
-         });
-       }
+          endDate: _availableClassDays.first);
+
+      if (mounted) {
+        setState(() {
+          final Map<String, List<AttendanceStatus>> newMap = {};
+
+          for (final record in history) {
+            final dateStr = record.date.toIso8601String().split('T')[0];
+            if (!newMap.containsKey(dateStr)) {
+              newMap[dateStr] = [];
+            }
+            if (record.status != AttendanceStatus.na) {
+              newMap[dateStr]!.add(record.status);
+            }
+          }
+          _existingStatusMap = newMap;
+        });
+      }
     } catch (e) {
       debugPrint('Error loading history: $e');
     }
@@ -199,7 +203,8 @@ class _IndividualAttendanceWizardState
           child: LinearProgressIndicator(
             minHeight: 6,
             value: (_currentStep + 1) / 3,
-            backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+            backgroundColor:
+                Theme.of(context).colorScheme.surfaceContainerHighest,
             valueColor: AlwaysStoppedAnimation<Color>(
                 Theme.of(context).colorScheme.primary),
           ),
@@ -312,7 +317,10 @@ class _IndividualAttendanceWizardState
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: isSelected
-                              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)
+                              ? Theme.of(context)
+                                  .colorScheme
+                                  .primary
+                                  .withValues(alpha: 0.3)
                               : Colors.transparent,
                         ),
                       ),
@@ -320,15 +328,18 @@ class _IndividualAttendanceWizardState
                         onTap: () => _toggleStudent(student.studentId),
                         borderRadius: BorderRadius.circular(12),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
                           child: Row(
                             children: [
                               Transform.scale(
                                 scale: 1.1,
                                 child: Checkbox(
                                   value: isSelected,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                                  activeColor: Theme.of(context).colorScheme.primary,
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(4)),
+                                  activeColor:
+                                      Theme.of(context).colorScheme.primary,
                                   onChanged: (_) =>
                                       _toggleStudent(student.studentId),
                                 ),
@@ -343,24 +354,34 @@ class _IndividualAttendanceWizardState
                                       style: GoogleFonts.inter(
                                         fontSize: 15,
                                         fontWeight: FontWeight.w600,
-                                        color: Theme.of(context).textTheme.bodyLarge?.color,
+                                        color: Theme.of(context)
+                                            .textTheme
+                                            .bodyLarge
+                                            ?.color,
                                       ),
                                     ),
                                     const SizedBox(height: 4),
                                     Row(
                                       children: [
                                         Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 6, vertical: 2),
                                           decoration: BoxDecoration(
-                                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                                            borderRadius: BorderRadius.circular(4),
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .surfaceContainerHighest,
+                                            borderRadius:
+                                                BorderRadius.circular(4),
                                           ),
                                           child: Text(
                                             student.regNo,
                                             style: GoogleFonts.sourceCodePro(
                                               fontSize: 11,
                                               fontWeight: FontWeight.w500,
-                                              color: Theme.of(context).textTheme.bodyMedium?.color,
+                                              color: Theme.of(context)
+                                                  .textTheme
+                                                  .bodyMedium
+                                                  ?.color,
                                             ),
                                           ),
                                         ),
@@ -370,7 +391,11 @@ class _IndividualAttendanceWizardState
                                             'Team ${student.teamId}',
                                             style: GoogleFonts.inter(
                                               fontSize: 12,
-                                              color: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
+                                              color: Theme.of(context)
+                                                  .textTheme
+                                                  .bodyMedium
+                                                  ?.color
+                                                  ?.withValues(alpha: 0.7),
                                             ),
                                           ),
                                       ],
@@ -421,7 +446,10 @@ class _IndividualAttendanceWizardState
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .primary
+                      .withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
@@ -496,8 +524,8 @@ class _IndividualAttendanceWizardState
                 setState(() {
                   if (allVisibleSelected) {
                     _selectedDates.removeWhere(
-                      (selected) =>
-                          visibleDays.any((visible) => _isSameDay(visible, selected)),
+                      (selected) => visibleDays
+                          .any((visible) => _isSameDay(visible, selected)),
                     );
                   } else {
                     _selectedDates.addAll(visibleDays);
@@ -505,15 +533,11 @@ class _IndividualAttendanceWizardState
                 });
               },
               icon: Icon(
-                allVisibleSelected
-                    ? Icons.deselect
-                    : Icons.select_all,
+                allVisibleSelected ? Icons.deselect : Icons.select_all,
                 size: 18,
               ),
               label: Text(
-                allVisibleSelected
-                    ? 'Deselect All'
-                    : 'Select All',
+                allVisibleSelected ? 'Deselect All' : 'Select All',
                 style: GoogleFonts.inter(fontWeight: FontWeight.w600),
               ),
             ),
@@ -578,11 +602,13 @@ class _IndividualAttendanceWizardState
                 final isSelected =
                     _selectedDates.any((d) => _isSameDay(d, date));
                 final isToday = _isSameDay(date, DateTime.now());
-                
+
                 final dateKey = date.toIso8601String().split('T')[0];
                 final existingStatuses = _existingStatusMap[dateKey];
-                final hasHistory = existingStatuses != null && existingStatuses.isNotEmpty;
-                final existingStatus = hasHistory ? existingStatuses.first : null;
+                final hasHistory =
+                    existingStatuses != null && existingStatuses.isNotEmpty;
+                final existingStatus =
+                    hasHistory ? existingStatuses.first : null;
 
                 return InkWell(
                   onTap: () => _toggleDate(date),
@@ -592,11 +618,13 @@ class _IndividualAttendanceWizardState
                     decoration: BoxDecoration(
                       color: isSelected
                           ? Theme.of(context).colorScheme.primary
-                          : Theme.of(context).cardColor, // Replaced scaffoldBackgroundColor
+                          : Theme.of(context)
+                              .cardColor, // Replaced scaffoldBackgroundColor
                       border: Border.all(
                         color: isSelected
                             ? Theme.of(context).colorScheme.primary
-                            : Colors.grey.withValues(alpha: 0.3), // More generic grey
+                            : Colors.grey
+                                .withValues(alpha: 0.3), // More generic grey
                         width: isSelected ? 0 : 1,
                       ),
                       borderRadius: BorderRadius.circular(12),
@@ -623,22 +651,32 @@ class _IndividualAttendanceWizardState
                                 DateFormat('MMM d').format(date),
                                 style: GoogleFonts.inter(
                                   fontWeight: FontWeight.bold,
-                                  color: isSelected 
-                                      ? Colors.white 
-                                      : Theme.of(context).textTheme.bodyLarge?.color,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : Theme.of(context)
+                                          .textTheme
+                                          .bodyLarge
+                                          ?.color,
                                   fontSize: 15,
                                 ),
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                isToday ? 'Today' : DateFormat('EEEE').format(date),
+                                isToday
+                                    ? 'Today'
+                                    : DateFormat('EEEE').format(date),
                                 style: GoogleFonts.inter(
                                   fontSize: 11,
                                   color: isSelected
                                       ? Colors.white.withValues(alpha: 0.9)
-                                      : Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
-                                  fontWeight:
-                                      isSelected ? FontWeight.w500 : FontWeight.w400,
+                                      : Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.color
+                                          ?.withValues(alpha: 0.7),
+                                  fontWeight: isSelected
+                                      ? FontWeight.w500
+                                      : FontWeight.w400,
                                 ),
                               ),
                             ],
@@ -652,9 +690,10 @@ class _IndividualAttendanceWizardState
                               width: 8,
                               height: 8,
                               decoration: BoxDecoration(
-                                color: existingStatus == AttendanceStatus.present 
-                                    ? Colors.green 
-                                    : Colors.red,
+                                color:
+                                    existingStatus == AttendanceStatus.present
+                                        ? Colors.green
+                                        : Colors.red,
                                 shape: BoxShape.circle,
                               ),
                             ),
@@ -664,19 +703,23 @@ class _IndividualAttendanceWizardState
                             top: 6,
                             right: 6,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 4, vertical: 2),
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
-                                existingStatus == AttendanceStatus.present ? 'P' : 'A',
+                                existingStatus == AttendanceStatus.present
+                                    ? 'P'
+                                    : 'A',
                                 style: GoogleFonts.inter(
                                   fontSize: 8,
                                   fontWeight: FontWeight.bold,
-                                  color: existingStatus == AttendanceStatus.present 
-                                      ? Colors.green 
-                                      : Colors.red,
+                                  color:
+                                      existingStatus == AttendanceStatus.present
+                                          ? Colors.green
+                                          : Colors.red,
                                 ),
                               ),
                             ),
@@ -709,8 +752,7 @@ class _IndividualAttendanceWizardState
         .toList()
       ..sort((a, b) => a.name.compareTo(b.name));
 
-    final dates = _selectedDates.toList()
-      ..sort((a, b) => a.compareTo(b));
+    final dates = _selectedDates.toList()..sort((a, b) => a.compareTo(b));
 
     return SingleChildScrollView(
       child: Column(
@@ -897,7 +939,11 @@ class _IndividualAttendanceWizardState
                 : 'Tap days to toggle selection',
             style: GoogleFonts.inter(
               fontSize: 12,
-              color: Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
+              color: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.color
+                  ?.withValues(alpha: 0.7),
             ),
           ),
         ),
@@ -935,7 +981,6 @@ class _IndividualAttendanceWizardState
       ),
     );
   }
-
 
   Widget _buildStatusSelector() {
     return Container(
@@ -1006,8 +1051,7 @@ class _IndividualAttendanceWizardState
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color:
-              isSelected ? color.withValues(alpha: 0.1) : Colors.transparent,
+          color: isSelected ? color.withValues(alpha: 0.1) : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected ? color : Colors.grey.withValues(alpha: 0.3),
@@ -1019,7 +1063,13 @@ class _IndividualAttendanceWizardState
           children: [
             Icon(
               icon,
-              color: isSelected ? color : Theme.of(context).textTheme.bodyLarge?.color?.withValues(alpha: 0.7),
+              color: isSelected
+                  ? color
+                  : Theme.of(context)
+                      .textTheme
+                      .bodyLarge
+                      ?.color
+                      ?.withValues(alpha: 0.7),
               size: 20,
             ),
             const SizedBox(width: 8),
@@ -1027,7 +1077,13 @@ class _IndividualAttendanceWizardState
               label,
               style: GoogleFonts.inter(
                 fontWeight: FontWeight.w600,
-                color: isSelected ? color : Theme.of(context).textTheme.bodyLarge?.color?.withValues(alpha: 0.8),
+                color: isSelected
+                    ? color
+                    : Theme.of(context)
+                        .textTheme
+                        .bodyLarge
+                        ?.color
+                        ?.withValues(alpha: 0.8),
               ),
             ),
           ],
@@ -1089,7 +1145,7 @@ class _IndividualAttendanceWizardState
         _selectedStudentIds.add(studentId);
       }
     });
-    
+
     if (_availableClassDays.isNotEmpty) {
       _loadExistingAttendance();
     }
@@ -1097,8 +1153,9 @@ class _IndividualAttendanceWizardState
 
   void _toggleDate(DateTime date) {
     setState(() {
-      final existing = _selectedDates.where((d) => _isSameDay(d, date)).firstOrNull;
-      
+      final existing =
+          _selectedDates.where((d) => _isSameDay(d, date)).firstOrNull;
+
       if (existing != null) {
         _selectedDates.remove(existing);
       } else {
@@ -1106,8 +1163,6 @@ class _IndividualAttendanceWizardState
       }
     });
   }
-
-
 
   bool _isSameDay(DateTime a, DateTime b) {
     return a.year == b.year && a.month == b.month && a.day == b.day;

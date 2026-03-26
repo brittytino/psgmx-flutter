@@ -1,27 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/utils/version_comparator.dart';
 import '../../services/update_service.dart';
-import 'emergency_block_screen.dart';
 import 'force_update_screen.dart';
 import 'optional_update_sheet.dart';
-import 'new_version_dialog.dart';
 
 /// Update Gate Widget
-/// 
+///
 /// Wraps the main app content and enforces update policies.
 /// Should be placed high in the widget tree, after authentication.
-/// 
+///
 /// Flow:
-/// 1. If emergency_block → Show EmergencyBlockScreen (full block)
-/// 2. If force_update required → Show ForceUpdateScreen (cannot proceed)
-/// 3. If optional_update available → Show bottom sheet once per session
-/// 4. Check if app was updated → Show NewVersionDialog
-/// 5. Otherwise → Show child (normal app)
+/// 1. If emergency_block or force_update required → Show ForceUpdateScreen
+/// 2. If optional_update available → Show bottom sheet once per session
+/// 3. Otherwise → Show child (normal app)
 class UpdateGate extends StatefulWidget {
   final Widget child;
-  
+
   /// Called when update check completes
   final VoidCallback? onUpdateCheckComplete;
 
@@ -39,16 +36,27 @@ class _UpdateGateState extends State<UpdateGate> with WidgetsBindingObserver {
   bool _hasShownOptionalUpdate = false;
   bool _initialCheckDone = false;
 
+  static bool _isAndroidNativeUpdatesEnabled() {
+    return !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+  }
+
   @override
   void initState() {
     super.initState();
+    if (!_isAndroidNativeUpdatesEnabled()) {
+      _initialCheckDone = true;
+      widget.onUpdateCheckComplete?.call();
+      return;
+    }
     WidgetsBinding.instance.addObserver(this);
     _performInitialCheck();
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
+    if (_isAndroidNativeUpdatesEnabled()) {
+      WidgetsBinding.instance.removeObserver(this);
+    }
     super.dispose();
   }
 
@@ -56,6 +64,7 @@ class _UpdateGateState extends State<UpdateGate> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
+    if (!_isAndroidNativeUpdatesEnabled()) return;
     if (state == AppLifecycleState.resumed) {
       // Recheck on resume (but respects cache)
       _recheckOnResume();
@@ -64,7 +73,7 @@ class _UpdateGateState extends State<UpdateGate> with WidgetsBindingObserver {
 
   Future<void> _performInitialCheck() async {
     final updateService = context.read<UpdateService>();
-    
+
     // Wait for update service to initialize if not already
     if (!updateService.isInitialized) {
       await updateService.initialize();
@@ -73,28 +82,16 @@ class _UpdateGateState extends State<UpdateGate> with WidgetsBindingObserver {
     if (mounted) {
       setState(() => _initialCheckDone = true);
       widget.onUpdateCheckComplete?.call();
-      
+
       // Show optional update if applicable (delayed to avoid blocking)
       _maybeShowOptionalUpdate();
-      
-      // Check if app was updated and show welcome dialog
-      _checkForNewVersion();
     }
-  }
-
-  void _checkForNewVersion() {
-    // Delay to ensure navigation is ready and update checks are complete
-    Future.delayed(const Duration(seconds: 1), () {
-      if (mounted && Navigator.maybeOf(context) != null) {
-        NewVersionDialog.checkAndShowIfNeeded(context);
-      }
-    });
   }
 
   Future<void> _recheckOnResume() async {
     final updateService = context.read<UpdateService>();
     await updateService.checkForUpdates();
-    
+
     if (mounted) {
       setState(() {});
     }
@@ -106,7 +103,7 @@ class _UpdateGateState extends State<UpdateGate> with WidgetsBindingObserver {
     final updateService = context.read<UpdateService>();
     if (updateService.shouldShowOptionalUpdate) {
       _hasShownOptionalUpdate = true;
-      
+
       // Delay slightly to ensure smooth UI and Navigator is ready
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted && updateService.shouldShowOptionalUpdate) {
@@ -121,6 +118,10 @@ class _UpdateGateState extends State<UpdateGate> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    if (!_isAndroidNativeUpdatesEnabled()) {
+      return widget.child;
+    }
+
     return Consumer<UpdateService>(
       builder: (context, updateService, _) {
         // Still initializing - show loading or child
@@ -130,17 +131,13 @@ class _UpdateGateState extends State<UpdateGate> with WidgetsBindingObserver {
 
         final status = updateService.updateStatus;
 
-        // Priority 1: Emergency Block
-        if (status == UpdateStatus.emergencyBlocked) {
-          return const EmergencyBlockScreen();
-        }
-
-        // Priority 2: Force Update Required
-        if (status == UpdateStatus.forceUpdateRequired) {
+        // Priority 1: Blocking update required
+        if (status == UpdateStatus.emergencyBlocked ||
+            status == UpdateStatus.forceUpdateRequired) {
           return const ForceUpdateScreen();
         }
 
-        // Priority 3: Optional Update (handled via bottom sheet, not blocking)
+        // Priority 2: Optional Update (handled via bottom sheet, not blocking)
         // Show the normal app
         return widget.child;
       },
@@ -153,9 +150,14 @@ class _UpdateGateState extends State<UpdateGate> with WidgetsBindingObserver {
 mixin UpdateCheckMixin<T extends StatefulWidget> on State<T> {
   bool _hasCheckedForUpdate = false;
 
+  bool _isAndroidNativeUpdatesEnabled() {
+    return !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+  }
+
   @override
   void initState() {
     super.initState();
+    if (!_isAndroidNativeUpdatesEnabled()) return;
     _checkForUpdate();
   }
 
@@ -175,6 +177,10 @@ mixin UpdateCheckMixin<T extends StatefulWidget> on State<T> {
 /// Simple function to check and show update dialog
 /// Can be called from anywhere
 Future<void> checkAndShowUpdate(BuildContext context) async {
+  if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+    return;
+  }
+
   final updateService = context.read<UpdateService>();
   await updateService.checkForUpdates(forceCheck: true);
 
@@ -182,14 +188,9 @@ Future<void> checkAndShowUpdate(BuildContext context) async {
 
   final status = updateService.updateStatus;
 
-  if (status == UpdateStatus.emergencyBlocked) {
-    // Navigate to emergency screen
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const EmergencyBlockScreen()),
-      (_) => false,
-    );
-  } else if (status == UpdateStatus.forceUpdateRequired) {
-    // Navigate to force update screen
+  if (status == UpdateStatus.emergencyBlocked ||
+      status == UpdateStatus.forceUpdateRequired) {
+    // Navigate to blocking update screen
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const ForceUpdateScreen()),
       (_) => false,

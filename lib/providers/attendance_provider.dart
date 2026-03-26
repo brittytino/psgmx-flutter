@@ -5,13 +5,13 @@ import '../services/supabase_service.dart';
 class AttendanceProvider extends ChangeNotifier {
   final SupabaseService _supabaseService;
   final Map<String, String> _emailToUid = {};
-  
+
   List<AppUser> _teamMembers = [];
   List<AppUser> get teamMembers => _teamMembers;
-  
+
   bool _isLoading = false;
   bool get isLoading => _isLoading;
-  
+
   bool _hasSubmittedToday = false;
   bool get hasSubmittedToday => _hasSubmittedToday;
 
@@ -58,18 +58,20 @@ class AttendanceProvider extends ChangeNotifier {
           .select()
           .eq('team_id', teamId)
           .order('reg_no');
-      
+
       final List<dynamic> whitelistStudents = whiteListResponse as List;
-      final List<String> emails = whitelistStudents.map((e) => e['email'] as String).toList();
+      final List<String> emails =
+          whitelistStudents.map((e) => e['email'] as String).toList();
 
       // 2. Fetch actual user IDs from users table (who have signed up)
       final usersResponse = await _supabaseService.client
           .from('users')
           .select('id, email')
           .inFilter('email', emails);
-      
+
       final Map<String, String> emailToUid = {
-        for (var u in usersResponse as List) u['email'] as String: u['id'] as String
+        for (var u in usersResponse as List)
+          u['email'] as String: u['id'] as String
       };
       _emailToUid
         ..clear()
@@ -85,7 +87,9 @@ class AttendanceProvider extends ChangeNotifier {
           name: e['name'],
           teamId: e['team_id'],
           batch: e['batch'],
-          roles: e['roles'] != null ? UserRoles.fromJson(Map<String, dynamic>.from(e['roles'])) : const UserRoles(),
+          roles: e['roles'] != null
+              ? UserRoles.fromJson(Map<String, dynamic>.from(e['roles']))
+              : const UserRoles(),
           leetcodeUsername: e['leetcode_username'],
           dob: e['dob'] != null ? DateTime.parse(e['dob']) : null,
         );
@@ -97,7 +101,6 @@ class AttendanceProvider extends ChangeNotifier {
       // Always preload existing statuses for the selected date so the UI
       // pre-fills any previously-saved records (whether or not fully submitted).
       await _preloadStatuses(teamId, dateStr);
-
     } catch (e) {
       debugPrint('Error loading team: $e');
     } finally {
@@ -118,18 +121,20 @@ class AttendanceProvider extends ChangeNotifier {
           .from('whitelist')
           .select()
           .order('reg_no');
-      
+
       final List<dynamic> whitelistStudents = whiteListResponse as List;
-      final List<String> emails = whitelistStudents.map((e) => e['email'] as String).toList();
+      final List<String> emails =
+          whitelistStudents.map((e) => e['email'] as String).toList();
 
       // 2. Fetch actual user IDs from users table
       final usersResponse = await _supabaseService.client
           .from('users')
           .select('id, email')
           .inFilter('email', emails);
-      
+
       final Map<String, String> emailToUid = {
-        for (var u in usersResponse as List) u['email'] as String: u['id'] as String
+        for (var u in usersResponse as List)
+          u['email'] as String: u['id'] as String
       };
       _emailToUid
         ..clear()
@@ -145,7 +150,9 @@ class AttendanceProvider extends ChangeNotifier {
           name: e['name'],
           teamId: e['team_id'],
           batch: e['batch'],
-          roles: e['roles'] != null ? UserRoles.fromJson(Map<String, dynamic>.from(e['roles'])) : const UserRoles(),
+          roles: e['roles'] != null
+              ? UserRoles.fromJson(Map<String, dynamic>.from(e['roles']))
+              : const UserRoles(),
           leetcodeUsername: e['leetcode_username'],
           dob: e['dob'] != null ? DateTime.parse(e['dob']) : null,
         );
@@ -155,7 +162,6 @@ class AttendanceProvider extends ChangeNotifier {
       await _preloadStatuses(null, dateStr);
 
       _hasSubmittedToday = false; // Reps can always edit/submit in this mode
-      
     } catch (e) {
       debugPrint('Error loading all users: $e');
     } finally {
@@ -185,7 +191,17 @@ class AttendanceProvider extends ChangeNotifier {
     DateTime? forDate,
     bool isRep = false,
   }) async {
-    final dateStr = (forDate ?? DateTime.now()).toIso8601String().split('T')[0];
+    final selectedDate = forDate ?? DateTime.now();
+    final normalizedSelected =
+        DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    if (normalizedSelected.isAfter(today)) {
+      throw Exception('Attendance cannot be marked for future dates.');
+    }
+
+    final dateStr = normalizedSelected.toIso8601String().split('T')[0];
     final user = _supabaseService.client.auth.currentUser;
     if (user == null) throw Exception('User not authenticated');
 
@@ -258,7 +274,8 @@ class AttendanceProvider extends ChangeNotifier {
     }
     notifyListeners();
 
-    debugPrint('[Attendance] Successfully marked attendance for ${rows.length} students');
+    debugPrint(
+        '[Attendance] Successfully marked attendance for ${rows.length} students');
     if (skippedUnregistered.isNotEmpty) {
       debugPrint(
         '[Attendance] Skipped ${skippedUnregistered.length} unregistered students during submission',

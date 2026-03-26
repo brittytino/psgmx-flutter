@@ -1,14 +1,12 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/update_service.dart';
 
-/// Force Update Screen
-/// 
-/// Full-screen non-dismissible UI for required updates with engaging design.
-/// User CANNOT continue without updating.
+/// Full-screen blocking update UI.
 class ForceUpdateScreen extends StatefulWidget {
   const ForceUpdateScreen({super.key});
 
@@ -17,40 +15,24 @@ class ForceUpdateScreen extends StatefulWidget {
 }
 
 class _ForceUpdateScreenState extends State<ForceUpdateScreen> {
-  bool _preparingDownload = false;
+  bool _openingStore = false;
 
   Future<void> _handleUpdate() async {
-    if (!mounted) return;
-    
-    setState(() => _preparingDownload = true);
-    
+    if (_openingStore || !mounted) return;
+
+    setState(() => _openingStore = true);
     final updateService = context.read<UpdateService>();
-    
-    // Brief delay to show "preparing" state
-    await Future.delayed(const Duration(milliseconds: 800));
-    
-    if (!mounted) return;
-    
+
     final success = await updateService.openUpdateUrl();
-    
     if (!mounted) return;
-    
+
     if (!success) {
-      setState(() => _preparingDownload = false);
+      setState(() => _openingStore = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.error_outline, color: Colors.white),
-              SizedBox(width: 12),
-              Expanded(child: Text('Could not open download link')),
-            ],
-          ),
+          content: Text('Unable to open update link. Please try again.'),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(12)),
-          ),
         ),
       );
     }
@@ -58,359 +40,152 @@ class _ForceUpdateScreenState extends State<ForceUpdateScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final updateService = Provider.of<UpdateService>(context);
+    final updateService = context.watch<UpdateService>();
     final config = updateService.config;
-    final message = config?.updateMessage ?? 
-        'A critical update is required to continue using PSGMX.';
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return PopScope(
-      canPop: false, // Prevent back button
-      child: Scaffold(
-        backgroundColor: isDark ? const Color(0xFF0F0F1E) : const Color(0xFFF8F9FA),
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-            child: Column(
-              children: [
-                const Spacer(),
+    final top = isDark ? const Color(0xFF090E1A) : const Color(0xFFF6F9FF);
+    final bottom = isDark ? const Color(0xFF0E1F3A) : const Color(0xFFE7EEFA);
+    final cardColor = isDark ? const Color(0xFF121D31) : Colors.white;
+    final border = isDark ? const Color(0xFF2E4365) : const Color(0xFFD4E1F6);
+    final titleColor = isDark ? Colors.white : const Color(0xFF10213F);
+    final labelColor =
+        isDark ? const Color(0xFFB8C8E4) : const Color(0xFF4D6186);
 
-                Image.asset(
-                  'assets/images/app_update_available.png',
-                  height: 240,
-                  fit: BoxFit.contain,
-                ),
-                const SizedBox(height: 32),
+    return Scaffold(
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [top, bottom],
+          ),
+        ),
+        child: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final maxWidth = math.min(560.0, constraints.maxWidth - 24);
+              final gifHeight = math.min(
+                constraints.maxHeight * 0.36,
+                math.max(180.0, constraints.maxWidth * 0.52),
+              );
 
-                Text(
-                  'Update Required',
-                  style: GoogleFonts.poppins(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? Colors.white : const Color(0xFF2D3748),
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
-
-                // Message
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: isDark 
-                        ? Colors.white.withValues(alpha: 0.05)
-                        : Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: isDark 
-                          ? Colors.white.withValues(alpha: 0.1)
-                          : Colors.grey.withValues(alpha: 0.2),
-                    ),
-                  ),
-                  child: Text(
-                    message,
-                    style: GoogleFonts.inter(
-                      fontSize: 15,
-                      color: isDark ? Colors.grey[300] : Colors.grey[700],
-                      height: 1.6,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // Version Comparison Card
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: isDark
-                          ? [
-                              Colors.orange.withValues(alpha: 0.1),
-                              Colors.deepOrange.withValues(alpha: 0.05),
-                            ]
-                          : [
-                              Colors.orange.withValues(alpha: 0.08),
-                              Colors.deepOrange.withValues(alpha: 0.04),
-                            ],
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: Colors.orange.withValues(alpha: 0.3),
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // Current Version
-                      _buildVersionBadge(
-                        'Current',
-                        'v${updateService.currentVersion ?? "?"}',
-                        Colors.red,
-                        isDark,
-                      ),
-                      
-                      // Arrow with animation
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 20),
-                        child: Icon(
-                          Icons.trending_up_rounded,
-                          color: Colors.orange,
-                          size: 28,
+              return Center(
+                child: SingleChildScrollView(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                  child: Container(
+                    width: maxWidth,
+                    padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+                    decoration: BoxDecoration(
+                      color: cardColor,
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(color: border, width: 1.2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black
+                              .withValues(alpha: isDark ? 0.35 : 0.12),
+                          blurRadius: 28,
+                          offset: const Offset(0, 12),
                         ),
-                      ),
-                      
-                      // Latest Version
-                      _buildVersionBadge(
-                        'Latest',
-                        'v${config?.latestVersion ?? "?"}',
-                        Colors.green,
-                        isDark,
-                      ),
-                    ],
-                  ),
-                ),
-
-                const Spacer(),
-
-                // Update Now Button
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 60,
-                    child: ElevatedButton(
-                      onPressed: _preparingDownload ? null : _handleUpdate,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor: Colors.orange.withValues(alpha: 0.6),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        elevation: 8,
-                        shadowColor: Colors.orange.withValues(alpha: 0.5),
-                      ),
-                      child: _preparingDownload
-                          ? Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Text(
-                                  'Opening Download...',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            )
-                          : Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.download_rounded, size: 24),
-                                const SizedBox(width: 12),
-                                Text(
-                                  'Update Now',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 11, vertical: 6),
+                          decoration: BoxDecoration(
+                            color:
+                                const Color(0xFFF59E0B).withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color: const Color(0xFFF59E0B)
+                                  .withValues(alpha: 0.35),
                             ),
+                          ),
+                          child: Text(
+                            'App Update Required',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFFB45309),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Image.asset(
+                            'assets/images/force_update_app.gif',
+                            height: gifHeight,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Update to Continue',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.poppins(
+                            fontSize: constraints.maxWidth < 360 ? 26 : 30,
+                            fontWeight: FontWeight.w700,
+                            color: titleColor,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Current v${updateService.currentVersion ?? "?"}   ->   Latest v${config?.latestVersion ?? "?"}',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.jetBrainsMono(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: labelColor,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 56,
+                          child: FilledButton.icon(
+                            onPressed: _openingStore ? null : _handleUpdate,
+                            icon: _openingStore
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Icon(Icons.system_update_alt_rounded,
+                                    size: 22),
+                            label: Text(
+                              _openingStore ? 'Opening Store...' : 'Update Now',
+                              style: GoogleFonts.poppins(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFFF59E0B),
+                              foregroundColor: Colors.white,
+                              disabledBackgroundColor: const Color(0xFFF59E0B)
+                                  .withValues(alpha: 0.7),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 14),
-
-                // Why Update Link
-                TextButton.icon(
-                  onPressed: () => _showWhyUpdateDialog(context),
-                  icon: Icon(
-                    Icons.info_outline_rounded,
-                    size: 18,
-                    color: isDark ? Colors.blue[300] : Colors.blue[600],
-                  ),
-                  label: Text(
-                    'Why is this update required?',
-                    style: GoogleFonts.inter(
-                      color: isDark ? Colors.blue[300] : Colors.blue[600],
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 4),
-
-                // Exit App Button
-                TextButton.icon(
-                  onPressed: () => SystemNavigator.pop(),
-                  icon: Icon(
-                    Icons.exit_to_app,
-                    size: 18,
-                    color: isDark ? Colors.grey[500] : Colors.grey[600],
-                  ),
-                  label: Text(
-                    'Exit App',
-                    style: GoogleFonts.inter(
-                      color: isDark ? Colors.grey[500] : Colors.grey[600],
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-            ),
+              );
+            },
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildVersionBadge(String label, String version, Color color, bool isDark) {
-    return Column(
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 12,
-            color: isDark ? Colors.grey[400] : Colors.grey[600],
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: color.withValues(alpha: 0.4),
-              width: 1.5,
-            ),
-          ),
-          child: Text(
-            version,
-            style: GoogleFonts.jetBrainsMono(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _showWhyUpdateDialog(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: isDark ? const Color(0xFF1E1E2E) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.orange.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.security_rounded, color: Colors.orange, size: 24),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              'Why Update?',
-              style: GoogleFonts.poppins(
-                fontWeight: FontWeight.bold,
-                fontSize: 20,
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'This update includes important changes:',
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                color: isDark ? Colors.grey[300] : Colors.grey[700],
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 16),
-            _buildUpdateReason(Icons.shield_outlined, 'Security improvements', color: Colors.green),
-            _buildUpdateReason(Icons.bug_report_outlined, 'Critical bug fixes', color: Colors.red),
-            _buildUpdateReason(Icons.auto_awesome, 'New features & enhancements', color: Colors.blue),
-            _buildUpdateReason(Icons.sync_rounded, 'Backend compatibility', color: Colors.purple),
-            const SizedBox(height: 16),
-            Text(
-              'Update now for the best experience! 🚀',
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                color: Colors.orange,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () => Navigator.pop(ctx),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-              child: Text(
-                'Got it! 👍',
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildUpdateReason(IconData icon, String text, {required Color color}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: color),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              text,
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                height: 1.4,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

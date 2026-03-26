@@ -25,7 +25,9 @@ class CaExamNotificationService {
 
   Timer? _midnightTimer;
   StreamSubscription? _timetableSub;
+  Timer? _realtimeRetryTimer;
   bool _isInitialized = false;
+  int _realtimeRetryCount = 0;
 
   // Track the last synced_at timestamp we scheduled from, to avoid redundant work.
   String? _lastScheduledSyncedAt;
@@ -43,27 +45,7 @@ class CaExamNotificationService {
     await _reschedule(source: 'init');
 
     // 2. Watch for timetable updates pushed by the placement rep.
-    _timetableSub = Supabase.instance.client
-        .from('ca_timetable_global')
-        .stream(primaryKey: ['id'])
-        .eq('id', 1)
-        .listen(
-          (rows) {
-            if (rows.isEmpty) return;
-            final syncedAt = rows.first['synced_at'] as String? ?? '';
-            if (syncedAt == _lastScheduledSyncedAt) return; // no change
-            debugPrint('[CaExamService] Timetable updated — rescheduling notifications');
-            _reschedule(
-              source: 'realtime',
-              overrideData: rows.first['data'],
-              syncedAt: syncedAt,
-            );
-          },
-          onError: (Object e) {
-            debugPrint('[CaExamService] Realtime error (non-fatal): $e');
-          },
-          cancelOnError: false,
-        );
+    _startRealtimeListener();
 
     // 3. Reschedule at midnight every day (past exams are pruned automatically).
     _scheduleMidnightRefresh();
@@ -77,6 +59,7 @@ class CaExamNotificationService {
   /// Dispose timers and subscriptions.
   void dispose() {
     _midnightTimer?.cancel();
+    _realtimeRetryTimer?.cancel();
     _timetableSub?.cancel();
     _isInitialized = false;
   }
@@ -89,7 +72,8 @@ class CaExamNotificationService {
     String? syncedAt,
   }) async {
     try {
-      debugPrint('[CaExamService] Rescheduling CA exam notifications (source: $source)…');
+      debugPrint(
+          '[CaExamService] Rescheduling CA exam notifications (source: $source)…');
 
       List<Map<String, String>> rows = [];
 
@@ -104,7 +88,8 @@ class CaExamNotificationService {
             .maybeSingle();
 
         if (result == null) {
-          debugPrint('[CaExamService] No global timetable row found — nothing to schedule');
+          debugPrint(
+              '[CaExamService] No global timetable row found — nothing to schedule');
           return;
         }
         syncedAt ??= result['synced_at'] as String? ?? '';
@@ -112,7 +97,8 @@ class CaExamNotificationService {
       }
 
       if (rows.isEmpty) {
-        debugPrint('[CaExamService] Timetable is empty — cancelling any old notifications');
+        debugPrint(
+            '[CaExamService] Timetable is empty — cancelling any old notifications');
         await NotificationService().cancelCaExamNotifications();
         return;
       }
@@ -157,5 +143,65 @@ class CaExamNotificationService {
       _reschedule(source: 'midnight');
       _scheduleMidnightRefresh(); // arm for next midnight
     });
+  }
+
+  void _startRealtimeListener() {
+    _realtimeRetryTimer?.cancel();
+    _timetableSub?.cancel();
+
+    _timetableSub = Supabase.instance.client
+        .from('ca_timetable_global')
+        .stream(primaryKey: ['id'])
+        .eq('id', 1)
+        .listen(
+          (rows) {
+            _realtimeRetryCount = 0;
+            if (rows.isEmpty) return;
+
+            final syncedAt = rows.first['synced_at'] as String? ?? '';
+            if (syncedAt == _lastScheduledSyncedAt) return;
+
+            debugPrint(
+                '[CaExamService] Timetable updated — rescheduling notifications');
+            _reschedule(
+              source: 'realtime',
+              overrideData: rows.first['data'],
+              syncedAt: syncedAt,
+            );
+          },
+          onError: (Object e) {
+            _scheduleRealtimeRetry(e);
+          },
+          onDone: () {
+            _scheduleRealtimeRetry('stream-closed');
+          },
+          cancelOnError: false,
+        );
+  }
+
+  void _scheduleRealtimeRetry(Object error) {
+    final seconds = _nextRealtimeBackoffSeconds();
+    final shouldLog = _realtimeRetryCount <= 3 || _realtimeRetryCount % 5 == 0;
+
+    if (shouldLog) {
+      debugPrint(
+        '[CaExamService] Realtime channel issue (non-fatal): $error. Retrying in ${seconds}s',
+      );
+    }
+
+    _realtimeRetryTimer?.cancel();
+    _realtimeRetryTimer = Timer(Duration(seconds: seconds), () async {
+      // Keep data fresh even when realtime has transient websocket failures.
+      await _reschedule(source: 'realtime-retry-fallback');
+      if (_isInitialized) {
+        _startRealtimeListener();
+      }
+    });
+  }
+
+  int _nextRealtimeBackoffSeconds() {
+    _realtimeRetryCount++;
+    final clamped = _realtimeRetryCount > 6 ? 6 : _realtimeRetryCount;
+    return 1 << clamped; // 2,4,8,16,32,64
   }
 }

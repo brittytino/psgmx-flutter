@@ -10,6 +10,13 @@ class AttendanceService {
     r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
   );
 
+  DateTime get _today {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
+
+  String _dateKey(DateTime date) => date.toIso8601String().split('T')[0];
+
   // ========================================
   // WORKING DAY MANAGEMENT
   // ========================================
@@ -146,13 +153,18 @@ class AttendanceService {
     required String markedBy,
   }) async {
     try {
+      final normalized = DateTime(date.year, date.month, date.day);
+      if (normalized.isAfter(_today)) {
+        throw Exception('Attendance cannot be marked for future dates');
+      }
+
       // Check if it's a working day
-      final workingDay = await isWorkingDay(date);
+      final workingDay = await isWorkingDay(normalized);
       if (!workingDay) {
         throw Exception('Cannot mark attendance on non-working days');
       }
 
-      final dateString = date.toIso8601String().split('T')[0];
+      final dateString = _dateKey(normalized);
       final now = DateTime.now().toIso8601String();
 
       final records = studentStatuses.map((entry) {
@@ -229,10 +241,10 @@ class AttendanceService {
         query = query.gte('date', startString);
       }
 
-      if (endDate != null) {
-        final endString = endDate.toIso8601String().split('T')[0];
-        query = query.lte('date', endString);
-      }
+      final cappedEndDate = endDate == null || endDate.isAfter(_today)
+          ? _today
+          : DateTime(endDate.year, endDate.month, endDate.day);
+      query = query.lte('date', _dateKey(cappedEndDate));
 
       final response = await query.order('date', ascending: false);
 
@@ -252,54 +264,44 @@ class AttendanceService {
     required String studentId,
   }) async {
     try {
-      final response = await _supabase
-          .from('student_attendance_summary')
-          .select()
-          .eq('student_id', studentId)
+      final userResponse = await _supabase
+          .from('users')
+          .select('id, email, reg_no, name, team_id, batch')
+          .eq('id', studentId)
           .maybeSingle();
 
-      if (response == null) {
-        // Fallback: Calculate manually if view returns null (e.g. user not in view filter)
-        final userResponse = await _supabase
-            .from('users')
-            .select()
-            .eq('id', studentId)
-            .maybeSingle();
+      if (userResponse == null) return null;
 
-        if (userResponse == null) return null;
+      final records = await _supabase
+          .from('attendance_records')
+          .select('status, date')
+          .eq('user_id', studentId)
+          .lte('date', _dateKey(_today));
 
-        final records = await _supabase
-            .from('attendance_records')
-            .select('status')
-            .eq('user_id', studentId);
+      int present = 0;
+      int absent = 0;
 
-        int present = 0;
-        int absent = 0;
-
-        for (final record in (records as List)) {
-          final status = record['status'];
-          if (status == 'PRESENT') present++;
-          if (status == 'ABSENT') absent++;
-        }
-
-        final total = present + absent;
-        final percentage = total == 0 ? 0.0 : (present / total) * 100;
-
-        return AttendanceSummary(
-          studentId: userResponse['id'],
-          email: userResponse['email'] ?? '',
-          regNo: userResponse['reg_no'] ?? '',
-          name: userResponse['name'] ?? '',
-          teamId: userResponse['team_id'],
-          batch: userResponse['batch'] ?? 'G1',
-          presentCount: present,
-          absentCount: absent,
-          totalWorkingDays: total,
-          attendancePercentage: double.parse(percentage.toStringAsFixed(1)),
-        );
+      for (final record in (records as List)) {
+        final status = (record['status'] ?? '').toString().toUpperCase();
+        if (status == 'PRESENT') present++;
+        if (status == 'ABSENT') absent++;
       }
 
-      return AttendanceSummary.fromMap(response);
+      final total = present + absent;
+      final percentage = total == 0 ? 0.0 : (present / total) * 100;
+
+      return AttendanceSummary(
+        studentId: userResponse['id'],
+        email: userResponse['email'] ?? '',
+        regNo: userResponse['reg_no'] ?? '',
+        name: userResponse['name'] ?? '',
+        teamId: userResponse['team_id'],
+        batch: userResponse['batch'] ?? 'G1',
+        presentCount: present,
+        absentCount: absent,
+        totalWorkingDays: total,
+        attendancePercentage: double.parse(percentage.toStringAsFixed(1)),
+      );
     } catch (e) {
       throw Exception('Failed to get attendance summary: ${e.toString()}');
     }
@@ -307,14 +309,12 @@ class AttendanceService {
 
   Future<List<AttendanceSummary>> getAllStudentsAttendanceSummary() async {
     try {
-      final response = await _supabase
-          .from('student_attendance_summary')
-          .select()
-          .order('attendance_percentage', ascending: false);
+      final users = await _supabase
+          .from('users')
+          .select('id, email, reg_no, name, team_id, batch')
+          .order('name');
 
-      return (response as List)
-          .map((data) => AttendanceSummary.fromMap(data))
-          .toList();
+      return _buildSummariesFromUsers(users as List);
     } catch (e) {
       throw Exception('Failed to get all students summary: ${e.toString()}');
     }
@@ -324,15 +324,13 @@ class AttendanceService {
     required String teamId,
   }) async {
     try {
-      final response = await _supabase
-          .from('student_attendance_summary')
-          .select()
+      final users = await _supabase
+          .from('users')
+          .select('id, email, reg_no, name, team_id, batch')
           .eq('team_id', teamId)
-          .order('attendance_percentage', ascending: false);
+          .order('name');
 
-      return (response as List)
-          .map((data) => AttendanceSummary.fromMap(data))
-          .toList();
+      return _buildSummariesFromUsers(users as List);
     } catch (e) {
       throw Exception('Failed to get team summary: ${e.toString()}');
     }
@@ -341,18 +339,15 @@ class AttendanceService {
   /// Get all teams attendance summary with ranking
   Future<List<Map<String, dynamic>>> getAllTeamsAttendanceSummary() async {
     try {
-      final response =
-          await _supabase.from('student_attendance_summary').select();
-
-      final data = response as List;
+      final summaries = await getAllStudentsAttendanceSummary();
 
       // Group by team_id
       final Map<String, List<AttendanceSummary>> teamGroups = {};
-      for (var item in data) {
-        final teamId = item['team_id'] as String?;
+      for (final item in summaries) {
+        final teamId = item.teamId;
         if (teamId != null) {
           teamGroups.putIfAbsent(teamId, () => []);
-          teamGroups[teamId]!.add(AttendanceSummary.fromMap(item));
+          teamGroups[teamId]!.add(item);
         }
       }
 
@@ -387,25 +382,22 @@ class AttendanceService {
 
   Future<Map<String, double>> getBatchAttendanceSummary() async {
     try {
-      final response =
-          await _supabase.from('student_attendance_summary').select();
+      final data = await getAllStudentsAttendanceSummary();
 
-      final data = response as List;
-
-      final g1Students = data.where((s) => s['batch'] == 'G1');
-      final g2Students = data.where((s) => s['batch'] == 'G2');
+      final g1Students = data.where((s) => s.batch == 'G1');
+      final g2Students = data.where((s) => s.batch == 'G2');
 
       final g1Avg = g1Students.isEmpty
           ? 0.0
           : g1Students
-                  .map((s) => (s['attendance_percentage'] ?? 0.0).toDouble())
+                  .map((s) => s.attendancePercentage)
                   .reduce((a, b) => a + b) /
               g1Students.length;
 
       final g2Avg = g2Students.isEmpty
           ? 0.0
           : g2Students
-                  .map((s) => (s['attendance_percentage'] ?? 0.0).toDouble())
+                  .map((s) => s.attendancePercentage)
                   .reduce((a, b) => a + b) /
               g2Students.length;
 
@@ -579,14 +571,24 @@ class AttendanceService {
       final validRecords = <Map<String, dynamic>>[];
       for (final record in records) {
         final userId = record['user_id']?.toString();
+        final dateRaw = record['date']?.toString() ?? '';
+        final parsedDate = DateTime.tryParse(dateRaw);
         if (userId == null || !_uuidRegex.hasMatch(userId)) {
           continue;
+        }
+        if (parsedDate != null) {
+          final normalized =
+              DateTime(parsedDate.year, parsedDate.month, parsedDate.day);
+          if (normalized.isAfter(_today)) {
+            continue;
+          }
         }
         validRecords.add(record);
       }
 
       if (validRecords.isEmpty) {
-        throw Exception('No valid registered students found in attendance selection.');
+        throw Exception(
+            'No valid registered students found in attendance selection.');
       }
 
       // Use upsert to insert or update based on user_id + date
@@ -609,6 +611,7 @@ class AttendanceService {
     final uniqueStudents = studentIds.toSet().toList();
     final uniqueDates = dates
         .map((date) => DateTime(date.year, date.month, date.day))
+        .where((date) => !date.isAfter(_today))
         .toSet()
         .toList()
       ..sort((a, b) => a.compareTo(b));
@@ -617,25 +620,25 @@ class AttendanceService {
       throw Exception('Select at least one student');
     }
     if (uniqueDates.isEmpty) {
-      throw Exception('Select at least one working day');
+      throw Exception('Select at least one present or past working day');
     }
 
     final totalRequests = uniqueStudents.length * uniqueDates.length;
-    final validStudents = uniqueStudents.where((id) => _uuidRegex.hasMatch(id)).toList();
-    final skippedInvalidCount = (uniqueStudents.length - validStudents.length) * uniqueDates.length;
+    final validStudents =
+        uniqueStudents.where((id) => _uuidRegex.hasMatch(id)).toList();
+    final skippedInvalidCount =
+        (uniqueStudents.length - validStudents.length) * uniqueDates.length;
 
     if (validStudents.isEmpty) {
       throw Exception('No valid registered students selected.');
     }
 
-    final dateStrings = uniqueDates
-        .map((date) => date.toIso8601String().split('T')[0])
-        .toList();
+    final dateStrings = uniqueDates.map(_dateKey).toList();
 
     final existingResponse = await _supabase
         .from('attendance_records')
         .select('user_id, date, status')
-      .inFilter('user_id', validStudents)
+        .inFilter('user_id', validStudents)
         .inFilter('date', dateStrings);
 
     final existingMap = <String, String>{};
@@ -650,7 +653,7 @@ class AttendanceService {
     for (final studentId in validStudents) {
       final teamId = studentTeamMap[studentId] ?? '';
       for (final date in uniqueDates) {
-        final dateKey = date.toIso8601String().split('T')[0];
+        final dateKey = _dateKey(date);
         final compoundKey = '$studentId-$dateKey';
         final existingStatus = existingMap[compoundKey];
 
@@ -734,7 +737,7 @@ class AttendanceService {
     final deletes = <Map<String, String>>[];
 
     for (final record in records) {
-      final dateKey = record.date.toIso8601String().split('T')[0];
+      final dateKey = _dateKey(record.date);
       if (record.previousStatus == null) {
         deletes.add({'user_id': record.studentId, 'date': dateKey});
       } else {
@@ -763,6 +766,69 @@ class AttendanceService {
           .eq('user_id', delete['user_id']!)
           .eq('date', delete['date']!);
     }
+  }
+
+  Future<List<AttendanceSummary>> _buildSummariesFromUsers(List users) async {
+    if (users.isEmpty) return [];
+
+    final userIds = users
+        .map((u) => u['id']?.toString() ?? '')
+        .where((id) => id.isNotEmpty)
+        .toList();
+
+    if (userIds.isEmpty) return [];
+
+    final records = await _supabase
+        .from('attendance_records')
+        .select('user_id, status, date')
+        .inFilter('user_id', userIds)
+        .lte('date', _dateKey(_today));
+
+    final byUser = <String, List<Map<String, dynamic>>>{};
+    for (final raw in records as List) {
+      final map = Map<String, dynamic>.from(raw as Map);
+      final userId = map['user_id']?.toString() ?? '';
+      if (userId.isEmpty) continue;
+      byUser.putIfAbsent(userId, () => []).add(map);
+    }
+
+    final result = <AttendanceSummary>[];
+    for (final rawUser in users) {
+      final user = Map<String, dynamic>.from(rawUser as Map);
+      final id = user['id']?.toString() ?? '';
+      final userRecords = byUser[id] ?? const [];
+
+      int present = 0;
+      int absent = 0;
+      for (final rec in userRecords) {
+        final status = (rec['status'] ?? '').toString().toUpperCase();
+        if (status == 'PRESENT') present++;
+        if (status == 'ABSENT') absent++;
+      }
+
+      final total = present + absent;
+      final percentage = total == 0 ? 0.0 : (present / total) * 100;
+
+      result.add(
+        AttendanceSummary(
+          studentId: id,
+          email: user['email']?.toString() ?? '',
+          regNo: user['reg_no']?.toString() ?? '',
+          name: user['name']?.toString() ?? '',
+          teamId: user['team_id']?.toString(),
+          batch: user['batch']?.toString() ?? 'G1',
+          presentCount: present,
+          absentCount: absent,
+          totalWorkingDays: total,
+          attendancePercentage: double.parse(percentage.toStringAsFixed(1)),
+        ),
+      );
+    }
+
+    result.sort(
+      (a, b) => b.attendancePercentage.compareTo(a.attendancePercentage),
+    );
+    return result;
   }
 }
 
