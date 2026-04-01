@@ -196,22 +196,22 @@ def _new_portal_session(rollno: str, password: str) -> requests.Session:
     session = requests.Session()
     r = session.get(NEW_PORTAL_URL, headers=HEADERS, timeout=20)
     soup = BeautifulSoup(r.text, "html.parser")
-    
+
     # Extract CSRF token
     token_input = soup.find("input", {"name": "__RequestVerificationToken"})
     token = token_input["value"] if token_input else ""
-    
+
     payload = {
         "__RequestVerificationToken": token,
         "rollno": rollno,
         "password": password,
         "chkterms": "on",  # Terms checkbox
     }
-    
+
     # Post login
     login_response = session.post(NEW_PORTAL_URL, data=payload, headers=HEADERS, timeout=20, allow_redirects=True)
     log.info(f"[new_portal_login] Login response status={login_response.status_code}, final_url={login_response.url[:80]}")
-    
+
     return session
 
 
@@ -531,6 +531,47 @@ def _read_cgpa(rollno: str) -> dict | None:
     return result.data
 
 
+def _extract_ca_cards_from_text(text: str) -> list[dict]:
+    """Extract CA timetable entries from card-style page text.
+
+    Works even when all cards are flattened into one large text block.
+    """
+    compact = re.sub(r"\s+", " ", text).strip()
+    if not compact:
+        return []
+
+    pattern = re.compile(
+        r"Course\s*Code\s*[:\-]?\s*(?P<course_code>[A-Za-z0-9]+)\s*"
+        r"Course\s*Name\s*[:\-]?\s*(?P<course_name>.*?)\s*"
+        r"Test\s*Date\s*[:\-]?\s*(?P<test_date>(?:\d{1,2}/[A-Za-z]{3}/\d{2,4}|\d{1,2}/\d{1,2}/\d{2,4}|[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{2,4}))\s*"
+        r"Slot\s*No\s*[:\-]?\s*(?P<slot_no>[A-Za-z0-9]+)\s*"
+        r"Session\s*[:\-]?\s*(?P<session>.*?)(?=\s*Course\s*Code\s*[:\-]|$)",
+        re.IGNORECASE,
+    )
+
+    items: list[dict] = []
+    seen_keys: set[str] = set()
+    for m in pattern.finditer(compact):
+        session_value = m.group("session").strip()
+        session_value = re.sub(r"\s*\d+\s+Days?\s+Left\s*$", "", session_value, flags=re.IGNORECASE).strip()
+
+        item = {
+            "course_code": m.group("course_code").strip().upper(),
+            "course_name": m.group("course_name").strip(" :"),
+            "test_date": m.group("test_date").strip(),
+            "slot_no": m.group("slot_no").strip().upper(),
+            "session": session_value,
+        }
+
+        key = f"{item['course_code']}|{item['test_date']}|{item['slot_no']}"
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        items.append(item)
+
+    return items
+
+
 def _fetch_ca_timetable(session: requests.Session) -> list:
     """Scrape CA test timetable rows from PSG eCampus.
 
@@ -548,7 +589,6 @@ def _fetch_ca_timetable(session: requests.Session) -> list:
         or soup.find("table", {"id": "gvCATimeTable"})
         or soup.find("table", {"id": "DgCATimeTable"})
         or soup.find("table", {"id": "CATestTimeTable"})
-        or soup.find("table", {"class": "cssbody"})
     )
 
     if not table:
@@ -564,38 +604,20 @@ def _fetch_ca_timetable(session: requests.Session) -> list:
 
     if not table:
         log.info("[fetch_ca_timetable] No table found, checking for card layout...")
-        # Card layout (new portal UI): extract from blocks containing labels.
-        cards = []
+        # Card layout (new portal UI): extract from blocks containing labels,
+        # then fallback to full-page text extraction.
+        items: list[dict] = []
         for el in soup.find_all(["div", "section", "article"]):
             text = el.get_text(" ", strip=True)
             if not text:
                 continue
             lt = text.lower()
             if "course code" in lt and "test date" in lt:
-                cards.append(text)
-                log.info(f"[fetch_ca_timetable] Found card: {text[:150]}...")
+                items.extend(_extract_ca_cards_from_text(text))
 
-        def _extract(text: str, pattern: str) -> str:
-            m = re.search(pattern, text, re.IGNORECASE)
-            return m.group(1).strip() if m else ""
-
-        items: list[dict] = []
-        seen_keys: set[str] = set()  # Track unique exams
-        for t in cards:
-            item = {
-                "course_code": _extract(t, r"Course\s*Code\s*[:\-]?\s*([A-Z0-9]+)"),
-                "course_name": _extract(t, r"Course\s*Name\s*[:\-]?\s*([A-Za-z0-9 .,&()\-/]+?)\s*(?:Test Date|$)"),
-                "test_date": _extract(t, r"Test\s*Date\s*[:\-]?\s*([0-9]{1,2}/[A-Za-z]{3}/[0-9]{2,4}|[0-9]{1,2}/[0-9]{1,2}/[0-9]{2,4}|[A-Za-z]{3,9}\s+[0-9]{1,2},?\s+[0-9]{2,4})"),
-                "slot_no": _extract(t, r"Slot\s*No\s*[:\-]?\s*([A-Za-z0-9]+)"),
-                "session": _extract(t, r"Session\s*[:\-]?\s*([0-9:.\sAPMapm\-]+)"),
-            }
-            if any(v for v in item.values()):
-                # Create unique key to avoid duplicates
-                key = f"{item['course_code']}|{item['test_date']}|{item['slot_no']}"
-                if key not in seen_keys:
-                    seen_keys.add(key)
-                    items.append(item)
-                    log.info(f"[fetch_ca_timetable] Parsed card item: {item}")
+        if not items:
+            # Some versions render cards in one container; parse full-page text.
+            items = _extract_ca_cards_from_text(soup.get_text(" ", strip=True))
 
         log.info(f"[fetch_ca_timetable] Card layout: found {len(items)} items")
         return items  # may be empty if timetable not published
@@ -962,9 +984,11 @@ def _sync_single_rollno(rollno: str, password: str) -> tuple[dict, dict, dict, d
         log.warning(f"[sync] {rollno} – CA marks unavailable: {exc}")
         ca_data = {"subjects": [], "note": "CA marks page unavailable"}
 
-    # CA timetable – non-fatal as well
+    # CA timetable is currently served by the new portal endpoint.
+    # Use a fresh new-portal session to avoid missing exams.
     try:
-        tt_rows = _fetch_ca_timetable(session)
+        tt_session = _new_portal_session(rollno, password)
+        tt_rows = _fetch_ca_timetable(tt_session)
         tt_data = _parse_ca_timetable(tt_rows)
     except Exception as exc:
         log.warning(f"[sync] {rollno} – CA timetable unavailable: {exc}")
@@ -1102,6 +1126,16 @@ def sync_user(
                        "Please update your eCampus password in the app.",
             )
         raise HTTPException(status_code=502, detail=f"eCampus sync failed: {exc}")
+
+    # Keep the shared timetable up-to-date so all app users can view exams.
+    try:
+        if tt_data.get("rows"):
+            _upsert_global_ca_timetable(tt_data, synced_by=rollno)
+            log.info(f"[sync] {rollno} – global CA timetable updated ({len(tt_data.get('rows', []))} rows)")
+        else:
+            log.info(f"[sync] {rollno} – global CA timetable unchanged (no rows parsed)")
+    except Exception as exc:
+        log.warning(f"[sync] {rollno} – global CA timetable upsert failed (non-fatal): {exc}")
 
     log.info(f"[sync] {rollno} – data stored ✔")
 
@@ -1328,14 +1362,17 @@ def sync_all_users(
     # ── Refresh the shared CA timetable using the placement rep's session ──
     try:
         rep_rollno, rep_password = _get_placement_rep_rollno()
-        rep_session = _ecampus_session(rep_rollno, rep_password)
+        rep_session = _new_portal_session(rep_rollno, rep_password)
         tt_rows = _fetch_ca_timetable(rep_session)
         tt_data = _parse_ca_timetable(tt_rows)
-        _upsert_global_ca_timetable(tt_data, synced_by=rep_rollno)
-        log.info(
-            f"[sync-all] global CA timetable updated: "
-            f"{len(tt_data.get('rows', []))} entries (via {rep_rollno})"
-        )
+        if tt_data.get("rows"):
+            _upsert_global_ca_timetable(tt_data, synced_by=rep_rollno)
+            log.info(
+                f"[sync-all] global CA timetable updated: "
+                f"{len(tt_data.get('rows', []))} entries (via {rep_rollno})"
+            )
+        else:
+            log.info("[sync-all] global CA timetable unchanged (no rows parsed)")
     except Exception as exc:
         log.warning(f"[sync-all] global CA timetable update failed (non-fatal): {exc}")
 
