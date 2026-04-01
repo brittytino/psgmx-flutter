@@ -572,6 +572,26 @@ def _extract_ca_cards_from_text(text: str) -> list[dict]:
     return items
 
 
+def _dedupe_ca_items(items: list[dict]) -> list[dict]:
+    """Deduplicate parsed CA timetable items across repeated containers."""
+    unique: list[dict] = []
+    seen_keys: set[str] = set()
+
+    for item in items:
+        course_code = str(item.get("course_code") or "").strip().upper()
+        test_date = str(item.get("test_date") or "").strip().upper()
+        slot_no = str(item.get("slot_no") or "").strip().upper()
+        session = str(item.get("session") or "").strip().upper()
+
+        key = f"{course_code}|{test_date}|{slot_no}|{session}"
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        unique.append(item)
+
+    return unique
+
+
 def _fetch_ca_timetable(session: requests.Session) -> list:
     """Scrape CA test timetable rows from PSG eCampus.
 
@@ -619,6 +639,7 @@ def _fetch_ca_timetable(session: requests.Session) -> list:
             # Some versions render cards in one container; parse full-page text.
             items = _extract_ca_cards_from_text(soup.get_text(" ", strip=True))
 
+        items = _dedupe_ca_items(items)
         log.info(f"[fetch_ca_timetable] Card layout: found {len(items)} items")
         return items  # may be empty if timetable not published
 

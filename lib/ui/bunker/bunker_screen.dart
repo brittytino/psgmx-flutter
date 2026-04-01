@@ -3248,8 +3248,30 @@ class _CaTimetableSection extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
+    // Deduplicate rows first. Some timetable payloads may repeat the same
+    // card multiple times due to nested container extraction.
+    final uniqueRows = <Map<String, String>>[];
+    final seen = <String>{};
+    for (final row in timetable.rows) {
+      final code =
+          _pickField(row, const ['course_code', 'code', 'subject_code']) ?? '';
+      final date = _pickField(row, const ['test_date', 'date', 'exam_date']) ??
+          '';
+      final slot =
+          _pickField(row, const ['slot_no', 'slot', 'slot_number']) ?? '';
+      final session =
+          _pickField(row, const ['session', 'time', 'timings']) ?? '';
+
+      final key =
+          '${code.trim().toLowerCase()}|${date.trim().toLowerCase()}|${slot.trim().toLowerCase()}|${session.trim().toLowerCase()}';
+      if (key == '|||') continue;
+      if (seen.add(key)) {
+        uniqueRows.add(row);
+      }
+    }
+
     // Filter and sort rows: hide completed exams, show upcoming first
-    final sortedRows = timetable.rows.where((row) {
+    final sortedRows = uniqueRows.where((row) {
       final dateRaw =
           _pickField(row, const ['test_date', 'date', 'exam_date']) ?? '';
       final date = _parseCaDate(dateRaw);
