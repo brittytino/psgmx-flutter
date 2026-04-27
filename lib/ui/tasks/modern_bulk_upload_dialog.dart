@@ -35,7 +35,8 @@ class _ModernBulkUploadDialogState extends State<ModernBulkUploadDialog> {
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 color: colorScheme.primaryContainer.withValues(alpha: 0.3),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(24)),
               ),
               child: Row(
                 children: [
@@ -90,7 +91,7 @@ class _ModernBulkUploadDialogState extends State<ModernBulkUploadDialog> {
                   children: [
                     // Format Info Card
                     _FormatInfoCard(),
-                    
+
                     const SizedBox(height: 24),
 
                     // Download Template Button
@@ -161,13 +162,15 @@ class _ModernBulkUploadDialogState extends State<ModernBulkUploadDialog> {
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 color: colorScheme.surfaceContainerHighest,
-                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
+                borderRadius:
+                    const BorderRadius.vertical(bottom: Radius.circular(24)),
               ),
               child: Row(
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: _isUploading ? null : () => Navigator.pop(context),
+                      onPressed:
+                          _isUploading ? null : () => Navigator.pop(context),
                       child: const Text('Cancel'),
                     ),
                   ),
@@ -185,7 +188,8 @@ class _ModernBulkUploadDialogState extends State<ModernBulkUploadDialog> {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Icon(Icons.cloud_upload_outlined),
-                      label: Text(_isUploading ? 'Uploading...' : 'Upload Tasks'),
+                      label:
+                          Text(_isUploading ? 'Uploading...' : 'Upload Tasks'),
                     ),
                   ),
                 ],
@@ -223,7 +227,8 @@ class _ModernBulkUploadDialogState extends State<ModernBulkUploadDialog> {
     }
   }
 
-  void _showConfirmationDialog(BuildContext context, UserProvider userProvider) {
+  void _showConfirmationDialog(
+      BuildContext context, UserProvider userProvider) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -292,7 +297,7 @@ class _ModernBulkUploadDialogState extends State<ModernBulkUploadDialog> {
 
     try {
       final uploadService = TaskUploadService();
-      
+
       // Get file bytes from PlatformFile
       final fileBytes = _selectedFile!.bytes;
       if (fileBytes == null) {
@@ -319,8 +324,8 @@ class _ModernBulkUploadDialogState extends State<ModernBulkUploadDialog> {
           context,
           'Upload Completed with Errors',
           'Successfully uploaded ${result.successCount} tasks\n'
-          'Failed: ${result.errorCount}\n\n'
-          'Errors:\n${result.errors.join('\n')}',
+              'Failed: ${result.errorCount}\n\n'
+              'Errors:\n${result.errors.join('\n')}',
           isError: true,
         );
       } else {
@@ -357,7 +362,9 @@ class _ModernBulkUploadDialogState extends State<ModernBulkUploadDialog> {
         title: Row(
           children: [
             Icon(
-              isError ? Icons.warning_amber_rounded : Icons.check_circle_outline,
+              isError
+                  ? Icons.warning_amber_rounded
+                  : Icons.check_circle_outline,
               color: isError
                   ? Theme.of(context).colorScheme.error
                   : Theme.of(context).colorScheme.tertiary,
@@ -435,7 +442,13 @@ class _FormatInfoCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           const _FormatRow(
-            columns: ['Date', 'Leetcode Topic', 'Leetcode URL', 'Core CS Topic', 'Description'],
+            columns: [
+              'Date',
+              'Leetcode Topic',
+              'Leetcode URL',
+              'Core CS Topic',
+              'Description'
+            ],
           ),
           const SizedBox(height: 8),
           Text(
@@ -552,6 +565,7 @@ class _FilePickerArea extends StatelessWidget {
         type: FileType.custom,
         allowedExtensions: ['xlsx', 'xls'],
         allowMultiple: false,
+        withData: true,
       );
 
       if (result != null && result.files.isNotEmpty) {
@@ -653,7 +667,8 @@ class _InfoRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+        Icon(icon,
+            size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
         const SizedBox(width: 8),
         Text(
           label,
