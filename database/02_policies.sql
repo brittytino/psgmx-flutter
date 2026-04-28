@@ -170,11 +170,20 @@ CREATE POLICY "attendance_insert_placement_rep" ON attendance_records
     FOR INSERT TO authenticated
     WITH CHECK (is_placement_rep(auth.uid()) OR is_coordinator(auth.uid()));
 
--- Team leaders can UPDATE attendance they marked
+-- Team leaders can UPDATE attendance for their own team on scheduled dates
 DROP POLICY IF EXISTS "attendance_update_team_leader" ON attendance_records;
 CREATE POLICY "attendance_update_team_leader" ON attendance_records
     FOR UPDATE TO authenticated
-    USING (marked_by = auth.uid());
+    USING (
+        is_team_leader(auth.uid())
+        AND team_id = get_user_team(auth.uid())
+        AND is_date_scheduled(date)
+    )
+    WITH CHECK (
+        is_team_leader(auth.uid())
+        AND team_id = get_user_team(auth.uid())
+        AND is_date_scheduled(date)
+    );
 
 -- PLACEMENT REP: FULL UPDATE ACCESS (any attendance record)
 DROP POLICY IF EXISTS "attendance_update_placement_rep" ON attendance_records;
